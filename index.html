@@ -37,15 +37,22 @@ header{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px
 
 main{padding-top:14px;min-height:60vh}
 h2{font-size:17px;font-weight:800;margin:22px 0 10px;display:flex;justify-content:space-between;align-items:center}
-.b{background:var(--g);color:var(--m);border:0;border-radius:12px;padding:9px 14px;font-weight:600;cursor:pointer;transition:background .2s,transform .15s}
+.b{background:var(--g);color:var(--m);border:0;border-radius:12px;padding:9px 14px;font-weight:600;cursor:pointer;transition:background .2s,transform .15s; text-align:center;}
 .b:hover{background:var(--gh)}.b:active{transform:scale(.96)}.b2{background:transparent;color:var(--lk);border:1px solid var(--ac)}
+
+/* Banner */
 .ban{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
 .ban>div{flex:0 0 100%;scroll-snap-align:center;border-radius:20px;padding:22px;background:linear-gradient(135deg,var(--g),var(--card));color:var(--tx);border:1px solid var(--bd)}
 .ban h3{font-size:20px;color:var(--lk);margin-bottom:4px}.ban p{color:var(--mu);margin-bottom:12px;white-space:normal;word-break:break-word;}
+
+/* Categories */
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .ct{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px;display:flex;gap:12px;align-items:center;transition:border-color .2s}
 .ct:hover{border-color:var(--ac)}.ct:hover .tile{transform:scale(1.08) rotate(-4deg)}
-.ct small{color:var(--mu);display:block;font-size:11px}
+.ct > span:last-child { min-width: 0; flex: 1; text-align: start; }
+.ct b { display: block; font-size: 13px; line-height: 1.4; word-break: break-word; }
+
+/* Products */
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .shelf{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;scrollbar-width:none}
 .shelf .cd{flex:0 0 165px;scroll-snap-align:start}
@@ -61,20 +68,18 @@ h2{font-size:17px;font-weight:800;margin:22px 0 10px;display:flex;justify-conten
 .bd2 h3{font-size:13px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .st{color:#FBBF24;font-size:12px}.st small{color:var(--mu)}
 .pr{display:flex;align-items:baseline;gap:6px;margin-top:auto;font-size:16px}.pr s{color:var(--mu);font-size:11px}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
-.chip{border:1px solid var(--bd);background:var(--card);border-radius:99px;padding:3px 12px;font-size:12px;cursor:pointer}
-.chip.on{background:var(--g);color:var(--m);border-color:var(--ac)}
+
+/* Box / Generic */
 .box{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:12px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0}
 .q{display:inline-flex;align-items:center;gap:8px}.q button{width:28px;height:28px;border-radius:99px;border:1px solid var(--bd);background:var(--bg);cursor:pointer}
 .tot{font-size:18px;font-weight:800;border-top:1px solid var(--bd);margin-top:6px;padding-top:10px}
 .inp{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:8px 12px;flex:1;min-width:0}
-.ok{color:var(--lk)}.er{color:#ef4444}
 .emp{text-align:center;color:var(--mu);padding:40px 0}
 
 /* Bottom Nav */
-nav{position:fixed;bottom:0;inset-inline:0;background:var(--card);border-top:1px solid var(--bd);display:flex;justify-content:space-around;padding:6px 0 calc(env(safe-area-inset-bottom,0px) + 6px);z-index:20}
-nav a{display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--mu);position:relative;padding:2px 14px;border-radius:12px;flex:1;min-width:0;margin:0 3px}
+nav{position:fixed;bottom:0;inset-inline:0;background:var(--card);border-top:1px solid var(--bd);display:flex;justify-content:space-around;padding:6px 0 calc(env(safe-area-inset-bottom,0px) + 6px);z-index:30}
+nav a{display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--mu);position:relative;padding:4px 14px;border-radius:12px;flex:1;min-width:0;margin:0 3px; cursor:pointer; -webkit-tap-highlight-color: transparent;}
 nav a.on{color:var(--m);background:var(--g)}
 nav a svg{transition:transform .25s}nav a.on svg{transform:translateY(-1px) scale(1.12)}
 .cnt{position:absolute;top:0;inset-inline-end:calc(50% - 24px);background:var(--ac);color:var(--g);font:900 10px Urbanist;border-radius:99px;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center}
@@ -105,14 +110,16 @@ input[dir=ltr]{text-align:left}.b:disabled{opacity:.6;cursor:wait}
 .gallery .thumbs img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 2px solid transparent; cursor: pointer; flex: none; }
 .gallery .thumbs img.on { border-color: var(--ac); }
 
-/* Partner Banner */
-.pt { position: relative; overflow: hidden; flex-wrap: wrap; background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--g) 55%,var(--card))); border-color:var(--ac); }
+/* FIX: Partner Banner */
+.pt { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 10px; background: linear-gradient(135deg,var(--card),color-mix(in srgb,var(--g) 55%,var(--card))); border-color: var(--ac); padding: 16px; border-radius: 16px; margin-bottom: 12px; border: 1px solid var(--ac); }
 .pt-bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.4; z-index: 0; }
-.pt-content { position: relative; z-index: 1; display: flex; gap: 14px; align-items: center; width: 100%; }
-.pt .tile{width:56px;height:56px;border-radius:18px}
-.pc{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.pk{color:var(--lk);font-size:11px;font-weight:600}.pnm{font-size:18px}
-.pbtn{width:100%;display:flex;justify-content:center;align-items:center;gap:6px;margin-top:2px}
+.pt-content { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; width: 100%; }
+.pt .tile { width: 56px; height: 56px; border-radius: 18px; flex: none; }
+.pc { flex: 1 1 150px; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: start; }
+.pk { color: var(--lk); font-size: 11px; font-weight: 600; }
+.pnm { font-size: 18px; }
+.pd { color: var(--mu); font-size: 13px; line-height: 1.7; word-break: break-word; }
+.pbtn { flex: 1 0 100%; width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -176,7 +183,7 @@ return partner()+`<div class="ban">${BN.map(b=>`<div${b.img?` style="background:
 <div class="tiles" style="margin-top:14px">${C.map(c=>`<a class="ct" href="#/c/${c.id}"><span class="tile">${ico(c,20)}</span><span><b>${c[lang]}</b></span></a>`).join('')}</div>
 <h2>${t('all')}</h2>${grid(P)}`}
 
-const partner=()=>{const p=CFG.partner||{},A=lang=='ar';if(p.on===false||!p.url)return'';return `<a class="box pt" href="${ex(p.url)}" target="_blank" rel="noopener"><div class="pt-bg" style="${p.banner_bg_url?`background-image:url('${ex(p.banner_bg_url)}')`:''}"></div><div class="pt-content"><span class="tile big">${p.logo?`<img src="${ex(p.logo)}">`:ic('bank')}</span><span class="pc"><b class="n">${ex(p.name)}</b><span class="pd">${ex(A?p.ar:p.en)}</span></span><span class="b pbtn">${ex(A?p.ba:p.be)}</span></div></a>`};
+const partner=()=>{const p=CFG.partner||{},A=lang=='ar';if(p.on===false||!p.url)return'';return `<a class="pt" href="${ex(p.url)}" target="_blank" rel="noopener"><div class="pt-bg" style="${p.banner_bg_url?`background-image:url('${ex(p.banner_bg_url)}')`:''}"></div><div class="pt-content"><span class="tile big">${p.logo?`<img src="${ex(p.logo)}">`:ic('bank')}</span><span class="pc"><b class="n pnm">${ex(p.name)}</b><span class="pd">${ex(A?p.ar:p.en)}</span></span><span class="b pbtn">${ex(A?p.ba:p.be)}</span></div></a>`};
 const ico=(o,z)=>o.image_url?`<img src="${ex(o.image_url)}">`:ic(o.i||'box',z);
 
 function catPage(id){const c=cat(id);if(!c)return home();
@@ -265,7 +272,7 @@ const nz=x=>String(x).toLowerCase().replace(/[ً-ٟ]/g,'').replace(/[أإآ]/g,'
 const hit=(p,k)=>{const h=nz(p.ar+' '+p.en+' '+p.tg+' '+p.sp);return nz(k).split(/\s+/).filter(Boolean).every(w=>h.includes(w))};
 let q='';$('#q').addEventListener('input',e=>{q=e.target.value;if((location.hash||'#/')=='#/')render()});
 
-addEventListener('hashchange',()=>{fl={};scrollTo(0,0);render()});
+addEventListener('hashchange',()=>{scrollTo(0,0);render()});
 
 async function boot(){
   const u=localStorage.getItem('amx_user');if(u){try{user=JSON.parse(u)}catch{}}
