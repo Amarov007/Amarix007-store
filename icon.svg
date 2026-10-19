@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#2F442C"/>
+  <!-- logo scaled into the maskable safe zone (centre 60%) -->
+  <g transform="translate(106 106) scale(10)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.5 25.5L14 7L16.5 12" stroke="#A7E8BD" stroke-width="2.75"/>
+    <path d="M10 18.5H19" stroke="#52B788" stroke-width="2.25"/>
+    <path d="M16.5 12L20.5 18L26 8" stroke="#A7E8BD" stroke-width="2.75"/>
+    <circle cx="26" cy="8" r="1.75" fill="#A7E8BD" stroke="none"/>
+  </g>
+</svg>
