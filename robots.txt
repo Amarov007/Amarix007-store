@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+
+# ملاحظة / Note:
+# روابط المتجر على شكل #/ (مثل #/c/... و #/p/...) غير قابلة للفهرسة لأن محركات البحث تتجاهل ما بعد #.
+# نقل المتجر إلى مسارات حقيقية مؤجّل، ولذلك لا يوجد sitemap لهذه الروابط.
+# Hash routes (#/c/..., #/p/...) are not indexable (search engines ignore the fragment).
+# Moving them to real paths is postponed, so no sitemap is provided for them.
