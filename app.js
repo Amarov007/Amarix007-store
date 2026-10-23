@@ -323,6 +323,13 @@ const T = {
     music_off: "الموسيقى: إيقاف",
     /* storefront v17: guards, filters, pages, payment proof */
     ratenote: "تقييم يحدده المتجر",
+    soldn: "تم بيعه {n} مرة",
+    best: "الأكثر مبيعاً",
+    rv_rate: "قيّم المنتج:",
+    rv_done: "تقييمك:",
+    rv_comment: "أضف تعليقاً (اختياري)",
+    rv_ok: "شكراً على تقييمك",
+    rv_fail: "تعذّر إرسال التقييم",
     nores: "لا نتائج لـ",
     noresh: "جرّب كلمات أخرى أو تصفّح الأقسام.",
     clrq: "مسح البحث",
@@ -604,6 +611,13 @@ const T = {
     music_off: "Music: off",
     /* storefront v17: guards, filters, pages, payment proof */
     ratenote: "Rating set by the store",
+    soldn: "Sold {n} times",
+    best: "Best seller",
+    rv_rate: "Rate this product:",
+    rv_done: "Your rating:",
+    rv_comment: "Add a comment (optional)",
+    rv_ok: "Thanks for your rating",
+    rv_fail: "Couldn't send the rating",
     nores: "No results for",
     noresh: "Try other words or browse the categories.",
     clrq: "Clear search",
@@ -739,6 +753,11 @@ let lang = ls.get("lang", "ar");
 let cur = ls.get("cur3", "SYP"); // Syrian pound by default (new key so older saved choices, e.g. SAR/AED/EUR, do not override it)
 let th = ls.get("th2", "light"); // light by default
 let cart = ls.json("cart", []);
+let STATS = {}; // product_stats(): { id: { s: sold, rc: reviews, ra: avg } }
+let MYREV = {}; // my submitted reviews: "orderId|productId" -> rating
+let cartSyncT = 0,
+  cartSyncLast = "";
+const viewed = new Set();
 let fav = ls.json("fav", []);
 let coupon = ls.get("amx_coupon", "");
 let payMethod = ls.get("amx_pay", ""); // chosen payment method id
@@ -984,10 +1003,19 @@ function convRow(total) {
 function emptyBox(icon, title, hint, extra) {
   return `<div class="emp">${ic(icon, 40)}<br><b>${title}</b>${hint ? `<br><small>${hint}</small>` : ""}${extra ? `<br><br>${extra}` : ""}</div>`;
 }
-const ratingHtml = (p) =>
-  +p.n > 0
-    ? `<div class="rt">★ ${(+p.r || 0).toFixed(1)} <small>(${ex(p.n)})</small></div><div class="rt-n">${t("ratenote")}</div>`
-    : "";
+const ratingHtml = (p) => {
+  const st = STATS[p.id],
+    real = st && +st.rc > 0,
+    r = real ? +st.ra : +p.r || 0,
+    n = real ? +st.rc : +p.n || 0;
+  const stars =
+    n > 0
+      ? `<div class="rt">★ ${r.toFixed(1)} <small>(${ex(n)})</small></div>${real ? "" : `<div class="rt-n">${t("ratenote")}</div>`}`
+      : "";
+  const sold = st && +st.s > 0 ? `<div class="rt-n sold">${ex(t("soldn").replace("{n}", st.s))}</div>` : "";
+  const best = +p.bs > 0 && +p.bs <= 3 && st && +st.s > 0 ? `<span class="best">${t("best")}</span>` : ""; // only with real paid sales
+  return stars + sold + best;
+};
 
 /* ---- category filters & sorting ---- */
 const FS = {};
@@ -1090,6 +1118,7 @@ function flagLink(l) {
 }
 
 function save() {
+  cartSync();
   ls.set("cart", cart);
   ls.set("fav", fav);
   ls.set("lang", lang);
@@ -1223,6 +1252,7 @@ function storeSession(j) {
     ls.set("amx_user", j.user);
     user = j.user;
     setTimeout(pushSync, 0);
+    setTimeout(cartSync, 0);
   }
 }
 function clearSession() {
@@ -1270,6 +1300,91 @@ async function sb(path, { method = "GET", body, auth = true, prefer } = {}) {
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+/* ---------- Store stats, product views, cart sync, reviews (server functions already in the database) ---------- */
+async function loadStats() {
+  try {
+    const r = await sb("/rest/v1/rpc/product_stats", { method: "POST", body: {}, auth: false });
+    if (!r.ok) return false;
+    const d = await r.json();
+    if (d && typeof d == "object" && !Array.isArray(d)) {
+      const same = JSON.stringify(d) === JSON.stringify(STATS);
+      STATS = d;
+      return !same;
+    }
+  } catch {}
+  return false;
+}
+function trackView() {
+  try {
+    const m = location.hash.match(/^#\/p\/([^/?]+)/);
+    if (!m) return;
+    const id = decodeURIComponent(m[1]);
+    if (viewed.has(id)) return;
+    viewed.add(id);
+    sb("/rest/v1/rpc/track_view", { method: "POST", body: { p_product: id }, auth: false }).catch(() => {});
+  } catch {}
+}
+/* Saves the signed-in user's cart on the server (debounced) so the hourly job can send an abandoned-cart reminder */
+function cartSync() {
+  clearTimeout(cartSyncT);
+  cartSyncT = setTimeout(async () => {
+    try {
+      if (!user || !ls.get("amx_token")) return;
+      const items = cart.filter((x) => x && x.id && x.q > 0).map((x) => ({ id: x.id, q: x.q }));
+      const key = JSON.stringify(items);
+      if (key === cartSyncLast) return;
+      const r = await sb("/rest/v1/rpc/save_cart", { method: "POST", body: { p_items: items, p_lang: lang } });
+      if (r.ok) cartSyncLast = key;
+    } catch {}
+  }, 3000);
+}
+async function loadMyReviews() {
+  try {
+    const r = await sb("/rest/v1/rpc/my_reviews", { method: "POST", body: {} });
+    if (!r.ok) return;
+    const d = await r.json();
+    MYREV = {};
+    (Array.isArray(d) ? d : []).forEach((x) => (MYREV[x.o + "|" + x.p] = +x.r));
+  } catch {}
+}
+function rateRow(o, i, st) {
+  if (st != "done" || !i || !i.id) return "";
+  const mine = MYREV[o.id + "|" + i.id];
+  if (mine) return `<div class="rv-row"><small>${t("rv_done")} ${"★".repeat(mine)}</small></div>`;
+  return `<div class="rv-row"><small>${t("rv_rate")}</small> ${[1, 2, 3, 4, 5]
+    .map((v) => `<button class="rv-s" data-a="rate" data-o="${ex(o.id)}" data-p="${ex(i.id)}" data-v="${v}" aria-label="${v}">★</button>`)
+    .join("")}</div>`;
+}
+async function rateItem(b) {
+  const o = b.dataset.o,
+    pid = b.dataset.p,
+    v = +b.dataset.v;
+  if (!(v >= 1 && v <= 5)) return;
+  let c = "";
+  try {
+    c = prompt(t("rv_comment"), "");
+  } catch {}
+  if (c === null) return; // cancelled
+  setBusy(b, true);
+  try {
+    const r = await sb("/rest/v1/rpc/submit_review", {
+      method: "POST",
+      body: { p_order: o, p_product: pid, p_rating: v, p_comment: (c || "").slice(0, 500) },
+    });
+    if (r.ok) {
+      MYREV[o + "|" + pid] = v;
+      toast(t("rv_ok"));
+      await loadStats();
+      render();
+      return;
+    }
+    toast(t("rv_fail"), "er");
+  } catch {
+    toast(t("rv_fail"), "er");
+  }
+  setBusy(b, false);
 }
 
 /* ---------- 7. Cart, coupon & totals ---------- */
@@ -2364,7 +2479,7 @@ function ordersHTML(rows) {
         const total = `<bdi dir="ltr">${( (o.total * R[cur][0]) / R[cur0][0] ).toFixed(2)} ${ex(R[cur][1])}</bdi>`;
         const m = o.payment_method ? pmOf(o.payment_method) : null;
         const canClaim = pay == "pending" && st != "cancelled";
-        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } <details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
+        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } <details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
       })
       .join("")
   );
@@ -2383,6 +2498,7 @@ async function ordersPage(seq) {
     }
     if (!r.ok) throw new Error(await r.text());
     const rows = await r.json();
+    await loadMyReviews();
     if (seq === routeSeq) {
       $("#m").innerHTML = ordersHTML(rows);
       decorate();
@@ -2887,6 +3003,7 @@ document.addEventListener("click", async (e) => {
     $("#q").value = "";
     render();
   } else if (a == "claim") claimPayment(b, id);
+  else if (a == "rate") rateItem(b);
   else if (a == "wa-contact") openWhatsApp(`${t("hi")}\n${t("ordno")}: ${id}`);
   else if (a == "copy") {
     const ok = await copyText(b.dataset.v);
@@ -3792,6 +3909,7 @@ function render() {
 addEventListener("hashchange", () => {
   scrollTo(0, 0);
   render();
+  trackView();
 });
 
 /* Section strip: mouse drag, vertical wheel -> horizontal scroll, edge fades; press ripple and pointer spotlight on section cards */
@@ -4029,7 +4147,12 @@ async function boot() {
     head();
     render();
   } // first paint (no cache) or a newer published version
-  if (user) syncProfile();
+  loadStats().then((ch) => ch && render());
+  trackView();
+  if (user) {
+    syncProfile();
+    cartSync();
+  }
   pushSync();
   if (coupon && !cpOf(coupon)) checkCoupon(coupon).then((ok) => ok && render());
 }

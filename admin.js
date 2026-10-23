@@ -149,6 +149,7 @@ const TABS = [
   ["apis", "إعدادات APIs"],
   ["affiliates", "المسوقين"],
   ["orders", "الطلبات"],
+  ["stats", "الإحصاءات"],
   ["tickets", "تذاكر الدعم"],
   ["push", "إشعار للجميع"],
 ];
@@ -501,6 +502,12 @@ const VIEW = {
 <div class="fl" style="margin-top:10px"><button type="button" class="b b2" data-a="push-test">إرسال تجريبي لي فقط</button><button type="button" class="b" data-a="push-send">إرسال للجميع</button></div></div>
 <div class="card"><h2>آخر الإشعارات المرسلة <button type="button" class="b b2 sm" data-a="reload-push">تحديث</button></h2><div id="bch">${loadingHTML}</div></div>`;
   },
+  stats() {
+    setTimeout(loadAdminStats, 50);
+    return `<div class="card"><h2>الإحصاءات <small class="od-m" id="stc"></small></h2><div class="fl">${[7, 30, 90]
+      .map((d) => `<button type="button" class="b ${d == STATS_DAYS ? "" : "b2"} sm" data-a="stats-${d}">${d} يوم</button>`)
+      .join("")}<button type="button" class="b b2 sm" data-a="reload-stats">تحديث</button></div></div><div id="stb">${loadingHTML}</div>`;
+  },
   tickets() {
     setTimeout(loadTickets, 50);
     return `<div class="card"><h2>تذاكر الدعم <small class="od-m" id="tkc"></small></h2><p class="hint">تصل التذكرة هنا فور إرسالها من المتجر، ويصلك إشعار على تلغرام (من إعدادات notify_settings). ردّك يظهر للزبون في صفحة «تذاكر الدعم» ويصله أيضاً على بريده الإلكتروني (يتطلب ضبط البريد في notify_settings). يقيّم الزبون ردّك بـ«تم الحل» أو «لم تُحل»؛ «لم تُحل» تعيد التذكرة إلى «مفتوحة».</p> <div class="fl"><select class="inp" id="tkf"><option value="">كل الحالات</option>${TK_ST.map(([k, n]) => `<option value="${k}" ${tkFilter == k ? "selected" : ""}>${n}</option>`).join("")}<option value="unres" ${tkFilter == "unres" ? "selected" : ""}>تقييم سلبي (لم تُحل)</option></select> <input class="inp" id="tkq" placeholder="بحث: رقم / اسم / بريد / طلب / نص" value="${esc(tkQ)}"><button class="b b2 sm" data-a="reload-tickets">تحديث</button></div> <div id="tkb">${loadingHTML}</div></div>`;
@@ -762,6 +769,11 @@ document.addEventListener("click", (e) => {
   if (a == "exp") return exportBackup();
   if (a == "reload-orders") return loadOrders();
   if (a == "reload-tickets") return loadTickets();
+  if (a == "reload-stats") return loadAdminStats();
+  if (/^stats-\d+$/.test(a)) {
+    STATS_DAYS = +a.slice(6);
+    return render();
+  }
   if (a == "reload-push") return loadPush();
   if (a == "bc-tpl") return fillPushTpl(+d.i);
   if (a == "push-test" || a == "push-send") return sendBroadcast(b, a);
@@ -1418,6 +1430,58 @@ const TK_ST = [
 let TICKETS = null,
   tkFilter = "open",
   tkQ = "";
+/* ---------- Store statistics (server functions admin_stats / admin_product_stats) ---------- */
+let STATS_DAYS = 30;
+const fnum = (v, d = 0) => Number(v || 0).toLocaleString("en", { maximumFractionDigits: d, minimumFractionDigits: d });
+async function loadAdminStats() {
+  const h = $("#stb");
+  if (!h) return;
+  h.innerHTML = loadingHTML;
+  try {
+    const body = JSON.stringify({ p_days: STATS_DAYS }),
+      hd = { "Content-Type": "application/json" };
+    const [r1, r2] = await Promise.all([
+      api("/rest/v1/rpc/admin_stats", { method: "POST", headers: hd, body }),
+      api("/rest/v1/rpc/admin_product_stats", { method: "POST", headers: hd, body }),
+    ]);
+    if (!r1.ok) throw new Error(await r1.text());
+    const a = await r1.json(),
+      b = r2.ok ? await r2.json() : null;
+    const days = a.by_day || [],
+      mx = Math.max(1, ...days.map((x) => +x.rev || 0));
+    const conv = b && b.views > 0 ? ((b.paid_orders * 100) / b.views).toFixed(1) + "%" : "—";
+    const tile = (n, l) => `<div class="card" style="flex:1;min-width:130px;text-align:center"><b style="font-size:22px">${n}</b><div class="od-m">${l}</div></div>`;
+    const f = a.funnel || {},
+      rv = a.reviews || {};
+    h.innerHTML =
+      `<div class="fl" style="flex-wrap:wrap">${tile(fnum(a.revenue, 2), "الإيرادات المدفوعة")}${tile(fnum(a.paid_orders) + " / " + fnum(a.orders), "طلبات مدفوعة / كل الطلبات")}${tile(b ? fnum(b.views) : "—", "مشاهدات المنتجات")}${tile(conv, "معدل التحويل (مدفوع ÷ مشاهدات)")}</div>` +
+      `<div class="card"><h3>المبيعات اليومية</h3>${
+        days.length
+          ? days
+              .map((x) => `<div class="fl" style="align-items:center;gap:8px"><small dir="ltr" style="width:78px">${esc(String(x.d).slice(5))}</small><div style="flex:1;background:var(--bg);border-radius:6px;overflow:hidden"><div style="height:12px;width:${Math.max(2, ((+x.rev || 0) / mx) * 100)}%;background:var(--ac,#52B788)"></div></div><small dir="ltr" style="width:90px;text-align:end">${fnum(x.rev, 2)} · ${fnum(x.n)}</small></div>`)
+              .join("")
+          : '<p class="hint">لا توجد طلبات في هذه الفترة.</p>'
+      }</div>` +
+      `<div class="card"><h3>الأكثر ربحاً</h3>${
+        (a.top || []).length
+          ? a.top.map((x) => `<div class="od-m">• ${esc(x.name || x.id)} — ${fnum(x.qty)} وحدة · ${fnum(x.rev, 2)}</div>`).join("")
+          : '<p class="hint">لا توجد مبيعات مدفوعة بعد.</p>'
+      }</div>` +
+      (b
+        ? `<div class="card"><h3>المشاهدات مقابل الشراء</h3>${
+            (b.rows || []).length
+              ? b.rows.slice(0, 15).map((x) => `<div class="od-m">• ${esc(x.name)} — ${fnum(x.views)} مشاهدة · ${fnum(x.orders)} طلب · تحويل ${x.conv == null ? "—" : x.conv + "%"}</div>`).join("")
+              : '<p class="hint">لا توجد مشاهدات مسجلة بعد (تُسجَّل عند فتح صفحة منتج).</p>'
+          }</div><div class="card"><h3>السلات المتروكة</h3><div class="od-m">بانتظار التذكير: ${fnum(b.carts_waiting)} · تم تذكيرها: ${fnum(b.carts_reminded)}</div></div>`
+        : "") +
+      `<div class="card"><h3>القمع والتقييمات</h3><div class="od-m">نقرات الإحالة: ${fnum(f.ref_clicks)} · مسجّلون: ${fnum(f.signups)} · مشترون: ${fnum(f.buyers)} · دفعوا: ${fnum(f.paid_buyers)}</div><div class="od-m">التقييمات: ${fnum(rv.count)}${rv.avg ? " · المتوسط " + rv.avg : ""} · طلبات سحب بانتظار المعالجة: ${fnum(a.pending_payouts)}</div></div>`;
+    const c = $("#stc");
+    if (c) c.textContent = "آخر " + a.days + " يوماً";
+  } catch (e) {
+    h.innerHTML = '<p class="hint warn">تعذّر تحميل الإحصاءات — ' + esc((e.message || "").slice(0, 120)) + "</p>";
+  }
+}
+
 async function loadTickets() {
   const b = $("#tkb");
   if (!b) return;

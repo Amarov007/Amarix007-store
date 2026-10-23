@@ -3366,3 +3366,11 @@ body.gate #nv,body.gate .sr,body.gate .menu-b,body.gate .sub-nav,body.gate #sup{
 /* background music button (music.js) */
 .ib.mus { color: var(--mu); }
 .ib.mus.on { color: var(--ac); border-color: var(--ac); }
+
+/* ---- real ratings, sold counter, best-seller chip, order review stars ---- */
+.rt-n.sold { color: var(--ac, #52B788); font-weight: 700; }
+.best { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; background: #F0B90B22; color: #B7860B; border: 1px solid #F0B90B66; }
+.rv-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 4px 0 8px; }
+.rv-s { background: none; border: 0; padding: 2px 4px; font-size: 22px; line-height: 1; cursor: pointer; color: #C9CFCB; transition: transform .12s, color .12s; }
+.rv-s:hover, .rv-s:focus-visible { color: #F0B90B; transform: scale(1.15); }
+.rv-s:disabled { opacity: .5; }
