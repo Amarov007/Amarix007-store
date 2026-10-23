@@ -24,7 +24,7 @@ window.AMX={
   "banner_bg_url": ""
  },
  "social": {
-  "whatsapp": ["wa", "https://wa.me/966500000000"],
+  "whatsapp": ["wa", ""],
   "telegram": ["tg", "https://t.me/amarix007"],
   "instagram": ["ig", "https://instagram.com/amarix007"],
   "x": ["xx", "https://x.com/amarix007"],
@@ -70,16 +70,14 @@ window.AMX={
    "free": []}
  ],
  "products": [
-  {"id": "boost_ig_followers_1k", "c": "boost", "ar": "زيادة 1000 متابع إنستغرام (جودة عالية)", "en": "Instagram 1,000 Followers (High Quality)", "p": 35, "o": 50, "r": 4.7, "n": 312, "bs": 3, "d": 0, "t": 3, "tg": "Instagram متابعين", "sp": "Instagram · 1,000", "img": "", "images": [], "ds": {"ar": "سعر تجريبي، عدّله من لوحة الإدارة.", "en": "Sample price, edit it from the admin panel."}},
+  {"id": "boost_ig_followers_1k", "c": "boost", "ar": "زيادة 1000 متابع إنستغرام (جودة عالية)", "en": "Instagram 1,000 Followers (High Quality)", "p": 35, "o": 50, "r": 4.7, "n": 312, "bs": 3, "d": 0, "t": 3, "tg": "Instagram متابعين", "sp": "Instagram · 1,000", "img": "", "images": []},
   {"id": "bot_scalper_01", "c": "bots", "ar": "روبوت التداول الآلي AMARIX Trend Scalper Pro (MT5)", "en": "AMARIX Trend Scalper Pro Trading Bot (MT5)", "p": 890, "o": 1450, "r": 4.95, "n": 247, "bs": 1, "d": 38, "t": 2, "tg": "MetaTrader 5 العملات Forex", "sp": "MT5 · Forex", "img": "", "images": []},
-  {"id": "num_wa_us_1", "c": "numbers", "ar": "رقم واتساب أمريكا (تفعيل مرة واحدة)", "en": "WhatsApp USA number (single activation)", "p": 1.5, "o": 0, "r": 5, "n": 0, "bs": 0, "d": 0, "t": 1, "tg": "WhatsApp أمريكا", "sp": "WhatsApp · USA", "img": "", "images": [], "ds": {"ar": "سعر تجريبي، عدّله من لوحة الإدارة. يُسلَّم الرقم بعد تحقق الفريق من الدفع.", "en": "Sample price, edit it from the admin panel. The number is delivered after payment is verified."}}
+  {"id": "num_wa_us_1", "c": "numbers", "ar": "رقم واتساب أمريكا (تفعيل مرة واحدة)", "en": "WhatsApp USA number (single activation)", "p": 1.5, "o": 0, "r": 5, "n": 0, "bs": 0, "d": 0, "t": 1, "tg": "WhatsApp أمريكا", "sp": "WhatsApp · USA", "img": "", "images": []}
  ],
- "embeds": [
-  {"id": "e_example", "c": "bonus", "ar": "مثال: بونص مجاني", "en": "Example: free bonus", "da": "ضع هنا رابط الموقع.", "de": "Put the link here.", "u": "https://example.com", "h": 420}
- ],
+ "embeds": [],
  "banners": [
   {"ar": "عروض التوفير الكبرى من AMARIX007", "en": "Big savings from AMARIX007", "sa": "خصومات حقيقية تصل إلى 38%", "se": "Real discounts up to 38%", "h": "#/", "img": ""}
  ],
- "coupons": {"AMARIX10": [10, 0]},
+ "coupons": {},
  "rates": {"USD": [1, "USDT"], "SYP": [140, "ل.س"]}
 };

@@ -1,4 +1,4 @@
-/* ===================================================================== AMARIX007 — Storefront logic (app.js) --------------------------------------------------------------------- Sections 1. Config & security notes 9. Views (pages) 2. Icons & brand logos 10. Orders, payments & tracking 3. Translations 11. AI support chat 4. State & storage 12. Actions (clicks) & sounds 5. Helpers (toast, loading) 13. Auth (login, signup, recovery, human check) 6. Supabase client 14. Search & router 7. Cart, coupon & totals 15. Boot 8. Sound effects SECURITY NOTES - This file uses ONLY the Supabase *anon* key. It is public by design; it is safe only because Row Level Security (RLS) is enabled. Never put a service_role key, payment secret or API secret here. - RLS must be ON for these tables (see supabase-schema.sql): orders -> a user can INSERT/SELECT only rows where user_id = auth.uid(); only admins can UPDATE. store_config -> SELECT for everyone, INSERT/UPDATE for admins only. profiles -> a user can read/update only their own row. api_settings -> admins only. NEVER readable by anon (it holds secret keys, so the storefront does not fetch it). - SMM-panel and AI-provider keys are used only by Supabase Edge Functions (supabase/functions/*), never by this file. - The "human check" is a client-side deterrent. For real bot protection enable CAPTCHA (e.g. Cloudflare Turnstile) in Supabase > Auth. - Prices are computed in the browser for display. For a real payment flow, re-calculate the total on the server (trigger / Edge Function). ===================================================================== */
+/* ===================================================================== AMARIX007 — Storefront logic (app.js) --------------------------------------------------------------------- Sections 1. Config & security notes 9. Views (pages) 2. Icons & brand logos 10. Orders, payments & tracking 3. Translations 11. AI support chat 4. State & storage 12. Actions (clicks) & sounds 5. Helpers (toast, loading) 13. Auth (login, signup, recovery, human check) 6. Supabase client 14. Search & router 7. Cart, coupon & totals 15. Boot 8. Sound effects SECURITY NOTES - This file uses ONLY the Supabase *anon* key. It is public by design; it is safe only because Row Level Security (RLS) is enabled. Never put a service_role key, payment secret or API secret here. - RLS must be ON for these tables (see supabase-schema.sql): orders -> a user can INSERT/SELECT only rows where user_id = auth.uid(); only admins can UPDATE. store_config -> SELECT for admins only (the storefront reads public_config(), which hides secret coupons); INSERT/UPDATE for admins only. profiles -> a user can read/update only their own row. api_settings -> admins only. NEVER readable by anon (it holds secret keys, so the storefront does not fetch it). - SMM-panel and AI-provider keys are used only by Supabase Edge Functions (supabase/functions/*), never by this file. - The built-in "human check" is a client-side deterrent. For real bot protection set TURNSTILE_SITE_KEY (section 13) and enable CAPTCHA in Supabase > Auth. - Prices shown in the browser are for display only: the orders_enforce_pricing trigger recomputes every order total on the server. ===================================================================== */
 "use strict";
 
 /* ---------- 1. Config ---------- */
@@ -378,6 +378,15 @@ const T = {
     po_man_t: "الدفع اليدوي",
     po_man: "الدفع يدوي: تحوّل المبلغ إلى الحساب الظاهر للوسيلة التي اخترتها ثم تضغط «تم الدفع»، ويتحقق الفريق منه يدوياً قبل التنفيذ.",
     po_risk_t: "تحذير مخاطر التداول",
+    po_prv_t: "الخصوصية",
+    po_prv: "نجمع الاسم والبريد وبيانات الطلبات وإثباتات الدفع لتنفيذ طلباتك والتواصل معك فقط، ولا نبيعها لأي طرف. تُخزَّن البيانات لدى مزوّد قواعد البيانات الذي نستخدمه، وتُرسَل الإشعارات عبر خدمة الإشعارات في متصفحك. يمكنك طلب حذف حسابك وبياناتك بالتواصل معنا.",
+    po_trm_t: "الشروط والمسؤولية",
+    po_trm: "أنت المسؤول عن استخدام ما تشتريه بما يوافق شروط المنصات وشركات التمويل والجهات المنظِّمة في بلدك، وقد تتغير سياسات هذه الأطراف خارج سيطرتنا. لا نضمن أي أرباح أو نتائج. باستخدامك المتجر فأنت توافق على هذه الشروط.",
+    pg_t: "فعّل الإشعارات للمتابعة",
+    pg_d: "نحتاج الإشعارات لنُعلمك فور تأكيد الدفع وتسليم طلبك وردود الدعم. اضغط «تفعيل الإشعارات» ثم اختر «السماح».",
+    pg_btn: "تفعيل الإشعارات",
+    pg_blk: "الإشعارات محظورة لهذا الموقع. افتح إعدادات المتصفح ← إعدادات الموقع ← الإشعارات ← اختر «السماح»، ثم اضغط «تحقّق مجدداً».",
+    pg_re: "تحقّق مجدداً",
     proof: "إثبات الدفع",
     proofhint: "ارفع صورة إيصال التحويل (JPG أو PNG أو WebP). لا يمكن الضغط على «تم الدفع» قبل رفع الإثبات.",
     proofreq: "مطلوب",
@@ -648,6 +657,15 @@ const T = {
     po_man_t: "Manual payment",
     po_man: "Payment is manual: you transfer the amount to the account shown for the method you chose, then tap “I have paid”, and the team verifies it manually before fulfilling the order.",
     po_risk_t: "Trading risk warning",
+    po_prv_t: "Privacy",
+    po_prv: "We collect your name, email, order data and payment proofs only to fulfil your orders and contact you, and we never sell them. Data is stored with our database provider, and notifications are delivered through your browser's push service. You can ask us to delete your account and data by contacting us.",
+    po_trm_t: "Terms and responsibility",
+    po_trm: "You are responsible for using what you buy in line with the terms of the platforms, funding firms and regulators that apply to you; their policies may change outside our control. We do not guarantee any profit or result. By using the store you accept these terms.",
+    pg_t: "Turn on notifications to continue",
+    pg_d: "We need notifications to tell you the moment your payment is confirmed, your order is delivered, or support replies. Tap “Enable notifications”, then choose “Allow”.",
+    pg_btn: "Enable notifications",
+    pg_blk: "Notifications are blocked for this site. Open browser settings → Site settings → Notifications → choose “Allow”, then tap “Check again”.",
+    pg_re: "Check again",
     proof: "Payment proof",
     proofhint: "Upload a photo of the transfer receipt (JPG, PNG or WebP). “I have paid” stays locked until the proof is uploaded.",
     proofreq: "Required",
@@ -727,6 +745,7 @@ let lastOrder = null; // info for the success page
 let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
+const PUBLIC_ROUTES = ["login", "policies", "faq"]; // reachable without an account
 let authMode = "login"; // login | signup | forgot | reset | check
 let checkKind = "signup"; // what the "check your email" page is about: signup | recover
 let pendingEmail = "";
@@ -1040,12 +1059,6 @@ function clearFilters(id) {
   FS[id] = { sel: {}, sort: fstate(id).sort };
   render();
 }
-function couponLine() {
-  const keys = Object.keys(CP || {}).filter((k) => Array.isArray(CP[k]));
-  if (!keys.length || cpOf(coupon)) return "";
-  const code = keys.length == 1 ? `<b class="cpn-code" dir="ltr">${ex(keys[0])}</b>` : "";
-  return `<a class="cpn-line" href="#/cart">${ic("gift", 16)} <span>${t("cpnline")}${code ? ":" : ""}</span>${code}</a>`;
-}
 function searchPage() {
   const a = P.filter((p) => hit(p, q));
   return (
@@ -1154,13 +1167,13 @@ function socialLink([code, url, logo], label) {
   const href = safeUrl(url);
   if (!href) return "";
   const b = BR[code] || BR.mail;
-  const inner = logo ? `<img src="${ex(logo)}" alt="">` : brandSvg(b.g, 22);
+  const inner = logo ? `<img src="${ex(logo)}" alt="" loading="lazy" decoding="async">` : brandSvg(b.g, 22);
   return `<a class="sl" style="background:${logo ? "#fff" : b.bg}" href="${ex( href )}" target="_blank" rel="noopener" aria-label="${ex( label || code )}">${inner}</a>`;
 }
 function payLogo(m, size = 44) {
   const st = `width:${size}px;height:${size}px`;
   if (m.logo)
-    return `<span class="pl" style="${st};background:#fff"><img src="${ex( m.logo )}" alt=""></span>`;
+    return `<span class="pl" style="${st};background:#fff"><img src="${ex( m.logo )}" alt="" loading="lazy" decoding="async"></span>`;
   const g = PAYG[m.icon];
   if (g)
     return `<span class="pl" style="${st};background:${g.bg};color:${ g.fg }"><svg viewBox="1.5 1.5 21 21" width="${size * 0.66}" height="${ size * 0.66 }" fill="currentColor" aria-hidden="true">${g.g}</svg></span>`;
@@ -1727,7 +1740,7 @@ function partner(sm) {
   const bg = p.banner_bg_url
     ? `<div class="pt-bg" style="background-image:url('${ex( p.banner_bg_url )}')"></div>`
     : "";
-  return `<a class="pt${sm ? " sm" : ""}" href="${ex( safeUrl(p.url) )}" target="_blank" rel="noopener">${bg} <div class="pt-in"> <span class="pt-logo">${ p.logo ? `<img src="${ex(p.logo)}" alt="">` : ic("bank", 26) }</span> <span class="pt-tx"><span class="pt-badge">${ic("shield", 12)} ${ A ? "شريك رسمي" : "Official partner" }</span> <b class="pt-nm">${ex(p.name)}</b><span class="pt-d">${ex( A ? p.ar : p.en )}</span></span> <span class="pt-cta">${ex(A ? p.ba : p.be)} ${ic("ext", 15)}</span> </div></a>`;
+  return `<a class="pt${sm ? " sm" : ""}" href="${ex( safeUrl(p.url) )}" target="_blank" rel="noopener">${bg} <div class="pt-in"> <span class="pt-logo">${ p.logo ? `<img src="${ex(p.logo)}" alt="" loading="lazy" decoding="async">` : ic("bank", 26) }</span> <span class="pt-tx"><span class="pt-badge">${ic("shield", 12)} ${ A ? "شريك رسمي" : "Official partner" }</span> <b class="pt-nm">${ex(p.name)}</b><span class="pt-d">${ex( A ? p.ar : p.en )}</span></span> <span class="pt-cta">${ex(A ? p.ba : p.be)} ${ic("ext", 15)}</span> </div></a>`;
 }
 function paymentsSection() {
   if (!PM.length) return "";
@@ -1737,7 +1750,7 @@ function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
   if (q) return searchPage();
   return (
-    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + couponLine() + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="#/c/${ex(c.id)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> <h2>${t("all")}</h2>${grid(P)}`
+    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="#/c/${ex(c.id)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> <h2>${t("all")}</h2>${grid(P)}`
   );
 }
 
@@ -1817,7 +1830,7 @@ function numFree(c) {
   return `${warn}<div class="box"><button type="button" class="b b2 sm" data-a="nfree" data-i="-1">${t("n_back")}</button><h3 style="margin:10px 0">${cu.fl} ${cu[lang] || cu.ar || cu.en}</h3><div class="nlist">${cu.nums
     .map(
       (n) =>
-        `<div class="nrow"><bdi dir="ltr" class="nn">${n.n}</bdi><span class="nact"><button type="button" class="b b2 sm" data-a="copy" data-v="${n.n}">${ic("copy", 14)} ${t("copy")}</button>${n.u ? `<a class="b sm" href="${ex(n.u)}" target="_blank" rel="noopener">${ic("ext", 14)} ${t("n_msgs")}</a>` : ""}</span></div>`
+        `<div class="nrow"><bdi dir="ltr" class="nn">${ex(n.n)}</bdi><span class="nact"><button type="button" class="b b2 sm" data-a="copy" data-v="${ex(n.n)}">${ic("copy", 14)} ${t("copy")}</button>${n.u ? `<a class="b sm" href="${ex(n.u)}" target="_blank" rel="noopener">${ic("ext", 14)} ${t("n_msgs")}</a>` : ""}</span></div>`
     )
     .join("")}</div></div>`;
 }
@@ -1868,7 +1881,7 @@ function prodPage(id) {
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "",
     imgs = [p.img, ...(p.images || [])].filter(Boolean);
   const gallery = imgs.length
-    ? `<div class="main-img zoomable" data-a="zoom" role="button" tabindex="0" aria-label="${t("zoom")}"><img src="${ex(imgs[0])}" id="main-img" alt="" data-ph="${ex(p.id)}"><span class="zm" aria-hidden="true">${ic("search", 18)}</span></div>${imgs.length > 1 ? `<div class="thumbs">${imgs.map((u, i) => `<img src="${ex(u)}" alt="" class="${i ? "" : "on"}" data-a="thumb">`).join("")}</div>` : ""}`
+    ? `<div class="main-img zoomable" data-a="zoom" role="button" tabindex="0" aria-label="${t("zoom")}"><img src="${ex(imgs[0])}" id="main-img" alt="" fetchpriority="high" decoding="async" data-ph="${ex(p.id)}"><span class="zm" aria-hidden="true">${ic("search", 18)}</span></div>${imgs.length > 1 ? `<div class="thumbs">${imgs.map((u, i) => `<img src="${ex(u)}" alt="" class="${i ? "" : "on"}" data-a="thumb" loading="lazy" decoding="async">`).join("")}</div>` : ""}`
     : `<div class="main-img">${placeholder(p, c)}</div>`;
   const vis = isVisit(p),
     boost = !vis && needsLink(p),
@@ -1900,6 +1913,8 @@ function policiesPage() {
     sec(t("po_dig_t"), t("po_dig")) +
     sec(t("po_ref_t"), t("po_ref")) +
     sec(t("po_man_t"), t("po_man")) +
+    sec(t("po_prv_t"), t("po_prv")) +
+    sec(t("po_trm_t"), t("po_trm")) +
     (risk ? sec(t("po_risk_t"), ex(risk)) : "") +
     `<div class="box"><a class="b b2" href="#/faq">${t("faq")}</a></div>`
   );
@@ -2916,6 +2931,7 @@ document.addEventListener("click", async (e) => {
     if (e.isTrusted) humanRun(900);
   } else if (a == "resend") resendMail(b);
   else if (a == "push-on") pushEnable(b);
+  else if (a == "push-re") location.reload();
   else if (a == "out") {
     const tk = ls.get("amx_token");
     pushOff(tk);
@@ -3034,6 +3050,53 @@ document.addEventListener("input", (e) => {
 /* ---------- 13. Auth: login, signup (+email confirmation), password recovery, human check ---------- */
 /* Human check: a branded verification box (client-side deterrent; enable CAPTCHA in Supabase for real protection) */
 let hvTimer;
+/* Cloudflare Turnstile (real CAPTCHA). Put the SITE key here AND enable Captcha protection in Supabase > Auth > Attack Protection with the matching secret. Left empty, the built-in client-side check is used. */
+const TURNSTILE_SITE_KEY = "";
+let tsToken = "",
+  tsId = null;
+function tsReset() {
+  try {
+    if (window.turnstile && tsId != null) window.turnstile.reset(tsId);
+  } catch {}
+}
+function tsInit() {
+  const box = $("#hv");
+  let w = $("#ts-w");
+  if (!w) {
+    w = document.createElement("div");
+    w.id = "ts-w";
+    w.style.cssText = "display:flex;justify-content:center;margin:12px 0";
+    if (box) {
+      box.style.display = "none";
+      box.after(w);
+    } else {
+      const a = $(".au.done .acts");
+      if (!a) return;
+      a.before(w);
+    }
+  }
+  tsToken = "";
+  const go = () => {
+    try {
+      if (tsId != null) window.turnstile.remove(tsId);
+    } catch {}
+    tsId = window.turnstile.render(w, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: "auto",
+      callback: (k) => (tsToken = k),
+      "expired-callback": () => (tsToken = ""),
+      "error-callback": () => (tsToken = ""),
+    });
+  };
+  if (window.turnstile) go();
+  else {
+    const sc = document.createElement("script");
+    sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    sc.async = true;
+    sc.onload = go;
+    document.head.appendChild(sc);
+  }
+}
 const humanBox =
   () => `<div class="hv" id="hv" data-s="verifying" role="group" aria-live="polite"> <div class="hv-l"><span class="hv-ic" id="hv-ic"></span><span class="hv-t" id="hv-t"></span></div> <div class="hv-r"><span class="hv-logo">${LOGO_SVG}</span><span class="hv-b"><b>AMARIX007</b><small>${t( "hv_sec" )} · <a href="#" data-a="ai-open">${t("hv_help")}</a></small></span></div> <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"></div>`;
 function setHv(s) {
@@ -3062,6 +3125,10 @@ function humanRun(ms) {
   hvTimer = setTimeout(() => setHv("ok"), ms);
 }
 function humanStart() {
+  if (TURNSTILE_SITE_KEY) {
+    tsInit();
+    return;
+  }
   if (!$("#hv")) return;
   if (navigator.webdriver) {
     setHv("manual");
@@ -3071,11 +3138,9 @@ function humanStart() {
 }
 const humanOk = (form) => {
   const box = $("#hv");
-  return (
-    !!box &&
-    box.dataset.s == "ok" &&
-    !(form.elements.website && form.elements.website.value)
-  );
+  const clean = !(form.elements.website && form.elements.website.value);
+  if (TURNSTILE_SITE_KEY) return !!box && !!tsToken && clean;
+  return !!box && box.dataset.s == "ok" && clean;
 };
 
 function authPage() {
@@ -3127,12 +3192,15 @@ const authMsg = (m) => {
   return m || t("net");
 };
 const siteBack = () => encodeURIComponent(location.origin + location.pathname); // must be listed in Supabase > Auth > URL Configuration > Redirect URLs
-const authPost = (path, body) =>
-  fetch(SB_URL + path, {
+const authPost = (path, body) => {
+  const b = TURNSTILE_SITE_KEY && tsToken ? { ...body, gotrue_meta_security: { captcha_token: tsToken } } : body;
+  tsToken = ""; // a CAPTCHA token works once
+  return fetch(SB_URL + path, {
     method: "POST",
     headers: { apikey: SB_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+    body: JSON.stringify(b),
+  }).finally(tsReset);
+};
 async function authFail(r) {
   const j = await r.json().catch(() => ({}));
   throw new Error(j.msg || j.error_description || j.message || "");
@@ -3301,6 +3369,7 @@ document.addEventListener("submit", async (e) => {
       toast(t("loggedin"));
       beep("ok");
       syncProfile();
+      pushSync();
       const to = returnTo && !/login/.test(returnTo) ? returnTo : "#/";
       returnTo = "";
       location.hash = to;
@@ -3324,6 +3393,7 @@ document.addEventListener("submit", async (e) => {
 
 async function resendMail(btn) {
   if (Date.now() - resendAt < 30000) return toast(t("wait30"), "wn");
+  if (TURNSTILE_SITE_KEY && !tsToken) return toast(t("hv_wait"), "wn");
   setBusy(btn, true);
   try {
     const r =
@@ -3632,13 +3702,22 @@ function render() {
   const seq = ++routeSeq;
   const [h] = (location.hash || "#/").split("?"),
     [, r, id] = h.split("/");
-  if (AUTH_ROUTES.includes(r) && !user) {
+  const needPush = pushNeeded();
+  document.body.classList.toggle("gate", !user || needPush);
+  /* Login wall: everything except sign-in, policies and FAQ needs an account */
+  if (!user && !PUBLIC_ROUTES.includes(r)) {
     returnTo = location.hash;
     location.hash = "#/login";
     return;
   }
   if (r == "login" && user && authMode != "reset") {
     location.hash = "#/account";
+    return;
+  }
+  /* Notification gate: a signed-in customer must allow notifications (only where the browser supports them) */
+  if (needPush && !PUBLIC_ROUTES.includes(r)) {
+    $("#m").innerHTML = pushGatePage();
+    nav();
     return;
   }
   const m = $("#m");
@@ -3834,6 +3913,14 @@ async function pushOff(tk) {
       });
     await sub.unsubscribe();
   } catch {}
+}
+/* Required step after sign-in: browsers only show the permission prompt from a tap, and a "denied" choice can only be undone from the browser's site settings */
+function pushNeeded() {
+  return !!user && pushReady() && Notification.permission !== "granted";
+}
+function pushGatePage() {
+  const denied = Notification.permission === "denied";
+  return `<div class="box au done"><div class="okc">${ic("bolt", 34)}</div><h1>${t("pg_t")}</h1><p class="pd">${t("pg_d")}</p>${denied ? `<p class="ord-note">🔕 ${t("pg_blk")}</p>` : ""}<div class="acts">${denied ? `<button class="b" data-a="push-re">${t("pg_re")}</button>` : `<button class="b" data-a="push-on">${t("pg_btn")}</button>`}</div></div>`;
 }
 function pushBox(compact) {
   if (!user || !pushReady()) return "";

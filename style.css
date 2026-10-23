@@ -3359,3 +3359,6 @@ button:disabled[data-a="buy"], button:disabled[data-a="add"] { opacity: .5; curs
 .qin { background: var(--bg); color: var(--tx); border: 1px solid var(--bd); font-variant-numeric: tabular-nums; }
 .qin:focus { outline: 2px solid var(--ac); }
 
+
+/* Login / notification gate: hide navigation until the customer is signed in and notifications are on */
+body.gate #nv,body.gate .sr,body.gate .menu-b,body.gate .sub-nav,body.gate #sup{display:none!important}

@@ -56,7 +56,7 @@ html.amx-skip #amx-splash{display:none!important}
   animation:amxMark 1.15s cubic-bezier(.2,1.25,.35,1) .3s forwards}
 .amx-mark img{display:block;width:100%;height:100%;filter:drop-shadow(0 0 22px rgba(82,183,136,.55))}
 .amx-shine{position:absolute;inset:0;overflow:hidden;
-  -webkit-mask:url(logo-mark.png) center/contain no-repeat;mask:url(logo-mark.png) center/contain no-repeat}
+  -webkit-mask:url(logo-mark.webp) center/contain no-repeat;mask:url(logo-mark.webp) center/contain no-repeat}
 .amx-shine::before{content:"";position:absolute;top:0;bottom:0;left:0;width:60%;
   background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,.9) 50%,transparent 100%);
   transform:translateX(-130%);will-change:transform;animation:amxShine 1.3s ease-in-out 1.15s forwards}
