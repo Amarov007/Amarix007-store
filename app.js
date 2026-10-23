@@ -61,6 +61,8 @@ const I = {
     '<path d="M20 11a8 8 0 0 0-14-4M4 5v3h3M4 13a8 8 0 0 0 14 4M20 19v-3h-3"/>',
   vol: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   mute: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>',
+  music: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+  musicoff: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/><path d="M3 3l18 18"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
   card: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/>',
 };
@@ -317,6 +319,8 @@ const T = {
     ai_close: "إغلاق",
     snd_on: "الصوت: تشغيل",
     snd_off: "الصوت: إيقاف",
+    music_on: "الموسيقى: تشغيل",
+    music_off: "الموسيقى: إيقاف",
     /* storefront v17: guards, filters, pages, payment proof */
     ratenote: "تقييم يحدده المتجر",
     nores: "لا نتائج لـ",
@@ -596,6 +600,8 @@ const T = {
     ai_close: "Close",
     snd_on: "Sound: on",
     snd_off: "Sound: off",
+    music_on: "Music: on",
+    music_off: "Music: off",
     /* storefront v17: guards, filters, pages, payment proof */
     ratenote: "Rating set by the store",
     nores: "No results for",
@@ -1462,7 +1468,7 @@ document.addEventListener(
         ? "add"
         : a == "fav"
         ? "pop"
-        : ["theme", "lang", "snd", "cur", "pw"].includes(a)
+        : ["theme", "lang", "snd", "music", "cur", "pw"].includes(a)
         ? "toggle"
         : "tap"
     );
@@ -1589,6 +1595,7 @@ function head() {
   $("#sb").textContent = lang == "ar" ? CFG.site.sa : CFG.site.se;
   $("#q").placeholder = t("ph");
   $("#ctl").innerHTML =
+    musicBtn() +
     `<button class="ib" data-a="theme" aria-label="${t("theme")}">${ic( th == "dark" ? "sun" : "moon", 18 )}</button>` +
     `<a class="ib" href="#/account" aria-label="${t("acc")}">${ic( "user", 18 )}</a>`;
   $("#mb").innerHTML = ic("menu", 22);
@@ -1598,6 +1605,27 @@ function head() {
   nav();
   aiLabels();
 }
+
+/* Background music (music.js): header button + menu row. The state lives in window.AMXMusic. */
+const musicOn = () => !!(window.AMXMusic && window.AMXMusic.on);
+const musicBtn = () =>
+  window.AMXMusic
+    ? `<button type="button" class="ib mus${musicOn() ? " on" : ""}" data-a="music" aria-pressed="${musicOn()}" aria-label="${t(musicOn() ? "music_on" : "music_off")}">${ic(musicOn() ? "music" : "musicoff", 18)}</button>`
+    : "";
+function musicSync() {
+  const on = musicOn();
+  document.querySelectorAll('.ib.mus[data-a="music"]').forEach((b) => {
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on);
+    b.setAttribute("aria-label", t(on ? "music_on" : "music_off"));
+    b.innerHTML = ic(on ? "music" : "musicoff", 18);
+  });
+  document.querySelectorAll('.dr-r[data-a="music"]').forEach((b) => {
+    b.querySelector(".dr-ic").innerHTML = ic(on ? "music" : "musicoff", 18);
+    b.querySelector(".dr-lb").textContent = t(on ? "music_on" : "music_off");
+  });
+}
+addEventListener("amx:music", musicSync);
 
 function footer() {
   const labels = {
@@ -1699,6 +1727,7 @@ function drawerRender() {
     <button type="button" class="dr-r" data-a="lang"><span class="dr-ic">${ic("globe", 18)}</span><span class="dr-lb">${A ? "اللغة" : "Language"}</span><small>${A ? "English" : "العربية"}</small></button>
     <button type="button" class="dr-r" data-a="theme"><span class="dr-ic">${ic(th == "dark" ? "sun" : "moon", 18)}</span><span class="dr-lb">${t("theme")}</span></button>
     <button type="button" class="dr-r" data-a="snd"><span class="dr-ic">${ic(sndOn ? "vol" : "mute", 18)}</span><span class="dr-lb">${t(sndOn ? "snd_on" : "snd_off")}</span></button>
+    ${window.AMXMusic ? `<button type="button" class="dr-r" data-a="music"><span class="dr-ic">${ic(musicOn() ? "music" : "musicoff", 18)}</span><span class="dr-lb">${t(musicOn() ? "music_on" : "music_off")}</span></button>` : ""}
     <label class="dr-r"><span class="dr-ic">${ic("card", 18)}</span><span class="dr-lb">${A ? "العملة" : "Currency"}</span><select class="sel dr-sel" data-a="cur" aria-label="currency">${Object.keys(R).map((k) => `<option value="${k}" ${k == cur ? "selected" : ""}>${k == "USD" ? "USDT" : k}</option>`).join("")}</select></label>
     <div class="dr-h">${A ? "المساعدة" : "Help"}</div>
     ${soc}
@@ -2900,6 +2929,8 @@ document.addEventListener("click", async (e) => {
     sndOn = !sndOn;
     save();
     head();
+  } else if (a == "music") {
+    window.AMXMusic && window.AMXMusic.toggle();
   } else if (a == "ban-prev") bannerCtl && bannerCtl.step(-1);
   else if (a == "ban-next") bannerCtl && bannerCtl.step(1);
   else if (a == "ban-go") bannerCtl && bannerCtl.to(+b.dataset.i);

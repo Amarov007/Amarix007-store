@@ -5,6 +5,7 @@
 ## الملفات
 - `index.html` + `app.js` + `style.css` + `store-data.js` — المتجر. `store-data.js` نسخة احتياطية فقط؛ الإعدادات الحية تأتي من `public_config()`.
 - `admin.html` + `admin.js` + `admin.css` — لوحة الإدارة (`noindex`).
+- `music.js` + `music.m4a` — موسيقى الخلفية: تبدأ بعد شاشة البداية (أو عند أول لمسة إن منع المتصفح التشغيل التلقائي)، تستمر أثناء التصفح، وتتوقف عند خروج الزائر من التبويب. زر الكتم في الشريط العلوي والقائمة، والاختيار محفوظ في `localStorage.amx_music`. لتغيير الأغنية استبدل `music.m4a` وارفع `?v=` في `music.js`.
 - `sw.js` — Service Worker (كاش للهيكل والأيقونات + الإشعارات).
 - `supabase-schema.sql` — مخطط قاعدة جديدة. `supabase-security-fixes.sql`, `supabase-support-tickets.sql` — ترقيات.
 - `supabase/functions/*` — مصدر الدالة الطرفية `send-push`. حمّل الباقي بـ `supabase functions download ai-support smm-order media-seed img-shrink`.

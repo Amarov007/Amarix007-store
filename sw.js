@@ -1,5 +1,5 @@
 /* AMARIX007 service worker
-   - app shell (index.html, app.js, style.css, store-data.js, splash.*): network-first, and every good response is kept,
+   - app shell (index.html, app.js, style.css, store-data.js, music.js, splash.*): network-first, and every good response is kept,
      so the store still opens with no connection (it then shows the last published catalogue saved in localStorage)
    - icons and logos: cache-first
    - admin page, Supabase API, auth, storage, fonts: untouched, never cached
@@ -7,8 +7,8 @@
 const ICONS_CACHE = "amx-icons-v4";
 const SHELL_CACHE = "amx-shell-v4";
 const ICONS = ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-64.png", "logo-mark.webp", "logo-word.webp"];
-const SHELL = ["./", "index.html", "app.js", "style.css", "store-data.js", "splash.js", "splash.css"];
-const CODE = /\/(app\.js|style\.css|store-data\.js|splash\.js|splash\.css)$/;
+const SHELL = ["./", "index.html", "app.js", "style.css", "store-data.js", "music.js", "splash.js", "splash.css"];
+const CODE = /\/(app\.js|style\.css|store-data\.js|music\.js|splash\.js|splash\.css)$/;
 const ADMIN = /\/admin\.(html|js|css)$/;
 
 self.addEventListener("install", (e) => {
