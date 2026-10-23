@@ -1,1 +1,8 @@
-
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "store.amarix007.twa",
+        "sha256_cert_fingerprints": ["C0:51:6F:62:65:D1:84:8C:04:55:14:8F:44:0C:29:D1:C0:7F:B4:C4:68:8B:83:0B:34:00:BE:56:5D:AB:B3:50"]
+      }
+    }]
