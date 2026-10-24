@@ -1982,6 +1982,7 @@ async function smmFetchRates(force) {
   const c = smmCache();
   if (!force && c && Date.now() - c.ts < 864e5) return c;
   const j = await fn("smm-order", { action: "services" });
+  if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق");
   const L = Array.isArray(j) ? j : j.services || [];
   const want = new Set(D.products.filter((p) => p.smm_service).map((p) => String(p.smm_service)));
   const map = {}, ids = [];
@@ -2088,6 +2089,7 @@ async function smmAction(btn, kind) {
       toast("الاتصال بموقع الرشق ناجح");
     } else {
       const j = await fn("smm-order", { action: "services" });
+      if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق — تحقق من الرابط والمفتاح في إعدادات APIs");
       SMM_SVC = Array.isArray(j)
         ? j.map((x) => ({
             id: x.service,
