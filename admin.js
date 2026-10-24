@@ -153,6 +153,37 @@ const TABS = [
   ["tickets", "تذاكر الدعم"],
   ["push", "إشعار للجميع"],
 ];
+
+const TI = {
+  home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  site:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  partner:'<path d="M8 12l3 3 5-6"/><rect x="3" y="4" width="18" height="16" rx="3"/>',
+  banners:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 15l5-4 4 3 3-2 6 4"/>',
+  categories:'<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
+  products:'<path d="M21 8l-9-5-9 5 9 5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>',
+  embeds:'<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
+  coupons:'<path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 0 0-6V6H3z"/><path d="M9 6v12" stroke-dasharray="2 2"/>',
+  social:'<circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/>',
+  payments:'<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/>',
+  users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>',
+  apis:'<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/>',
+  affiliates:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  orders:'<path d="M6 2l-2 4v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4z"/><path d="M4 6h16M9 11a3 3 0 0 0 6 0"/>',
+  stats:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  tickets:'<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  push:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'
+};
+const TG = [
+  ["المبيعات", ["orders","payments","coupons","affiliates","users"]],
+  ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
+  ["التواصل والدعم", ["tickets","push","social"]],
+  ["النظام", ["apis","stats"]]
+];
+const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
+const sideNav = () => {
+  const nm = Object.fromEntries(TABS);
+  return TG.map(([g, ks]) => `<div class="sg"><span class="sgl">${g}</span>${ks.filter((k) => nm[k]).map((k) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("")}</div>`).join("");
+};
 const SOCIAL = [
   ["whatsapp", "wa", "واتساب", "https://wa.me/9665XXXXXXXX"],
   ["telegram", "tg", "تلغرام", "https://t.me/username"],
@@ -391,7 +422,7 @@ function freeEditor(c, ci) {
 const VIEW = {
   home() {
     const n = D.products.length;
-    return `<div class="stats"><div class="stat"><b>${ D.categories.length }</b><span>الأقسام</span></div><div class="stat"><b>${n}</b><span>المنتجات</span></div><div class="stat"><b>${ D.embeds.length }</b><span>التضمين</span></div><div class="stat"><b>${ D.banners.length }</b><span>البانرات</span></div><div class="stat"><b>${ Object.keys(D.coupons).length }</b><span>الكوبونات</span></div></div> ${checklistHTML()}<div class="card"><h2>نشر التعديلات</h2><p class="hint">النشر يحفظ إعدادات المتجر في جدول store_config. مفاتيح الـ APIs لا تُنشر أبداً.</p><div class="acts"><button class="b" data-a="pub">نشر الآن</button><button class="b b2" data-a="exp">نسخة احتياطية</button><label class="b b2">استيراد<input type="file" accept=".js,.json" hidden data-imp="1"></label></div></div>`;
+    return `<div class="stats"><div class="stat"><b>${ D.categories.length }</b><span>الأقسام</span></div><div class="stat"><b>${n}</b><span>المنتجات</span></div><div class="stat"><b>${ D.embeds.length }</b><span>التضمين</span></div><div class="stat"><b>${ D.banners.length }</b><span>البانرات</span></div><div class="stat"><b>${ Object.keys(D.coupons).length }</b><span>الكوبونات</span></div></div> <div class="card qa"><h2>إجراءات سريعة</h2><div class="qa-g"><button class="qa-b" data-tab="orders">${tabIc("orders")}<span>مراجعة الطلبات</span></button><button class="qa-b" data-tab="products">${tabIc("products")}<span>إدارة المنتجات</span></button><button class="qa-b" data-tab="apis">${tabIc("apis")}<span>ربط المزوّد واستيراد الخدمات</span></button><button class="qa-b" data-tab="tickets">${tabIc("tickets")}<span>تذاكر الدعم</span></button></div></div> ${checklistHTML()}<div class="card"><h2>نشر التعديلات</h2><p class="hint">النشر يحفظ إعدادات المتجر في جدول store_config. مفاتيح الـ APIs لا تُنشر أبداً.</p><div class="acts"><button class="b" data-a="pub">نشر الآن</button><button class="b b2" data-a="exp">نسخة احتياطية</button><label class="b b2">استيراد<input type="file" accept=".js,.json" hidden data-imp="1"></label></div></div>`;
   },
   site() {
     const s = "site.";
@@ -523,7 +554,7 @@ function render() {
       : "";
   $(
     "#app"
-  ).innerHTML = `<header class="top"><div class="w tr"><b class="ttl">⚙ لوحة التحكم <small>${esc( D.site.n1 + D.site.n2 )}</small></b><span class="bdg" id="bdg"></span><span class="sp"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a><button class="b sm" data-a="pub">نشر الآن</button><button class="b b2 sm" data-a="logout">خروج</button></div></header><div class="w lay"><nav class="sd">${TABS.map( ([k, n]) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${n}</button>` ).join("")}</nav><main>${warn}${(VIEW[tab] || VIEW.home)()}</main></div>`;
+  ).innerHTML = `<header class="top"><div class="w tr"><b class="ttl"><span class="brand-dot"></span>لوحة التحكم <small>${esc( D.site.n1 + D.site.n2 )}</small></b><span class="bdg" id="bdg"></span><span class="sp"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a><button class="b sm" data-a="pub">نشر الآن</button><button class="b b2 sm" data-a="logout">خروج</button></div></header><div class="w lay"><nav class="sd">${sideNav()}</nav><main>${warn}${(VIEW[tab] || VIEW.home)()}</main></div>`;
   badge();
 }
 
@@ -764,6 +795,7 @@ document.addEventListener("click", (e) => {
   if (a == "proof-link") return proofLink(b);
   if (a == "save-api") return saveApis(b);
   if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
+  if (a == "smm-imp") return smmImport(b);
   if (a == "smm-send" || a == "smm-status") return smmOrder(b);
   if (a == "pub") return publish(b);
   if (a == "exp") return exportBackup();
@@ -1592,23 +1624,70 @@ function smmOut(html) {
   const o = $("#smm-out");
   if (o) o.innerHTML = html;
 }
-function smmList() {
+let SMM_MK = "30", SMM_CAT = "";
+const smmFiltered = () => {
   const q = (($("#smm-q") || {}).value || "").trim().toLowerCase();
-  const L = SMM_SVC.filter(
-    (x) =>
-      !q ||
-      (x.id + " " + x.name + " " + (x.category || "")).toLowerCase().includes(q)
-  ).slice(0, 80);
+  return SMM_SVC.filter(
+    (x) => !q || (x.id + " " + x.name + " " + (x.category || "")).toLowerCase().includes(q)
+  );
+};
+function smmList() {
+  const mk = $("#smm-mk"), ct = $("#smm-cat");
+  if (mk) SMM_MK = mk.value;
+  if (ct) SMM_CAT = ct.value;
+  if (!SMM_CAT) SMM_CAT = ((D.categories.find((c) => c.ty == "boost") || D.categories[0] || {}).id) || "";
+  const all = smmFiltered(), L = all.slice(0, 80);
+  const bar =
+    '<div class="g2" style="margin:8px 0;align-items:end">' +
+    '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641</span><select class="inp" id="smm-cat">' +
+    D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("") +
+    '</select></label>' +
+    `<label class="fld"><span>\u0647\u0627\u0645\u0634 \u0627\u0644\u0631\u0628\u062d %</span><input class="inp" id="smm-mk" type="number" min="0" step="1" value="${esc(SMM_MK)}" dir="ltr"></label></div>` +
+    `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, 300)})</button>`;
   smmOut(
     L.length
-      ? '<table class="tb"><tr><th>ID</th><th>الخدمة</th><th>السعر/1000</th><th>min-max</th></tr>' +
+      ? bar +
+          '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
           L.map(
             (x) =>
-              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc( x.name )}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc( x.min )}-${esc(x.max)}</td></tr>`
+              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button></td></tr>`
           ).join("") +
           "</table>"
-      : "لا توجد نتائج"
+      : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c"
   );
+}
+/* Turn panel services into store products: 1 package = 1000 units, price = rate x (1 + markup). qmin/qmax are in packages. */
+function smmImport(btn) {
+  const mk = Math.max(0, parseFloat(($("#smm-mk") || {}).value) || 0);
+  const cat = ($("#smm-cat") || {}).value || SMM_CAT;
+  if (!cat) return toast("\u0627\u062e\u062a\u0631 \u0642\u0633\u0645\u0627\u064b", "e");
+  const src = btn.dataset.id == "*" ? smmFiltered().slice(0, 300) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
+  let add = 0, skip = 0;
+  src.forEach((x) => {
+    const sid = String(x.id), rate = parseFloat(x.rate);
+    if (!(rate > 0) || D.products.some((p) => String(p.smm_service) == sid && p.c == cat)) { skip++; return; }
+    const it = NEW.products();
+    const name = String(x.name || ("Service " + sid)).trim();
+    Object.assign(it, {
+      id: "smm" + sid,
+      c: cat,
+      k: "buy",
+      ar: name,
+      en: name,
+      p: Math.max(0.01, Math.round(rate * (1 + mk / 100) * 100) / 100),
+      o: 0, d: 0, r: 5, n: 0, bs: 0,
+      tg: String(x.category || ""),
+      sp: String(x.category || "").slice(0, 40),
+      smm_service: sid,
+      smm_qty: 1000,
+      qmin: Math.max(1, Math.ceil((parseFloat(x.min) || 1) / 1000)),
+      qmax: Math.max(1, Math.floor((parseFloat(x.max) || 1000) / 1000)),
+    });
+    D.products.push(it);
+    add++;
+  });
+  save();
+  toast(`\u062a\u0645 \u0625\u0636\u0627\u0641\u0629 ${add} \u00b7 \u062a\u062e\u0637\u0651\u064a ${skip}. \u0627\u0636\u063a\u0637 \u0646\u0634\u0631 \u0644\u0644\u062d\u0641\u0638`, add ? "" : "e");
 }
 async function smmAction(btn, kind) {
   busy(btn, true);
