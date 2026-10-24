@@ -522,7 +522,7 @@ const VIEW = {
     return `<div class="card"><h2>المستخدمين المسجلين</h2><div id="users-list">${loadingHTML}</div></div>`;
   },
   apis() {
-    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("SMM API URL", "api.smm_url", { d: 1 })}${F( "SMM API Key", "api.smm_key", { d: 1 } )}${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> <div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase (المتصفح لا يستطيع الاتصال بموقع الرشق مباشرة، والمفتاح يبقى في الخادم). احفظ الإعدادات أولاً.</p> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
+    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("SMM API URL", "api.smm_url", { d: 1 })}${F( "SMM API Key", "api.smm_key", { d: 1 } )}${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> <div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase (المتصفح لا يستطيع الاتصال بموقع الرشق مباشرة، والمفتاح يبقى في الخادم). احفظ الإعدادات أولاً.</p> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="acts" style="margin-top:8px"><button class="b bd2" data-a="smm-wipe" type="button">🗑 حذف كل منتجات الرشق</button><button class="b" data-a="smm-redo" type="button">♻ حذف وإعادة جلب من المزوّد</button><button class="b b2" data-a="smm-undo" type="button">↩ استرجاع المحذوف</button></div><p class="hint">«حذف وإعادة جلب» يجلب الخدمات من المزوّد أولاً، وإن فشل الجلب لا يُحذف شيء. يُحفظ نسخة احتياطية قبل الحذف ويمكن الاسترجاع منها. بعدها اضغط «نشر».</p> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
   },
   affiliates() {
     setTimeout(loadAffiliates, 50);
@@ -994,6 +994,9 @@ document.addEventListener("click", (e) => {
   if (a == "save-api") return saveApis(b);
   if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
   if (a == "smm-imp") return smmImport(b);
+  if (a == "smm-wipe") return smmWipe(b, false);
+  if (a == "smm-redo") return smmWipe(b, true);
+  if (a == "smm-undo") return smmUndo();
   if (a == "smm-reprice") return smmReprice();
   if (a == "smm-recheck") { busy(b, true); return smmFetchRates(true).then(() => homeStats()).catch((e) => toast("فشل: " + String(e.message).slice(0, 70), "e")).finally(() => busy(b, false)); }
   if (a == "autosend-t") { localStorage.setItem("amx_autosend", autoOn() ? "0" : "1"); toast(autoOn() ? "الإرسال التلقائي مفعّل" : "الإرسال التلقائي متوقف"); return homeStats(); }
@@ -1954,6 +1957,11 @@ function smmImport(btn) {
   if (!cat) return toast("اختر قسماً", "e");
   try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {}
   const src = btn.dataset.id == "*" ? smmFiltered().slice(0, 300) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
+  const r = smmImportList(src, cat, mk);
+  save();
+  toast(`تمت إضافة ${r.add} · تخطّي ${r.skip}. اضغط نشر للحفظ`, r.add ? "" : "e");
+}
+function smmImportList(src, cat, mk) {
   let add = 0, skip = 0;
   src.forEach((x) => {
     const sid = String(x.id), rate = parseFloat(x.rate);
@@ -1971,8 +1979,63 @@ function smmImport(btn) {
     smmEnsureFilter(cat, mt.plEn, mt.ty);
     add++;
   });
+  return { add, skip };
+}
+
+/* ---- حذف كل منتجات الرشق (المستوردة + القديمة داخل أقسام الرشق) وإعادة جلبها ---- */
+const isBoostProduct = (p) => !!p.smm_service || (D.categories.find((c) => c.id == p.c) || {}).ty == "boost";
+async function smmLoadServices() {
+  const j = await fn("smm-order", { action: "services" });
+  if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق — تحقق من الرابط والمفتاح في إعدادات APIs");
+  SMM_SVC = Array.isArray(j)
+    ? j.map((x) => ({ id: x.service, name: x.name, category: x.category, rate: x.rate, min: x.min, max: x.max }))
+    : j.services || [];
+}
+async function smmWipe(btn, redo) {
+  const old = D.products.filter(isBoostProduct);
+  if (!old.length && !redo) return toast("لا توجد منتجات رشق لحذفها", "e");
+  const mkEl = $("#smm-mk"), catEl = $("#smm-cat");
+  const mk = Math.max(0, parseFloat(mkEl ? mkEl.value : localStorage.getItem("amx_smm_mk")) || 30);
+  const cat = (catEl && catEl.value) || SMM_CAT || (D.categories.find((c) => c.ty == "boost") || {}).id || "";
+  if (redo && !cat) return toast("لا يوجد قسم رشق لاستيراد المنتجات إليه", "e");
+  busy(btn, true);
+  try {
+    if (redo) {
+      await smmLoadServices(); // fetch first: if this fails nothing is deleted
+      if (!SMM_SVC.length) throw new Error("المزوّد لم يُرجع أي خدمة — لم يُحذف شيء");
+    }
+    const n = Math.min(SMM_SVC.length, 300);
+    const msg = redo
+      ? `سيتم حذف ${old.length} منتج رشق ثم استيراد ${n} خدمة جديدة من المزوّد بهامش ${mk}% إلى قسم «${catName(cat)}». متابعة؟`
+      : `سيتم حذف ${old.length} منتج رشق (المستوردة والقديمة داخل أقسام الرشق). متابعة؟`;
+    if (!confirm(msg)) return;
+    try { localStorage.setItem("amx_smm_backup", JSON.stringify({ ts: Date.now(), items: old })); } catch (e) {
+      if (!confirm("تعذّر حفظ نسخة احتياطية للاسترجاع. المتابعة دون نسخة؟")) return;
+    }
+    for (let i = D.products.length - 1; i >= 0; i--) if (isBoostProduct(D.products[i])) D.products.splice(i, 1);
+    let r = { add: 0, skip: 0 };
+    if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportList(SMM_SVC.slice(0, 300), cat, mk); }
+    save();
+    toast(redo ? `حُذف ${old.length} وأُضيف ${r.add} منتج جديد. اضغط نشر للحفظ` : `حُذف ${old.length} منتج. اضغط نشر للحفظ`);
+    smmOut(redo ? `✓ حُذف ${old.length} وأُضيف ${r.add} (تخطّي ${r.skip}). اضغط «نشر» لتطبيق التغيير على المتجر.` : `✓ حُذف ${old.length} منتج رشق. اضغط «نشر» لتطبيق التغيير.`);
+  } catch (e) {
+    smmOut("✗ " + esc(e.message));
+    toast("فشل: " + String(e.message).slice(0, 80), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
+function smmUndo() {
+  let b = null;
+  try { b = JSON.parse(localStorage.getItem("amx_smm_backup") || "null"); } catch (e) {}
+  if (!b || !Array.isArray(b.items) || !b.items.length) return toast("لا توجد نسخة محذوفة للاسترجاع", "e");
+  if (!confirm(`استرجاع ${b.items.length} منتج حُذف في ${new Date(b.ts).toLocaleString("ar")}؟ (المنتجات الجديدة بنفس المعرّف ستُستبدل)`)) return;
+  const ids = new Set(b.items.map((p) => p.id));
+  for (let i = D.products.length - 1; i >= 0; i--) if (ids.has(D.products[i].id)) D.products.splice(i, 1);
+  b.items.forEach((p) => D.products.push(p));
   save();
-  toast(`تمت إضافة ${add} · تخطّي ${skip}. اضغط نشر للحفظ`, add ? "" : "e");
+  toast(`تم استرجاع ${b.items.length} منتج. اضغط نشر للحفظ`);
+  render();
 }
 
 /* ---- price sync with the provider (cache is kept 24h; only ids + rates of imported products) ---- */
