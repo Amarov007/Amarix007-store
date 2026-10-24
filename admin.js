@@ -23,7 +23,7 @@ const EMPTY = {
     sa: "",
     se: "",
     desc: "",
-    col: { g: "#2F442C", m: "#A7E8BD", ac: "#52B788" },
+    col: { g: "#08694a", m: "#A7E8BD", ac: "#52B788" },
     rt: { ar: "", en: "" },
     risk: { ar: "", en: "" },
     ai_on: true,
@@ -472,7 +472,7 @@ const VIEW = {
       const k = "products." + ed + ".",
         p = D.products[ed],
         opts = D.categories.map((x) => [x.id, x.ar]);
-      return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F( "رقم خدمة الرشق في الموقع (SMM service id)", k + "smm_service", { d: 1 } )}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
+      return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F( "رقم خدمة الرشق في الموقع (SMM service id)", k + "smm_service", { d: 1 } )}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql). منتجات الرشق المستوردة تلقائياً تكون «كمية الرشق لكل وحدة = 1» والسعر هو سعر وحدة واحدة (سعر الألف ÷ 1000)، وأقل/أعلى كمية تأتي مباشرة من المزوّد (شغّل supabase-boost-units.sql مرة واحدة).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
     }
     const q = pq.trim().toLowerCase(),
       L = D.products
@@ -1139,7 +1139,7 @@ const NEW = {
     en: "New method",
     icon: "",
     logo: "",
-    color: "#2F442C",
+    color: "#08694a",
     acc: "",
     da: "",
     de: "",
@@ -2176,7 +2176,16 @@ function smmEnsureFilter(cat, plEn, ty) {
   const add = (g, v) => { if (g && Array.isArray(g.o) && v && !g.o.some((o) => String(o).toLowerCase() == String(v).toLowerCase())) g.o.push(v); };
   if (c.ty == "boost") { add(c.f[0], plEn == "Other" ? "" : plEn); add(c.f[1], ty); }
 }
-/* Turn panel services into store products: 1 package = 1000 units, price = rate x (1 + markup). qmin/qmax are in packages. */
+/* Turn panel services into store products. New imports are sold per SINGLE unit (smm_qty = 1): the buyer types any quantity between the provider's min and max,
+   price per unit = rate / 1000 x (1 + markup), qmin / qmax = the provider's own min / max. Older products (smm_qty = 1000) keep working as packages of 1000. */
+const smmUnitPrice = (rate, u, mk) => {
+  const v = (rate * u / 1000) * (1 + mk / 100);
+  return u >= 1000 ? Math.max(0.01, Math.round(v * 100) / 100) : Math.max(0.000001, Math.round(v * 1e6) / 1e6);
+};
+const smmLimits = (min, max, u) => {
+  const lo = Math.max(1, Math.ceil((parseFloat(min) || 1) / u)), hi = Math.floor((parseFloat(max) || 0) / u);
+  return { qmin: lo, qmax: hi > 0 ? Math.max(lo, hi) : 0 };
+};
 function smmImport(btn) {
   const mk = Math.max(0, parseFloat(($("#smm-mk") || {}).value) || 0);
   const cat = ($("#smm-cat") || {}).value || SMM_CAT;
@@ -2195,11 +2204,10 @@ function smmImportList(src, cat, mk) {
     const it = NEW.products(), mt = smmMeta(x), name = String(x.name || ("Service " + sid)).trim();
     Object.assign(it, {
       id: "smm" + sid, c: cat, k: "buy", ar: mt.ar, en: name,
-      p: Math.max(0.01, Math.round(rate * (1 + mk / 100) * 100) / 100),
+      p: smmUnitPrice(rate, 1, mk),
       o: 0, d: 0, r: 5, n: 0, bs: 0, tg: mt.tg, sp: mt.plAr + " · " + mt.ty,
-      smm_service: sid, smm_qty: 1000, smm_mk: mk,
-      qmin: Math.max(1, Math.ceil((parseFloat(x.min) || 1) / 1000)),
-      qmax: Math.max(1, Math.floor((parseFloat(x.max) || 1000) / 1000)),
+      smm_service: sid, smm_qty: 1, smm_mk: mk,
+      ...smmLimits(x.min, x.max, 1),
     });
     D.products.push(it);
     smmEnsureFilter(cat, mt.plEn, mt.ty);
@@ -2288,15 +2296,15 @@ function smmDrift(c) {
   D.products.filter((p) => p.smm_service).forEach((p) => {
     const sid = String(p.smm_service), r = c.map[sid];
     if (!r) { if (have.size && !have.has(sid)) gone.push(p); return; }
-    const np = Math.max(0.01, Math.round(r[0] * (1 + smmMk(p) / 100) * 100) / 100);
-    if (Math.abs(np - p.p) > 0.009 && Math.abs(np - p.p) / Math.max(p.p, 0.01) > 0.005) up.push({ p, np, rate: r[0] });
+    const u = +p.smm_qty > 0 ? +p.smm_qty : 1000, np = smmUnitPrice(r[0], u, smmMk(p));
+    if (Math.abs(np - p.p) > (u >= 1000 ? 0.009 : 1e-7) && Math.abs(np - p.p) / Math.max(p.p, 1e-6) > 0.005) up.push({ p, np, rate: r[0] });
   });
   return { up, gone };
 }
 function smmReprice() {
   const c = smmCache(), d = smmDrift(c);
   d.up.forEach(({ p, np }) => { p.p = np; if (p.smm_mk == null) p.smm_mk = smmMk(p); });
-  if (c) D.products.filter((p) => p.smm_service && c.map[String(p.smm_service)]).forEach((p) => { const r = c.map[String(p.smm_service)]; p.qmin = Math.max(1, Math.ceil((r[1] || 1) / 1000)); p.qmax = Math.max(1, Math.floor((r[2] || 1000) / 1000)); });
+  if (c) D.products.filter((p) => p.smm_service && c.map[String(p.smm_service)]).forEach((p) => { const r = c.map[String(p.smm_service)], l = smmLimits(r[1], r[2], +p.smm_qty > 0 ? +p.smm_qty : 1000); p.qmin = l.qmin; p.qmax = l.qmax; });
   save();
   toast(`تم تحديث ${d.up.length} سعراً. اضغط نشر للحفظ`);
   render();

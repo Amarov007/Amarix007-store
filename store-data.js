@@ -8,7 +8,7 @@ window.AMX={
   "sa": "متجر الأصول الرقمية",
   "se": "Digital Assets Store",
   "desc": "AMARIX007 — متجر الأصول الرقمية: روبوتات تداول، منصات ويب، تطبيقات، زيادة متابعين وبونصات مجانية.",
-  "col": {"g": "#2F442C", "m": "#A7E8BD", "ac": "#52B788"},
+  "col": {"g": "#08694a", "m": "#A7E8BD", "ac": "#52B788"},
   "rt": {"ar": "© 2026 AMARIX007. جميع الحقوق محفوظة.", "en": "© 2026 AMARIX007. All rights reserved."},
   "risk": {"ar": "التداول ينطوي على مخاطر، والمنتجات رقمية وتُسلَّم إلكترونياً.", "en": "Trading involves risk. Products are digital and delivered electronically."}
  },

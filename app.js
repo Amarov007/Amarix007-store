@@ -771,6 +771,7 @@ let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
 const PUBLIC_ROUTES = ["login", "policies", "faq"]; // reachable without an account
+const GUEST_ROUTES = ["", "c", "p", "boost", "cart", "fav"]; // browsing + cart: open to visitors; checkout, orders, account, support and partner still need an account
 let authMode = "login"; // login | signup | forgot | reset | check
 let checkKind = "signup"; // what the "check your email" page is about: signup | recover
 let pendingEmail = "";
@@ -985,7 +986,7 @@ function linkOk(v) {
 }
 const smmEq = (p, n) => {
   const u = +p.smm_qty;
-  return u > 0
+  return u > 1
     ? `<div class="smm-q"><bdi dir="ltr">${n} × ${u} = ${n * u}</bdi></div>`
     : "";
 };
@@ -1225,7 +1226,7 @@ function payLogo(m, size = 44) {
     .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
     .trim();
   if (!nm)
-    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#2F442C" };color:#fff">${ic("card", size * 0.5)}</span>`;
+    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#08694a" };color:#fff">${ic("card", size * 0.5)}</span>`;
   const ini = ex(
     [
       ...plain(m.en || m.ar || pmReadable(m) || "?")
@@ -1239,7 +1240,7 @@ function payLogo(m, size = 44) {
       .join("")
       .toUpperCase() || "?"
   );
-  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#2F442C" };color:#fff"><b>${ini}</b></span>`;
+  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#08694a" };color:#fff"><b>${ini}</b></span>`;
 }
 
 /* ---------- 6. Supabase client (anon key + user JWT) ---------- */
@@ -1432,10 +1433,10 @@ function totals() {
 function addToCart(id, n = 1) {
   if (isVisit(prod(id))) return; // visit-only items are never ordered
   const pp = prod(id);
-  n = Math.max(1, Math.min(100000, Math.floor(+n) || 1));
+  n = Math.max(1, Math.min(QCAP, Math.floor(+n) || 1));
   if (pp && needsLink(pp)) n = qClamp(pp, n);
   const x = cart.find((c) => c.id == id);
-  x ? (x.q = Math.min(100000, x.q + n)) : cart.push({ id, q: n });
+  x ? (x.q = Math.min(QCAP, x.q + n)) : cart.push({ id, q: n });
   if (pp && needsLink(pp)) {
     const y = cart.find((c) => c.id == id);
     if (y && y.q > qMax(pp)) y.q = qMax(pp);
@@ -1468,20 +1469,33 @@ async function copyText(v) {
 }
 
 /* ---------- Quantity limits for boost items (admin sets qmin / qmax per product, in units) ---------- */
+const QCAP = 1e7; // highest quantity of one line (boost services are ordered in real units, providers allow up to millions)
 const qMin = (p) => Math.max(1, Math.floor(+(p && p.qmin)) || 1);
 const qMax = (p) => {
   const v = Math.floor(+(p && p.qmax)) || 0;
-  return v > 0 ? Math.min(100000, Math.max(v, qMin(p))) : 100000;
+  return v > 0 ? Math.min(QCAP, Math.max(v, qMin(p))) : QCAP;
 };
 const qClamp = (p, n) => Math.min(qMax(p), Math.max(qMin(p), Math.floor(+n) || qMin(p)));
 const fmtN = (n) => Number(n).toLocaleString("en-US");
+const qUnit1 = (p) => !!(p && p.smm_service && !(+p.smm_qty > 1)); // boost service sold per single unit (quantity = real units)
 const qPresets = (p) => {
   const lo = qMin(p),
     hi = qMax(p),
     set = new Set();
+  if (qUnit1(p)) {
+    /* provider min, a few round numbers inside [min, max], and the provider max */
+    set.add(lo);
+    [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 500000, 1000000].forEach((v) => v > lo && v < hi && set.add(v));
+    if (hi < QCAP && hi > lo) set.add(hi);
+    const all = [...set].sort((x, y) => x - y);
+    if (all.length <= 6) return all;
+    return [0, 1, 2, 3, 4, 5].map((i) => all[Math.round((i * (all.length - 1)) / 5)]);
+  }
   [1, 2, 5, 10, 25].forEach((m) => lo * m <= hi && set.add(lo * m));
   return [...set];
 };
+/* +/- button step: 1 for normal products, a tenth of the current magnitude for single-unit boost services (so 1,000,000 is reachable) */
+const qStep = (p, n, d) => (qUnit1(p) ? d * Math.max(1, Math.pow(10, Math.floor(Math.log10(Math.max(n, 1))) - 1)) : d);
 function qtyBox(p) {
   const lo = qMin(p),
     hi = qMax(p),
@@ -1496,9 +1510,9 @@ function qtyBox(p) {
     )
     .join("");
   return `<div class="qpick"><small>${t("qtyl")}</small><div class="qchips" role="radiogroup" aria-label="${t("qtyl")}">${chips}</div>
-<div class="qcustom"><small>${t("qcustom")}${u ? ` <span class="qeach">(${t("qeach")} <bdi dir="ltr">${fmtN(u)}</bdi>)</span>` : ""}</small>
+<div class="qcustom"><small>${t("qcustom")}${u > 1 ? ` <span class="qeach">(${t("qeach")} <bdi dir="ltr">${fmtN(u)}</bdi>)</span>` : ""}</small>
 <div class="qstep"><button type="button" class="qs" data-a="bqs" data-d="-1" aria-label="-">−</button><input id="bq-in" class="inp qin" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" value="${n}" dir="ltr" data-a="bqin" aria-label="${t("qcustom")}"><button type="button" class="qs" data-a="bqs" data-d="1" aria-label="+">+</button></div>
-<small class="qhint">${t("qminl")}: <bdi dir="ltr">${fmtN(lo)}</bdi>${hi < 100000 ? ` · ${t("qmaxl")}: <bdi dir="ltr">${fmtN(hi)}</bdi>` : ""}</small></div>
+<small class="qhint">${t("qminl")}: <bdi dir="ltr">${fmtN(lo)}</bdi>${hi < QCAP ? ` · ${t("qmaxl")}: <bdi dir="ltr">${fmtN(hi)}</bdi>` : ""}</small></div>
 <div class="qsum"><span id="bq-eq">${smmEq(p, n)}</span><span class="qtot">${t("qtotl")}: <b class="n" id="bq-tot">${money(pr(p) * n)}</b></span></div></div>`;
 }
 /* Live update while the buyer types a custom quantity (no re-render, so the keyboard stays open) */
@@ -1614,7 +1628,7 @@ function card(p) {
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "";
   const rating = ratingHtml(p);
   const vis = isVisit(p);
-  return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${money(pr(p))}</b>${old}</div> <button class="b add" data-a="add" data-id="${ex(p.id)}">${ic( "cart", 15 )} ${t("add")}</button>`}</div></div>`;
+  return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${p.smm_service ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div> <button class="b add" data-a="add" data-id="${ex(p.id)}">${ic( "cart", 15 )} ${t("add")}</button>`}</div></div>`;
 }
 const grid = (a) =>
   a.length
@@ -2048,7 +2062,7 @@ function prodPage(id) {
   const ds = p.ds && (p.ds[lang] || (boost ? p.ds.ar || p.ds.en : ""));
   const rel = boost ? [] : P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
   const back = boost ? `<a class="b b2 sm sb-back" href="#/boost">${ic("chev", 14)} ${lang == "ar" ? "العودة إلى منصة الرشق" : "Back to the Boost panel"}</a>` : "";
-  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
+  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${p.smm_service ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
 }
 
 /* Static pages: FAQ and policies */
@@ -2085,7 +2099,7 @@ function cartPage() {
     cp = cpOf(coupon);
   const rows = lines
     .map(
-      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
+      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${p.smm_service ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
     )
     .join("");
   const couponBox = cp
@@ -3137,7 +3151,7 @@ document.addEventListener("click", async (e) => {
     const pq = prod(id),
       nq = x.q + (+b.dataset.d || 0),
       lo = pq && needsLink(pq) ? qMin(pq) : 1,
-      hi = pq && needsLink(pq) ? qMax(pq) : 100000;
+      hi = pq && needsLink(pq) ? qMax(pq) : QCAP;
     if (nq < lo) cart = cart.filter((c) => c.id != id);
     else x.q = Math.min(hi, nq);
     save();
@@ -3174,7 +3188,7 @@ document.addEventListener("click", async (e) => {
   } else if (a == "bqs") {
     const pq = prod(bqId);
     if (pq) {
-      bq = qClamp(pq, bq + (+b.dataset.d || 0));
+      bq = qClamp(pq, bq + qStep(pq, bq, +b.dataset.d || 0));
       render();
     }
   } else if (a == "zoom") {
@@ -3972,7 +3986,7 @@ const sbU = (p) => (+p.smm_qty > 0 ? +p.smm_qty : 1); // real quantity of one pa
 const sbN = (p) => qClamp(p, SB.n);
 const sbPrice = (p) => {
   const u = sbU(p);
-  return u > 1 ? { v: (pr(p) * 1000) / u, l: "/ 1000" } : { v: pr(p), l: sbT("/ وحدة", "/ unit") };
+  return u > 1 || p.smm_service ? { v: (pr(p) * 1000) / u, l: "/ 1000" } : { v: pr(p), l: sbT("/ وحدة", "/ unit") };
 };
 const sbAll = () => P.filter(isBoost);
 
@@ -4210,7 +4224,7 @@ document.addEventListener("click", (e) => {
     if (p) sbLive((+b.dataset.n || 1) * sbU(p), false);
   } else if (a == "sbs") {
     const p = prod(SB.sel);
-    if (p) sbLive(qClamp(p, SB.n + (+b.dataset.d || 0)) * sbU(p), false);
+    if (p) sbLive(qClamp(p, SB.n + qStep(p, SB.n, +b.dataset.d || 0)) * sbU(p), false);
   } else if (a == "sbbuy") sbCommit(true);
   else if (a == "sbadd") sbCommit(false);
 });
@@ -4481,9 +4495,9 @@ function render0() {
   const sk = $(".skip");
   if (sk) sk.textContent = lang == "ar" ? "تخطَّ إلى المحتوى" : "Skip to content";
   const needPush = pushNeeded();
-  document.body.classList.toggle("gate", !user || needPush);
-  /* Login wall: everything except sign-in, policies and FAQ needs an account */
-  if (!user && !PUBLIC_ROUTES.includes(r)) {
+  document.body.classList.toggle("gate", (!user && r == "login") || needPush);
+  /* Login wall: visitors can browse the catalogue and fill a cart; orders, account, support and partner pages need an account */
+  if (!user && !PUBLIC_ROUTES.includes(r) && !GUEST_ROUTES.includes(r || "")) {
     returnTo = location.hash;
     location.hash = "#/login";
     return;

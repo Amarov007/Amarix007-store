@@ -3,7 +3,7 @@
    ===================================================================== */
 
 /* ---------- Theme tokens ---------- */
-:root{--bg:#F8FAF9;--card:#fff;--tx:#0f1111;--mu:#565959;--bd:#e5e7eb;--g:#2F442C;--m:#A7E8BD;--ac:#52B788;--lk:#2D6A4F;--er:#ef4444;--ok:#22c55e;--wn:#FBBF24;--info:#3b82f6}
+:root{--bg:#F8FAF9;--card:#fff;--tx:#0f1111;--mu:#565959;--bd:#e5e7eb;--g:#08694a;--m:#A7E8BD;--ac:#52B788;--lk:#2D6A4F;--er:#ef4444;--ok:#22c55e;--wn:#FBBF24;--info:#3b82f6}
 @media(prefers-color-scheme:dark){:root{--bg:#121212;--card:#1A1A1A;--tx:#f3f4f6;--mu:#9ca3af;--bd:#2a2a2a;--lk:#A7E8BD}}
 
 /* ---------- Base ---------- */
@@ -133,7 +133,7 @@ textarea.inp{resize:vertical}
    PRO LAYER (v3): dark-first console, grouped sidebar, refined controls
    ===================================================================== */
 :root{--bg:#0a1610;--card:#10231a;--card2:#14301f;--tx:#eaf4ee;--mu:#93ab9d;--bd:#1d3d2d;--g:#1d3a2a;--m:#a7e8bd;--ac:#52b788;--lk:#a7e8bd;--r:16px}
-@media(prefers-color-scheme:light){:root{--bg:#f4f7f5;--card:#fff;--card2:#f0f6f2;--tx:#0f1111;--mu:#5c6b63;--bd:#dfe7e2;--g:#2f442c;--m:#a7e8bd;--lk:#2d6a4f}}
+@media(prefers-color-scheme:light){:root{--bg:#f4f7f5;--card:#fff;--card2:#f0f6f2;--tx:#0f1111;--mu:#5c6b63;--bd:#dfe7e2;--g:#08694a;--m:#a7e8bd;--lk:#2d6a4f}}
 body{background:var(--bg);font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(90% 40% at 50% -5%,color-mix(in srgb,var(--ac) 14%,transparent),transparent 70%)}
 h2{font-size:18px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
