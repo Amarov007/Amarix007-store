@@ -3374,3 +3374,37 @@ body.gate #nv,body.gate .sr,body.gate .menu-b,body.gate .sub-nav,body.gate #sup{
 .rv-s { background: none; border: 0; padding: 2px 4px; font-size: 22px; line-height: 1; cursor: pointer; color: #C9CFCB; transition: transform .12s, color .12s; }
 .rv-s:hover, .rv-s:focus-visible { color: #F0B90B; transform: scale(1.15); }
 .rv-s:disabled { opacity: .5; }
+
+
+/* =====================================================================
+   PRO LAYER (v29): dark-first premium look + prominent "My orders"
+   ===================================================================== */
+:root, :root[data-theme="dark"] {
+  --pro-bg: #0b1a13; --pro-card: #10241a; --pro-card2: #153024; --pro-bd: #1f4231;
+}
+:root[data-theme="dark"] {
+  --bg: var(--pro-bg); --card: var(--pro-card); --ft: #08130d; --bd: var(--pro-bd);
+  --tx: #eef6f1; --mu: #9bb3a6; --lk: #a7e8bd;
+}
+:root[data-theme="dark"] body { background: radial-gradient(120% 60% at 50% -10%, #12301f 0%, var(--bg) 60%) fixed; }
+body { font-size: 15px; line-height: 1.7; }
+main.w { padding-top: 18px; padding-bottom: 96px; }
+h2 { font-size: 21px; margin: 34px 0 14px; letter-spacing: -.2px; }
+
+/* category cards: calmer, larger, one clear action */
+.tiles { gap: 12px; }
+.ct { padding: 18px; border-radius: 20px; gap: 14px; border-color: var(--bd); background: linear-gradient(160deg, var(--card), var(--pro-card2)); }
+:root:not([data-theme="dark"]) .ct { background: var(--card); }
+.ct:hover, .ct:active { border-color: var(--ac); }
+.ct b { font-size: 16px; }
+.ct small { font-size: 12.5px; color: var(--mu); }
+.ct .tile { width: 52px; height: 52px; border-radius: 16px; }
+
+/* bottom bar: "My orders" is the centre action */
+#nv { padding: 8px 6px calc(env(safe-area-inset-bottom, 0px) + 8px); background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+#nv a { font-size: 11.5px; gap: 2px; }
+#nv a.hl { flex: 1.25; margin-top: -22px; color: #062314; background: var(--m); border-radius: 20px; padding: 9px 6px 7px; box-shadow: 0 8px 22px rgba(82,183,136,.35), 0 0 0 5px var(--bg); font-weight: 800; }
+#nv a.hl svg { stroke: currentColor; }
+#nv a.hl.on { background: var(--ac); color: #fff; }
+#nv a.hl:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) { #nv a, #nv a svg { transition: none; } }

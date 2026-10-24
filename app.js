@@ -751,7 +751,7 @@ const CPV = {}; // coupons confirmed by the server (check_coupon RPC): code -> [
 const cpOf = (c) => (c && (CPV[c] || (CP && CP[c]))) || null; // store config: categories, products, embeds, banners, coupons, rates, payment methods
 let lang = ls.get("lang", "ar");
 let cur = ls.get("cur3", "SYP"); // Syrian pound by default (new key so older saved choices, e.g. SAR/AED/EUR, do not override it)
-let th = ls.get("th2", "light"); // light by default
+let th = ls.get("th2", "dark"); // dark by default
 let cart = ls.json("cart", []);
 let STATS = {}; // product_stats(): { id: { s: sold, rc: reviews, ra: avg } }
 let MYREV = {}; // my submitted reviews: "orderId|productId" -> rating
@@ -761,7 +761,7 @@ const viewed = new Set();
 let fav = ls.json("fav", []);
 let coupon = ls.get("amx_coupon", "");
 let payMethod = ls.get("amx_pay", ""); // chosen payment method id
-let sndOn = ls.get("snd", "1") !== "0"; // click sounds
+let sndOn = ls.get("snd", "0") === "1"; // click sounds: opt-in
 let user = null; // Supabase user object when signed in
 let profileName = ""; // name from profiles table (best effort)
 let q = ""; // search query
@@ -1782,14 +1782,14 @@ function nav() {
   const items = [
     ["", "home", "home"],
     ["fav", "heart", "fav"],
-    ["cart", "cart", "cart"],
     ["orders", "box", "ord"],
+    ["cart", "cart", "cart"],
     ["account", "user", "acc"],
   ];
   v.innerHTML = items
     .map(
       ([l, i, k]) =>
-        `<a href="#/${l}" data-r="${l}">${ic(i, 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + n + "</span>" : "" }</a>`
+        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + n + "</span>" : "" }</a>`
     )
     .join("");
   v.querySelectorAll("a").forEach((e) =>

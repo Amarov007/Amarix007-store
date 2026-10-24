@@ -19,7 +19,7 @@
   try {
     var saved = localStorage.getItem(KEY);
     if (saved === '0') pref = false;
-    else if (saved === null && navigator.connection && navigator.connection.saveData) pref = false;
+    else if (saved === null) pref = false; /* opt-in: music starts only after the visitor turns it on */
   } catch (e) {}
   function save() { try { localStorage.setItem(KEY, pref ? '1' : '0'); } catch (e) {} }
   function emit() { try { w.dispatchEvent(new Event('amx:music')); } catch (e) {} }

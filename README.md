@@ -11,12 +11,6 @@
 - `supabase/functions/*` — مصدر الدالة الطرفية `send-push`. حمّل الباقي بـ `supabase functions download ai-support smm-order media-seed img-shrink`.
 - `supabase/migrations/*` — التعديلات المطبّقة على القاعدة الحية بعد هذا التاريخ.
 
-## جودة الإصدار والأمان
-- أضفنا `SECURITY-AND-RELEASE-CHECKLIST.md` لقائمة إطلاق الإنتاج، و`tests/verify-project.py` لفحوصات ساكنة قابلة للتكرار.
-- تمت مراجعة CSP لتقييد الإطارات إلى Cloudflare Turnstile بدل السماح بكل نطاقات HTTPS، مع إضافة ترويسات دفاعية عبر meta. هذه ليست بديلاً عن ترويسات HTTP على الاستضافة؛ راجع ملف قائمة الإطلاق.
-- تم رفع إصدار كاش Service Worker ونسخ الأصول في HTML حتى تصل الملفات الجديدة إلى الزوار.
-- لم يتم تنفيذ SQL على مشروع Supabase الحي؛ ملفات SQL تحتاج مراجعة على نسخة staging ثم تطبيقًا واعيًا على قاعدة الإنتاج. لا يمكن من ملف ZIP وحده التحقق من إعدادات Auth/Storage/Edge Functions الحية.
-
 ## ملاحظات مهمة
 - القاعدة الحية تحوي جداول غير موجودة في ملفات SQL هنا: `push_subscriptions`, `push_broadcasts`, `reviews`, `payout_requests` ودوال مرتبطة بها. للمزامنة: `supabase db pull`.
 - بعد تعديل `app.js` أو `style.css` أو `store-data.js` ارفع رقم `?v=` في `index.html`.
