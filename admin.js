@@ -1924,10 +1924,10 @@ function smmList() {
 }
 /* ---- service -> Arabic title / platform / type (so the store filters work) ---- */
 const SMM_PLAT = [
-  [/insta|\big\b/i, "Instagram", "إنستغرام"], [/tik ?tok/i, "TikTok", "تيك توك"], [/youtube|\byt\b/i, "YouTube", "يوتيوب"],
+  [/instagram|\binsta\b|\big\b/i, "Instagram", "إنستغرام"], [/tik ?tok/i, "TikTok", "تيك توك"], [/youtube|\byt\b/i, "YouTube", "يوتيوب"],
   [/telegram|\btg\b/i, "Telegram", "تيليجرام"], [/twitter|\bx\b|tweet/i, "X", "إكس (تويتر)"], [/facebook|\bfb\b/i, "Facebook", "فيسبوك"],
   [/snap ?chat/i, "Snapchat", "سناب شات"], [/spotify/i, "Spotify", "سبوتيفاي"], [/threads/i, "Threads", "ثريدز"],
-  [/linked ?in/i, "LinkedIn", "لينكدإن"], [/discord/i, "Discord", "ديسكورد"], [/twitch/i, "Twitch", "تويتش"], [/kick/i, "Kick", "كيك"],
+  [/linked ?in/i, "LinkedIn", "لينكدإن"], [/discord/i, "Discord", "ديسكورد"], [/twitch/i, "Twitch", "تويتش"], [/\bkick\b/i, "Kick", "كيك"],
 ];
 const SMM_TYPE = [
   [/follower|subscriber|member|subs\b/i, "متابعين"], [/like|reaction|heart/i, "لايكات"], [/view|play|impression|watch|reach/i, "مشاهدات"],

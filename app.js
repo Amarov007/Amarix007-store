@@ -848,6 +848,7 @@ function setCfg(cfg) {
       };
     })
     .filter((m) => (m.ar || m.en || m.logo || pmReadable(m)) && m.acc); // a method with no account/number yet is hidden (customers would have nowhere to pay)
+  Object.keys(SBM).forEach((k) => delete SBM[k]); // boost panel: platform / type detection is recomputed for the new catalogue
   R = normRates(CFG.rates);
   BASE = "USD";
   if (!R[cur]) cur = "SYP";
@@ -1094,11 +1095,19 @@ function clearFilters(id) {
   render();
 }
 function searchPage() {
-  const a = P.filter((p) => hit(p, q));
+  const a = P.filter((p) => hit(p, q)),
+    st = a.filter((p) => !isBoost(p)),
+    nb = a.length - st.length;
+  const bl = nb
+    ? `<a class="box sb-found" href="#/boost" data-a="sbgo">${ic("trend", 22)}<span style="flex:1">${nb} ${lang == "ar" ? "خدمة رشق مطابقة لبحثك — افتح منصة الرشق" : "matching boost services — open the Boost panel"}</span>${ic("chev", 16)}</a>`
+    : "";
   return (
     `<h2>${t("all")}</h2>` +
-    (a.length
-      ? grid(a)
+    bl +
+    (st.length
+      ? grid(st)
+      : nb
+      ? ""
       : emptyBox("search", `${t("nores")} «${ex(q)}»`, t("noresh"), `<button class="b b2" data-a="clrq">${t("clrq")}</button>`))
   );
 }
@@ -1621,10 +1630,10 @@ const ico = (o, z) =>
 const rtl = () => document.documentElement.dir == "rtl";
 let snKey; /* last active section of the strip (undefined = not positioned yet) */
 function stripRender() {
-  const sn = (id, icon, label) =>
-    `<a class="sn" href="${id === "" ? "#/" : "#/c/" + ex(id)}" data-s="${ex(id)}">${icon}<span>${label}</span></a>`;
+  const sn = (id, icon, label, href) =>
+    `<a class="sn" href="${href}" data-s="${ex(id)}">${icon}<span>${label}</span></a>`;
   snKey = undefined;
-  $("#sub-nav").innerHTML = `<div class="sn-track"><i class="sn-ind"></i>${sn("", ic("home", 16), t("home"))}${CV.map((c) => sn(c.id, ico(c, 16), c[lang])).join("")}</div>`;
+  $("#sub-nav").innerHTML = `<div class="sn-track"><i class="sn-ind"></i>${sn("", ic("home", 16), t("home"), "#/")}${CV.map((c) => sn(c.id, ico(c, 16), c[lang], catHref(c))).join("")}</div>`;
 }
 function stripFades(el) {
   const max = el.scrollWidth - el.clientWidth,
@@ -1639,7 +1648,7 @@ function snSync() {
     tr = box && box.firstElementChild;
   if (!tr || !tr.classList.contains("sn-track")) return;
   const [, r, id] = (location.hash || "#/").split("?")[0].split("/"),
-    cur = r == "c" ? dec(id || "") : r ? null : "";
+    cur = r == "c" ? dec(id || "") : r == "boost" ? (boostCat() || {}).id ?? null : r ? null : "";
   let on = null;
   tr.querySelectorAll(".sn").forEach((a) => {
     const is = cur !== null && a.dataset.s == cur;
@@ -1837,7 +1846,7 @@ function drawerRender() {
     ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${n}</span>` : "")}
     ${big("#/fav", "heart", t("fav"))}
     ${big("#/account", user ? "user" : "out", user ? t("acc") : t("login"))}
-    ${CV.length ? `<div class="dr-h">${A ? "الأقسام" : "Categories"}</div>${CV.map((c) => { const k = P.filter((p) => p.c == c.id).length; return `<a class="dr-r" href="#/c/${ex(c.id)}"><span class="dr-ic">${ico(c, 18)}</span><span class="dr-lb">${c[lang]}</span>${k ? `<small>${k}</small>` : ""}</a>`; }).join("")}` : ""}
+    ${CV.length ? `<div class="dr-h">${A ? "الأقسام" : "Categories"}</div>${CV.map((c) => { const k = P.filter((p) => p.c == c.id).length; return `<a class="dr-r" href="${catHref(c)}"><span class="dr-ic">${ico(c, 18)}</span><span class="dr-lb">${c[lang]}</span>${k ? `<small>${k}</small>` : ""}</a>`; }).join("")}` : ""}
     <div class="dr-h">${A ? "الإعدادات" : "Settings"}</div>
     <button type="button" class="dr-r" data-a="lang"><span class="dr-ic">${ic("globe", 18)}</span><span class="dr-lb">${A ? "اللغة" : "Language"}</span><small>${A ? "English" : "العربية"}</small></button>
     <button type="button" class="dr-r" data-a="theme"><span class="dr-ic">${ic(th == "dark" ? "sun" : "moon", 18)}</span><span class="dr-lb">${t("theme")}</span></button>
@@ -1894,7 +1903,7 @@ function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
   if (q) return searchPage();
   return (
-    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="#/c/${ex(c.id)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> <h2>${t("all")}</h2>${grid(P)}`
+    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> <h2>${t("all")}</h2>${grid(P.filter((p) => !isBoost(p)))}`
   );
 }
 
@@ -1987,6 +1996,7 @@ function catPage(id) {
   const c = cat(id);
   if (!c) return home();
   if (c.ty == "numbers") return numbersPage(c);
+  if (c.ty == "boost") return boostPage();
   const embeds = E.filter((e) => e.c == id)
     .map(
       (e) => `<div class="box"><h3>${ex(lang == "ar" ? e.ar : e.en)}</h3><p class="pd">${ex(lang == "ar" ? e.da : e.de)}</p> ${frameSrc(e.u) ? `<iframe src="${ex(frameSrc(e.u))}" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style="width:100%;height:${+e.h || 420}px;border:0;border-radius:12px;margin-top:8px"></iframe>` : ""}</div>`
@@ -2035,8 +2045,9 @@ function prodPage(id) {
   const qty = boost ? qtyBox(p) : "";
   /* boost description: only text that already exists in the data (the other language when this one is empty) */
   const ds = p.ds && (p.ds[lang] || (boost ? p.ds.ar || p.ds.en : ""));
-  const rel = P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
-  return `<div class="box"><div class="gallery">${gallery}</div> <h1>${p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
+  const rel = boost ? [] : P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
+  const back = boost ? `<a class="b b2 sm sb-back" href="#/boost">${ic("chev", 14)} ${lang == "ar" ? "العودة إلى منصة الرشق" : "Back to the Boost panel"}</a>` : "";
+  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
 }
 
 /* Static pages: FAQ and policies */
@@ -3661,6 +3672,327 @@ async function handleAuthRedirect() {
   } catch {}
 }
 
+/* ---------- 9b. Boost panel (#/boost) ----------
+   A page of its own for the followers / likes / views services (the SMM catalogue), so hundreds of services never flood the store.
+   Flow on one screen: 1 platform icons -> 2 service type (+ search) -> 3 pick a service, enter the link + quantity, buy.
+   Platform and service type are detected from the product text (tag / spec / names), so no data has to be changed. */
+const isBoost = (p) => !!p && !isVisit(p) && needsLink(p);
+const boostCat = () => C.find((c) => c.ty == "boost") || null;
+const catHref = (c) => (c && c.ty == "boost" ? "#/boost" : "#/c/" + ex(c && c.id));
+const sbT = (ar, en) => (lang == "ar" ? ar : en);
+
+/* [id, Arabic, English, detection regex (runs on normalised text), glyph (BR code or letters), background, text colour] */
+const SBP = [
+  ["instagram", "إنستغرام", "Instagram", /instagram|\binsta\b|\big\b|انستغرام|انستجرام/, "ig", "#d6249f"],
+  ["tiktok", "تيك توك", "TikTok", /tik ?tok|تيك ?توك/, "tt", "#111"],
+  ["youtube", "يوتيوب", "YouTube", /youtube|\byt\b|يوتيوب/, "yt", "#ff0000"],
+  ["telegram", "تيليجرام", "Telegram", /telegram|\btg\b|تيليجرام|تيليغرام/, "tg", "#229ed9"],
+  ["facebook", "فيسبوك", "Facebook", /facebook|\bfb\b|فيسبوك/, "fb", "#1877f2"],
+  ["whatsapp", "واتساب", "WhatsApp", /whatsapp|واتساب/, "wa", "#25d366"],
+  ["coinmarketcap", "كوين ماركت كاب", "CoinMarketCap", /coin ?market ?cap|\bcmc\b/, "C", "#3861fb"],
+  ["snapchat", "سناب شات", "Snapchat", /snap ?chat|سناب/, "Sn", "#fffc00", "#111"],
+  ["spotify", "سبوتيفاي", "Spotify", /spotify|سبوتيفاي/, "Sp", "#1db954"],
+  ["threads", "ثريدز", "Threads", /threads|ثريدز/, "@", "#111"],
+  ["linkedin", "لينكدإن", "LinkedIn", /linked ?in|لينكد/, "in", "#0a66c2"],
+  ["discord", "ديسكورد", "Discord", /discord|ديسكورد/, "Dc", "#5865f2"],
+  ["twitch", "تويتش", "Twitch", /twitch|تويتش/, "Tw", "#9146ff"],
+  ["kick", "كيك", "Kick", /\bkick\b|كيك/, "K", "#53fc18", "#111"],
+  ["reddit", "ريديت", "Reddit", /reddit|ريديت/, "R", "#ff4500"],
+  ["soundcloud", "ساوند كلاود", "SoundCloud", /sound ?cloud|ساوند/, "SC", "#ff5500"],
+  ["pinterest", "بينترست", "Pinterest", /pinterest|بينترست/, "P", "#e60023"],
+  ["tumblr", "تمبلر", "Tumblr", /tumblr|تمبلر/, "t", "#36465d"],
+  ["quora", "كورا", "Quora", /quora|كورا/, "Q", "#b92b27"],
+  ["web", "زيارات مواقع", "Website traffic", /traffic|website|web visit|\bseo\b|زيارات/, "W", "#0ea5e9"],
+  ["x", "إكس (تويتر)", "X (Twitter)", /twitter|\bx\b|tweet|تويتر|اكس/, "xx", "#000"],
+];
+const SBO = ["other", "منصات أخرى", "Other platforms", null, "", "#64748b"];
+/* [id, Arabic, English, regex] */
+const SBT = [
+  ["followers", "متابعين", "Followers", /follower|subscriber|member|\bsubs\b|متابع|مشترك|اعضاء/],
+  ["likes", "لايكات", "Likes", /\blikes?\b|reaction|heart|لايك|اعجاب/],
+  ["views", "مشاهدات", "Views", /\bviews?\b|\bplays?\b|impression|\bwatch(es|ing)?\b|reach|stream|مشاهد/],
+  ["comments", "تعليقات", "Comments", /comment|تعليق/],
+  ["shares", "مشاركات وحفظ", "Shares & saves", /share|\bsaves?\b|repost|retweet|مشارك|حفظ/],
+  ["other", "خدمات أخرى", "Other services", null],
+];
+const SBM = {}; // product id -> { pl, ty, h } (cleared whenever the store config reloads)
+function sbMeta(p) {
+  let m = SBM[p.id];
+  if (m) return m;
+  const h = nz(plain([p.tg, p.sp, p.en, p.ar].join(" "))),
+    h0 = nz(plain(p.en)); // the provider's own service name is the most reliable text: it is tried first, the Arabic title / tags are the fallback
+  const pl = SBP.find((r) => r[3].test(h0)) || SBP.find((r) => r[3].test(h)),
+    ty = SBT.find((r) => r[3] && r[3].test(h0)) || SBT.find((r) => r[3] && r[3].test(h));
+  return (SBM[p.id] = { pl: pl ? pl[0] : "other", ty: ty ? ty[0] : "other", h });
+}
+const sbPl = (id) => SBP.find((r) => r[0] == id) || SBO;
+const sbLabPl = (id) => sbPl(id)[lang == "ar" ? 1 : 2];
+const sbLabTy = (id) => (SBT.find((r) => r[0] == id) || SBT[SBT.length - 1])[lang == "ar" ? 1 : 2];
+function sbBadge(id, z) {
+  const r = sbPl(id),
+    br = BR[r[4]];
+  const bg = br && r[4] == "ig" ? br.bg : r[5],
+    inner = br ? brandSvg(br.g, z) : r[4] ? `<b class="sb-lt">${ex(r[4])}</b>` : ic("globe", z);
+  return `<span class="sb-pi" style="background:${bg};color:${r[6] || "#fff"}">${inner}</span>`;
+}
+
+const SB = { pl: "", ty: "", q: "", sort: "def", sel: "", n: 1, link: "", lim: 20, pm: false };
+const sbU = (p) => (+p.smm_qty > 0 ? +p.smm_qty : 1); // real quantity of one package (1 package = sbU units)
+const sbN = (p) => qClamp(p, SB.n);
+const sbPrice = (p) => {
+  const u = sbU(p);
+  return u > 1 ? { v: (pr(p) * 1000) / u, l: "/ 1000" } : { v: pr(p), l: sbT("/ وحدة", "/ unit") };
+};
+const sbAll = () => P.filter(isBoost);
+
+/* One pass over the catalogue: the filtered list plus the counts shown on the platform icons and the type chips */
+function sbCalc() {
+  const all = sbAll(),
+    qq = SB.q.trim(),
+    w = nz(qq).split(/\s+/).filter(Boolean),
+    plAll = {},
+    plc = {},
+    tyc = {};
+  let list = [];
+  all.forEach((p) => {
+    const m = sbMeta(p);
+    plAll[m.pl] = (plAll[m.pl] || 0) + 1;
+    if (qq && !(String(p.smm_service) === qq || w.every((x) => m.h.includes(x)))) return;
+    const okPl = !SB.pl || m.pl == SB.pl,
+      okTy = !SB.ty || m.ty == SB.ty;
+    if (okTy) plc[m.pl] = (plc[m.pl] || 0) + 1;
+    if (okPl) tyc[m.ty] = (tyc[m.ty] || 0) + 1;
+    if (okPl && okTy) list.push(p);
+  });
+  if (SB.sort == "pa") list = [...list].sort((x, y) => sbPrice(x).v - sbPrice(y).v);
+  else if (SB.sort == "pd") list = [...list].sort((x, y) => sbPrice(y).v - sbPrice(x).v);
+  return { list, plAll, plc, tyc, n: all.length };
+}
+
+const SB_PL_SHOWN = 6; // platform icons visible before "More"
+function sbPlats(f) {
+  const ids = Object.keys(f.plAll).sort((a, b) => (a == "other") - (b == "other") || f.plAll[b] - f.plAll[a]);
+  let show = SB.pm ? ids : ids.slice(0, SB_PL_SHOWN);
+  if (!SB.pm && SB.pl && ids.includes(SB.pl) && !show.includes(SB.pl)) show = [...ids.slice(0, SB_PL_SHOWN - 1), SB.pl];
+  const sum = Object.values(f.plc).reduce((s, x) => s + x, 0);
+  const tile = (id, badge, label, n, on) =>
+    `<button type="button" class="sb-p${on ? " on" : ""}${n ? "" : " z"}" data-a="sbpl" data-p="${ex(id)}" aria-pressed="${on}">${badge}<small>${ex(label)}</small><span class="sb-ct n">${fmtN(n)}</span></button>`;
+  return `<div class="sb-pls">${tile("", `<span class="sb-pi sb-all">${ic("grid", 20)}</span>`, sbT("الكل", "All"), sum, !SB.pl)}${show
+    .map((id) => tile(id, sbBadge(id, 20), sbLabPl(id), f.plc[id] || 0, SB.pl == id))
+    .join("")}${
+    ids.length > SB_PL_SHOWN
+      ? `<button type="button" class="sb-p sb-mo" data-a="sbpm" aria-expanded="${SB.pm}"><span class="sb-pi sb-all">${ic(SB.pm ? "x" : "grid", 20)}</span><small>${SB.pm ? sbT("أقل", "Less") : sbT("المزيد", "More")}</small></button>`
+      : ""
+  }</div>`;
+}
+function sbTypes(f) {
+  const sum = Object.values(f.tyc).reduce((s, x) => s + x, 0);
+  const chip = (id, label, n, on) =>
+    `<button type="button" class="fchip${on ? " on" : ""}" aria-pressed="${on}" data-a="sbty" data-t="${ex(id)}">${ex(label)} <small class="n">${fmtN(n)}</small></button>`;
+  return `<div class="fchips">${chip("", sbT("الكل", "All"), sum, !SB.ty)}${SBT.filter((r) => f.tyc[r[0]] || SB.ty == r[0])
+    .map((r) => chip(r[0], r[lang == "ar" ? 1 : 2], f.tyc[r[0]] || 0, SB.ty == r[0]))
+    .join("")}</div>`;
+}
+
+function sbForm(p) {
+  const u = sbU(p),
+    lo = qMin(p),
+    hi = qMax(p),
+    n = sbN(p),
+    ds = p.ds && (p.ds[lang] || p.ds.ar || p.ds.en);
+  const chips = qPresets(p)
+    .slice(0, 6)
+    .map((k) => `<button type="button" role="radio" aria-checked="${k == n}" class="qchip${k == n ? " on" : ""}" data-a="sbn" data-n="${k}">${fmtN(k * u)}</button>`)
+    .join("");
+  const per = sbPrice(p);
+  return `<div class="sb-f">${ds ? `<p class="pd sb-ds">${ex(ds)}</p>` : ""}
+<div class="sb-info"><span>${sbT("السعر", "Price")}: <b class="n">${money(per.v)}</b> ${ex(per.l)}</span><span>${sbT("الحد الأدنى", "Min")}: <bdi dir="ltr">${fmtN(lo * u)}</bdi></span>${+p.qmax > 0 ? `<span>${sbT("الحد الأقصى", "Max")}: <bdi dir="ltr">${fmtN(hi * u)}</bdi></span>` : ""}</div>
+<label class="sb-l"><span>${sbT("رابط الحساب أو المنشور", "Account or post link")} *</span><input id="sb-lk" class="inp" type="text" dir="ltr" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" data-a="sblk" value="${ex(SB.link)}" placeholder="https://… / @username"></label>
+<div class="sb-l"><span>${sbT("الكمية", "Quantity")}</span><div class="qchips" role="radiogroup" aria-label="${sbT("الكمية", "Quantity")}">${chips}</div>
+<div class="qstep"><button type="button" class="qs" data-a="sbs" data-d="-1" aria-label="-">−</button><input id="sb-n" class="inp qin" type="number" inputmode="numeric" min="${lo * u}" max="${hi * u}" value="${n * u}" dir="ltr" data-a="sbqin" aria-label="${sbT("الكمية", "Quantity")}"><button type="button" class="qs" data-a="sbs" data-d="1" aria-label="+">+</button></div>
+<small class="qhint">${u > 1 ? sbT("بمضاعفات", "In steps of") + " <bdi dir=\"ltr\">" + fmtN(u) + "</bdi>" : ""}</small></div>
+<div class="sb-tot"><span>${sbT("الإجمالي", "Total")}</span><b class="n" id="sb-tot">${money(pr(p) * n)}</b></div>
+<div class="sb-act"><button type="button" class="b" data-a="sbbuy">${ic("bolt", 15)} ${t("buy")}</button><button type="button" class="b b2" data-a="sbadd">${ic("cart", 15)} ${t("add")}</button></div>
+<a class="sb-det" href="#/p/${ex(p.id)}">${sbT("تفاصيل الخدمة", "Service details")}</a></div>`;
+}
+function sbRow(p) {
+  const m = sbMeta(p),
+    on = SB.sel == p.id,
+    u = sbU(p),
+    pp = sbPrice(p),
+    lo = qMin(p) * u;
+  const rng = fmtN(lo) + (+p.qmax > 0 ? " – " + fmtN(qMax(p) * u) : "+");
+  return `<div class="sb-r${on ? " on" : ""}" id="sbr-${ex(p.id)}"><button type="button" class="sb-h" data-a="sbsel" data-id="${ex(p.id)}" aria-expanded="${on}">${sbBadge(m.pl, 18)}<span class="sb-nm"><b>${ex(p[lang] || p.ar || p.en)}</b><small>${ex(sbLabTy(m.ty))} · <bdi dir="ltr">${rng}</bdi></small></span><span class="sb-pr"><b class="n">${money(pp.v)}</b><small>${ex(pp.l)}</small></span><i class="sb-ch">${ic("chev", 16)}</i></button>${on ? sbForm(p) : ""}</div>`;
+}
+function sbRes(f) {
+  const a = f.list,
+    show = a.slice(0, SB.lim);
+  const bar = `<div class="sb-meta"><span><b class="n">${fmtN(a.length)}</b> ${sbT("خدمة", "services")}</span><label class="fsort"><span>${t("sortl")}</span><select class="sel" data-a="sbsort" aria-label="${t("sortl")}">${[
+    ["def", sbT("الافتراضي", "Default")],
+    ["pa", sbT("الأرخص أولاً", "Cheapest first")],
+    ["pd", sbT("الأغلى أولاً", "Priciest first")],
+  ]
+    .map(([k, l]) => `<option value="${k}"${SB.sort == k ? " selected" : ""}>${l}</option>`)
+    .join("")}</select></label></div>`;
+  if (!a.length)
+    return bar + emptyBox("search", sbT("لا توجد خدمات مطابقة", "No matching services"), sbT("جرّب منصة أو نوعاً آخر أو امسح البحث.", "Try another platform or type, or clear the search."), `<button type="button" class="b b2" data-a="sbclr">${t("fclear")}</button>`);
+  return `${bar}<div class="sb-list">${show.map(sbRow).join("")}</div>${
+    a.length > show.length ? `<button type="button" class="b b2 block sb-more" data-a="sbmore">${sbT("عرض المزيد", "Show more")} (${fmtN(a.length - show.length)})</button>` : ""
+  }`;
+}
+
+function boostPage() {
+  if (loadingCfg && !P.length) return skeletonGrid();
+  const c = boostCat(),
+    f = sbCalc();
+  const head = `<div class="box row sb-hero"><span class="tile big">${c ? ico(c, 30) : ic("trend", 30)}</span><div style="flex:1"><h1>${c ? c[lang] : sbT("منصة الرشق", "Boost panel")}</h1><p class="pd">${sbT("اختر المنصة ثم نوع الخدمة، وأكمل طلبك من نفس الصفحة.", "Pick a platform, then a service type, and order right here.")}</p></div></div>`;
+  if (!f.n) return head + emptyBox("box", t("catempty"));
+  return `${head}<div class="box sb-panel"><div class="sb-lab"><i>1</i>${sbT("المنصة", "Platform")}</div><div id="sb-pls">${sbPlats(f)}</div>
+<div class="sb-s"><span class="sb-si">${ic("search", 18)}</span><input id="sb-q" class="inp" type="search" data-a="sbq" value="${ex(SB.q)}" placeholder="${sbT("ابحث عن خدمة أو رقمها…", "Search a service or its ID…")}" autocomplete="off" enterkeyhint="search" aria-label="${sbT("بحث", "Search")}"></div>
+<div class="sb-lab"><i>2</i>${sbT("نوع الخدمة", "Service type")}</div><div id="sb-tys">${sbTypes(f)}</div></div>
+<div class="sb-lab out"><i>3</i>${sbT("اختر الخدمة وأكمل الطلب", "Choose a service and order")}</div><div id="sb-res">${sbRes(f)}</div>`;
+}
+/* Redraw only the panel parts (the search box keeps focus while typing) */
+function sbDraw() {
+  const g = (id) => document.getElementById(id);
+  if (!g("sb-res")) return;
+  const f = sbCalc();
+  g("sb-pls").innerHTML = sbPlats(f);
+  g("sb-tys").innerHTML = sbTypes(f);
+  g("sb-res").innerHTML = sbRes(f);
+}
+const sbReset = () => {
+  SB.sel = "";
+  SB.lim = 20;
+  sbDraw();
+};
+/* Quantity edits update the total in place (no re-render, so the keyboard stays open). keep = leave what the buyer typed in the box */
+function sbLive(raw, keep) {
+  const p = prod(SB.sel);
+  if (!p) return;
+  const u = sbU(p),
+    v = Math.round((+raw || 0) / u),
+    ok = v >= qMin(p) && v <= qMax(p),
+    n = qClamp(p, v);
+  SB.n = n;
+  const inp = $("#sb-n"),
+    tot = $("#sb-tot");
+  if (tot) tot.innerHTML = money(pr(p) * n);
+  if (inp) {
+    inp.setAttribute("aria-invalid", ok ? "false" : "true");
+    if (!keep) {
+      inp.value = n * u;
+      inp.setAttribute("aria-invalid", "false");
+    }
+  }
+  document.querySelectorAll("#sb-res .qchip").forEach((c) => {
+    const on = +c.dataset.n == n && (ok || !keep);
+    c.classList.toggle("on", on);
+    c.setAttribute("aria-checked", String(on));
+  });
+}
+function sbCommit(go) {
+  const p = prod(SB.sel);
+  if (!p) return;
+  const inp = $("#sb-n");
+  if (inp) sbLive(inp.value, false);
+  const lk = SB.link.trim(),
+    lki = $("#sb-lk");
+  if (!linkOk(lk)) {
+    if (lki) {
+      lki.setAttribute("aria-invalid", "true");
+      lki.focus();
+    }
+    return toast(sbT("أدخل رابط الحساب أو المنشور بشكل صحيح", "Enter a valid account or post link"), "wn");
+  }
+  const old = cart.find((c) => c.id == p.id);
+  if (old && String(old.l || "").trim() && String(old.l).trim() != lk) {
+    toast(sbT("هذه الخدمة في سلتك برابط آخر. أكمل طلبها أو احذفها أولاً.", "This service is already in your cart with another link. Finish or remove it first."), "wn");
+    return qbOpen();
+  }
+  addToCart(p.id, SB.n);
+  const x = cart.find((c) => c.id == p.id);
+  if (x) {
+    x.l = lk;
+    save();
+  }
+  go ? qbOpen() : toast(t("added"));
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-a^='sb']");
+  if (!b) return;
+  const a = b.dataset.a;
+  if (a == "sbgo") {
+    // from the store search: carry the typed words into the boost panel
+    SB.q = q;
+    SB.pl = SB.ty = SB.sel = "";
+    SB.lim = 20;
+    q = "";
+    const qi = $("#q");
+    if (qi) qi.value = "";
+  } else if (a == "sbpl") {
+    const v = b.dataset.p || "";
+    SB.pl = v && SB.pl == v ? "" : v;
+    SB.ty = "";
+    sbReset();
+  } else if (a == "sbpm") {
+    SB.pm = !SB.pm;
+    sbDraw();
+  } else if (a == "sbty") {
+    const v = b.dataset.t || "";
+    SB.ty = v && SB.ty == v ? "" : v;
+    sbReset();
+  } else if (a == "sbmore") {
+    SB.lim += 20;
+    sbDraw();
+  } else if (a == "sbclr") {
+    SB.pl = SB.ty = SB.q = "";
+    const i = $("#sb-q");
+    if (i) i.value = "";
+    sbReset();
+  } else if (a == "sbsel") {
+    const id = b.dataset.id,
+      p = prod(id);
+    SB.sel = SB.sel == id ? "" : id;
+    if (SB.sel && p) SB.n = qMin(p);
+    sbDraw();
+    const el = SB.sel && document.getElementById("sbr-" + id);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  } else if (a == "sbn") {
+    const p = prod(SB.sel);
+    if (p) sbLive((+b.dataset.n || 1) * sbU(p), false);
+  } else if (a == "sbs") {
+    const p = prod(SB.sel);
+    if (p) sbLive(qClamp(p, SB.n + (+b.dataset.d || 0)) * sbU(p), false);
+  } else if (a == "sbbuy") sbCommit(true);
+  else if (a == "sbadd") sbCommit(false);
+});
+document.addEventListener("input", (e) => {
+  const el = e.target,
+    a = el.dataset && el.dataset.a;
+  if (a == "sbq") {
+    SB.q = el.value;
+    SB.sel = "";
+    SB.lim = 20;
+    sbDraw();
+  } else if (a == "sbqin") sbLive(el.value, true);
+  else if (a == "sblk") {
+    SB.link = el.value;
+    el.removeAttribute("aria-invalid");
+  }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target,
+    a = el.dataset && el.dataset.a;
+  if (a == "sbsort") {
+    SB.sort = el.value;
+    SB.sel = "";
+    SB.lim = 20;
+    sbDraw();
+  } else if (a == "sbqin") sbLive(el.value, false);
+});
+
+
 /* ---------- 14. Search, banners & router ---------- */
 const nz = (x) =>
   String(x)
@@ -3895,6 +4227,8 @@ function render0() {
       ? catPage(dec(id || ""))
       : r == "p"
       ? prodPage(dec(id || ""))
+      : r == "boost"
+      ? boostPage()
       : r == "cart"
       ? cartPage()
       : r == "fav"
