@@ -525,8 +525,11 @@ const VIEW = {
     return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("SMM API URL", "api.smm_url", { d: 1 })}${F( "SMM API Key", "api.smm_key", { d: 1 } )}${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> <div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase (المتصفح لا يستطيع الاتصال بموقع الرشق مباشرة، والمفتاح يبقى في الخادم). احفظ الإعدادات أولاً.</p> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="acts" style="margin-top:8px"><button class="b bd2" data-a="smm-wipe" type="button">🗑 حذف كل منتجات الرشق</button><button class="b" data-a="smm-redo" type="button">♻ حذف وإعادة جلب من المزوّد</button><button class="b b2" data-a="smm-undo" type="button">↩ استرجاع المحذوف</button></div><p class="hint">«حذف وإعادة جلب» يجلب الخدمات من المزوّد أولاً، وإن فشل الجلب لا يُحذف شيء. يُحفظ نسخة احتياطية قبل الحذف ويمكن الاسترجاع منها. بعدها اضغط «نشر».</p> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
   },
   affiliates() {
-    setTimeout(loadAffiliates, 50);
-    return `<div class="card"><h2>برنامج الشركاء (Affiliate)</h2><div id="aff-list">${loadingHTML}</div></div>`;
+    setTimeout(() => { loadAffiliates(); loadAffReport(); loadAffTiers(); }, 50);
+    return `<div class="card"><h2>برنامج الشركاء (Affiliate)</h2><div id="aff-list">${loadingHTML}</div></div>
+    <div class="card"><h2>التقرير الشهري للعمولات</h2><p class="hint">العمولات المستحقة للشركاء عن الطلبات المدفوعة في كل شهر (الشهر = شهر إنشاء الطلب).</p><div id="aff-rep">${loadingHTML}</div></div>
+    <div class="card"><h2>شرائح العمولة (Tiers)</h2><p class="hint">كل طلب مدفوع يُحتسب بنسبة الشريحة التي وصل إليها الشريك في ذلك الشهر (ترتيب الطلب داخل الشهر). النسبة الخاصة بالشريك (في الجدول أعلاه) تتغلب على الشرائح.</p><div id="aff-tiers">${loadingHTML}</div></div>
+    <div class="card"><h2>حاسبة التكلفة والأرباح</h2><p class="hint">قدّر ما ستدفعه لشريك شهرياً حسب أدائه المتوقع، بنفس منطق الشرائح أعلاه.</p><div id="aff-calc"></div></div>`;
   },
   orders() {
     setTimeout(loadOrders, 50);
@@ -895,6 +898,49 @@ document.addEventListener("click", (e) => {
     D[d.k].splice(+d.i, 1);
     save();
     return render();
+  }
+  if (a == "aff-tier-save" || a == "aff-tier-del" || a == "aff-tier-add") {
+    const hdr = { "Content-Type": "application/json", Prefer: "return=minimal" };
+    let req;
+    if (a == "aff-tier-add") {
+      const l = affTL(),
+        last = l[l.length - 1] || { min_sales: 0, rate: 5 };
+      req = api("/rest/v1/affiliate_tiers", {
+        method: "POST",
+        headers: hdr,
+        body: JSON.stringify({ label: "Tier " + (l.length + 1), min_sales: last.min_sales + 10, rate: +last.rate }),
+      });
+    } else if (a == "aff-tier-del") {
+      if (!confirm("حذف الشريحة؟")) return;
+      req = api("/rest/v1/affiliate_tiers?id=eq." + encodeURIComponent(d.id), { method: "DELETE", headers: hdr });
+    } else {
+      const tr = b.closest("tr"),
+        label = tr.querySelector("[data-t-l]").value.trim().slice(0, 30),
+        mn = tr.querySelector("[data-t-m]").value.trim(),
+        rt = tr.querySelector("[data-t-r]").value.trim().replace(",", ".");
+      if (!/^\d{1,5}$/.test(mn)) return toast("رقم الطلب يجب أن يكون عدداً صحيحاً ≥ 0", "e");
+      if (rt === "" || !(+rt >= 0 && +rt <= 100)) return toast("العمولة بين 0 و 100", "e");
+      req = api("/rest/v1/affiliate_tiers?id=eq." + encodeURIComponent(d.id), {
+        method: "PATCH",
+        headers: hdr,
+        body: JSON.stringify({ label, min_sales: +mn, rate: +rt }),
+      });
+    }
+    b.disabled = true;
+    req
+      .then(async (r) => {
+        if (!r.ok) {
+          const t = await r.text();
+          throw new Error(/duplicate|unique/i.test(t) ? "dup" : "x");
+        }
+        toast("تم الحفظ ✓");
+        loadAffTiers();
+      })
+      .catch((er) => {
+        toast(er.message == "dup" ? "يوجد شريحة بنفس رقم الطلب" : "فشل الحفظ", "e");
+        b.disabled = false;
+      });
+    return;
   }
   if (a == "aff-status") {
     const rin = b.closest("tr").querySelector("input[data-aff-r]"),
@@ -1547,6 +1593,7 @@ async function loadUsers() {
     b.textContent = "فشل التحميل";
   }
 }
+const AFF_AUD = { lt1k: "< 1K", "1k-10k": "1K–10K", "10k-50k": "10K–50K", gt50k: "50K+" };
 const AFF_ST = { none: "لم يقدّم", pending: "بانتظار المراجعة", approved: "معتمد", rejected: "مرفوض" };
 async function loadAffiliates() {
   const b = $("#aff-list");
@@ -1564,13 +1611,105 @@ async function loadAffiliates() {
     b.innerHTML = `<div class="tw"><table class="tb"><tr><th>الشريك</th><th>الحالة</th><th>محفظة الدفع</th><th>النسبة %</th><th>كوبونه</th><th>النقرات</th><th>المبيعات</th><th>العمولة</th><th></th></tr>${a
       .map(
         (x) =>
-          `<tr><td dir="ltr">${esc((x.profiles || {}).email || x.user_id)}</td><td>${esc(AFF_ST[x.status] || x.status || "—")}</td><td dir="ltr" style="max-width:160px;word-break:break-all">${esc(x.payout_id || "—")}</td><td><input class="inp" data-aff-r dir="ltr" inputmode="decimal" maxlength="5" style="width:70px;display:inline-block" value="${esc(x.rate == null ? "" : x.rate)}" placeholder="افتراضي"></td><td style="white-space:nowrap"><input class="inp" data-aff-c dir="ltr" maxlength="40" style="width:110px;display:inline-block" value="${esc(x.coupon || "")}" placeholder="CODE"> <button class="b sm" data-a="aff-coupon" data-id="${esc(x.id)}">حفظ</button></td><td>${x.clicks}</td><td>${x.sales}</td><td>${(+x.total_commission).toFixed(2)}</td><td style="white-space:nowrap">${x.status == "approved" ? `<button class="b sm" data-a="aff-status" data-st="approved" data-id="${esc(x.id)}">حفظ النسبة</button> <button class="b b2 sm" data-a="aff-status" data-st="rejected" data-id="${esc(x.id)}">إيقاف</button>` : `<button class="b sm" data-a="aff-status" data-st="approved" data-id="${esc(x.id)}">قبول</button>${x.status == "pending" ? ` <button class="b b2 sm" data-a="aff-status" data-st="rejected" data-id="${esc(x.id)}">رفض</button>` : ""}`}</td></tr>`
+          `<tr><td dir="ltr">${esc((x.profiles || {}).email || x.user_id)}${x.channel_url ? `<div class="od-m" style="white-space:normal;word-break:break-all">${esc(x.channel_type || "")} · ${esc(x.channel_url)}${x.audience ? " · " + esc(AFF_AUD[x.audience] || x.audience) : ""}${x.pitch ? `<br>${esc(x.pitch)}` : ""}</div>` : ""}</td><td>${esc(AFF_ST[x.status] || x.status || "—")}</td><td dir="ltr" style="max-width:160px;word-break:break-all">${esc(x.payout_id || "—")}</td><td><input class="inp" data-aff-r dir="ltr" inputmode="decimal" maxlength="5" style="width:70px;display:inline-block" value="${esc(x.rate == null ? "" : x.rate)}" placeholder="افتراضي"></td><td style="white-space:nowrap"><input class="inp" data-aff-c dir="ltr" maxlength="40" style="width:110px;display:inline-block" value="${esc(x.coupon || "")}" placeholder="CODE"> <button class="b sm" data-a="aff-coupon" data-id="${esc(x.id)}">حفظ</button></td><td>${x.clicks}</td><td>${x.sales}</td><td>${(+x.total_commission).toFixed(2)}</td><td style="white-space:nowrap">${x.status == "approved" ? `<button class="b sm" data-a="aff-status" data-st="approved" data-id="${esc(x.id)}">حفظ النسبة</button> <button class="b b2 sm" data-a="aff-status" data-st="rejected" data-id="${esc(x.id)}">إيقاف</button>` : `<button class="b sm" data-a="aff-status" data-st="approved" data-id="${esc(x.id)}">قبول</button>${x.status == "pending" ? ` <button class="b b2 sm" data-a="aff-status" data-st="rejected" data-id="${esc(x.id)}">رفض</button>` : ""}`}</td></tr>`
       )
       .join("")}</table></div>`;
   } catch {
     b.textContent = "فشل التحميل";
   }
 }
+
+let AFF_REP = null,
+  AFF_TIERS = null;
+const AFF_DEF_TIERS = [
+  { label: "Bronze", min_sales: 0, rate: 5 },
+  { label: "Silver", min_sales: 10, rate: 7 },
+  { label: "Gold", min_sales: 30, rate: 10 },
+  { label: "Platinum", min_sales: 100, rate: 12 },
+];
+const affTL = () =>
+  (AFF_TIERS && AFF_TIERS.length ? AFF_TIERS : AFF_DEF_TIERS).slice().sort((x, y) => x.min_sales - y.min_sales);
+async function loadAffReport() {
+  const b = $("#aff-rep");
+  if (!b) return;
+  try {
+    const r = await api("/rest/v1/rpc/admin_affiliate_monthly", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_months: 12 }),
+    });
+    if (!r.ok) throw new Error();
+    AFF_REP = await r.json();
+    renderAffReport();
+  } catch {
+    b.textContent = "فشل التحميل (شغّل supabase-affiliate-tiers.sql)";
+  }
+}
+function renderAffReport(sel) {
+  const b = $("#aff-rep");
+  if (!b || !AFF_REP) return;
+  const key = new Date().toISOString().slice(0, 7),
+    months = [...new Set(AFF_REP.map((x) => x.month))];
+  if (!months.includes(key)) months.unshift(key);
+  sel = sel || b.dataset.m || months[0];
+  b.dataset.m = sel;
+  const rows = AFF_REP.filter((x) => x.month == sel),
+    tot = rows.reduce((t, x) => ({ s: t.s + +x.sales, v: t.v + +x.volume, c: t.c + +x.commission }), { s: 0, v: 0, c: 0 }),
+    cu = esc(baseCur());
+  b.innerHTML = `<div class="fl"><select class="inp" id="aff-month">${months.map((m) => `<option value="${esc(m)}"${m == sel ? " selected" : ""}>${esc(m)}</option>`).join("")}</select></div><div class="tw"><table class="tb"><tr><th>الشريك</th><th>المبيعات</th><th>حجم الطلبات</th><th>العمولة المستحقة</th></tr>${
+    rows.length
+      ? rows.map((x) => `<tr><td dir="ltr">${esc(x.email || x.user_id)}</td><td>${x.sales}</td><td>${(+x.volume).toFixed(2)} ${cu}</td><td><b>${(+x.commission).toFixed(2)} ${cu}</b></td></tr>`).join("") +
+        `<tr><td><b>الإجمالي</b></td><td><b>${tot.s}</b></td><td><b>${tot.v.toFixed(2)} ${cu}</b></td><td><b>${tot.c.toFixed(2)} ${cu}</b></td></tr>`
+      : '<tr><td colspan="4">لا توجد مبيعات من الشركاء في هذا الشهر</td></tr>'
+  }</table></div>`;
+}
+async function loadAffTiers() {
+  const b = $("#aff-tiers");
+  if (!b) return;
+  try {
+    const r = await api("/rest/v1/affiliate_tiers?select=*&order=min_sales.asc");
+    if (!r.ok) throw new Error();
+    AFF_TIERS = await r.json();
+    b.innerHTML = `<div class="tw"><table class="tb"><tr><th>الاسم</th><th>من الطلب رقم</th><th>العمولة %</th><th></th></tr>${AFF_TIERS.map(
+      (t) =>
+        `<tr><td><input class="inp" data-t-l maxlength="30" style="width:110px" value="${esc(t.label)}"></td><td><input class="inp" data-t-m dir="ltr" inputmode="numeric" maxlength="5" style="width:70px" value="${esc(t.min_sales)}"></td><td><input class="inp" data-t-r dir="ltr" inputmode="decimal" maxlength="5" style="width:70px" value="${esc(t.rate)}"></td><td style="white-space:nowrap"><button class="b sm" data-a="aff-tier-save" data-id="${esc(t.id)}">حفظ</button> <button class="b b2 sm" data-a="aff-tier-del" data-id="${esc(t.id)}">حذف</button></td></tr>`
+    ).join("")}</table></div><button class="b sm" data-a="aff-tier-add" style="margin-top:10px">+ إضافة شريحة</button><p class="hint">الشريحة الأولى يجب أن تبدأ من 0 حتى تُغطي الطلبات الأولى في الشهر.</p>`;
+    affAdminCalc(true);
+  } catch {
+    b.textContent = "فشل التحميل (شغّل supabase-affiliate-tiers.sql)";
+  }
+}
+function affAdminCalc(init) {
+  const box = $("#aff-calc");
+  if (!box) return;
+  if (init || !box.dataset.ready) {
+    box.dataset.ready = "1";
+    box.innerHTML = `<div class="fl" style="flex-wrap:wrap;gap:8px"><label class="fld"><span>عملاء مُحالون شهرياً</span><input class="inp" id="ac-n" type="number" min="0" value="20" style="width:110px"></label><label class="fld"><span>طلبات العميل شهرياً</span><input class="inp" id="ac-p" type="number" min="0" step="0.5" value="1" style="width:110px"></label><label class="fld"><span>متوسط الطلب (${esc(baseCur())})</span><input class="inp" id="ac-a" type="number" min="0" value="20" style="width:110px"></label><label class="fld"><span>نسبة ثابتة % (اختياري)</span><input class="inp" id="ac-c" type="number" min="0" max="100" step="0.5" placeholder="الشرائح" style="width:110px"></label></div><div id="ac-out" class="hint" style="margin-top:12px"></div>`;
+  }
+  const v = (id) => +($("#" + id).value || 0),
+    cv = $("#ac-c").value,
+    c = cv === "" ? null : +cv,
+    sales = Math.max(0, Math.round(v("ac-n") * v("ac-p"))),
+    aov = v("ac-a");
+  let earn = 0;
+  for (let i = 1; i <= sales; i++) {
+    let r = c;
+    if (r == null) {
+      r = 0;
+      for (const t of affTL()) if (t.min_sales <= i) r = +t.rate;
+    }
+    earn += (aov * r) / 100;
+  }
+  const vol = sales * aov,
+    cu = esc(baseCur());
+  $("#ac-out").innerHTML = `طلبات مدفوعة: <b>${sales}</b> · حجم الطلبات: <b>${vol.toFixed(2)} ${cu}</b><br>العمولة الشهرية للشريك: <b>${earn.toFixed(2)} ${cu}</b> (${vol ? ((earn / vol) * 100).toFixed(1) : 0}% في المتوسط) · سنوياً: <b>${(earn * 12).toFixed(2)} ${cu}</b><br>صافي تقديري لك بعد العمولة: <b>${(vol - earn).toFixed(2)} ${cu}</b> شهرياً (قبل تكلفة المنتجات)`;
+}
+document.addEventListener("input", (e) => {
+  if (e.target.id && /^ac-[npac]$/.test(e.target.id)) affAdminCalc();
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id == "aff-month") renderAffReport(e.target.value);
+});
 
 /* Orders: list, filter, and a status change that really updates the database */
 let ORDERS = null,

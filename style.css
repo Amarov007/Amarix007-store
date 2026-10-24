@@ -2031,6 +2031,25 @@ footer {
   font-size: 10.5px;
 }
 
+/* Partner program: levels, calculator, earnings table */
+.ref .fld { display: flex; flex-direction: column; gap: 6px; }
+.ref textarea.inp { resize: vertical; min-height: 72px; font-family: inherit; }
+.aff-lv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
+.aff-lv div, .aff-res div { background: var(--bg); border-radius: 12px; padding: 10px 6px; display: flex; flex-direction: column; gap: 2px; }
+.aff-lv b, .aff-res b { font-size: 15px; }
+.aff-lv small, .aff-res small { color: var(--mu); font-size: 10.5px; }
+.aff-tw { overflow-x: auto; }
+.aff-tb { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: center; }
+.aff-tb th { color: var(--mu); font-weight: 600; font-size: 11px; padding: 6px 4px; }
+.aff-tb td { padding: 8px 4px; border-top: 1px solid color-mix(in srgb, var(--mu) 25%, transparent); }
+.aff-sl { display: flex; flex-direction: column; gap: 6px; }
+.aff-sl label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
+.aff-sl label span { color: var(--mu); }
+.aff-sl input[type="range"] { width: 100%; accent-color: var(--ac); }
+.aff-res { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.aff-res .big { grid-column: span 3; padding: 14px 6px; border: 1px dashed var(--ac); }
+.aff-res .big b { font-size: 20px; }
+
 /* ---------- 16. Support speed-dial ---------- */
 .sup {
   position: fixed;

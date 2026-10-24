@@ -2124,35 +2124,160 @@ function accPage() {
     shown = name || user.email.split("@")[0];
   return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${pushBox()}${partnerBox()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
 }
+/* ---- Partner (affiliate) program: tiers, calculator, monthly earnings ---- */
+const AFF_DEF = [
+  { min_sales: 0, rate: 5, label: "Bronze" },
+  { min_sales: 10, rate: 7, label: "Silver" },
+  { min_sales: 30, rate: 10, label: "Gold" },
+  { min_sales: 100, rate: 12, label: "Platinum" },
+];
+let affTiers = null, // rows of public.affiliate_tiers
+  refMonthly = null; // [{month, sales, volume, commission}] for an approved partner
+const affTierList = () =>
+  (affTiers && affTiers.length ? affTiers : AFF_DEF).slice().sort((x, y) => x.min_sales - y.min_sales);
+/* rate that applies to the i-th paid order of the month (a custom partner rate wins) */
+function affRateAt(i, custom) {
+  if (custom != null && custom !== "") return +custom;
+  let r = 0;
+  for (const t of affTierList()) if (t.min_sales <= i) r = +t.rate;
+  return r;
+}
+function affTierAt(i) {
+  let x = null;
+  for (const t of affTierList()) if (t.min_sales <= i) x = t;
+  return x;
+}
+function affCalc(clients, per, aov, custom) {
+  const sales = Math.max(0, Math.round(clients * per));
+  let earn = 0;
+  for (let i = 1; i <= sales; i++) earn += (aov * affRateAt(i, custom)) / 100;
+  const volume = sales * aov;
+  return { sales, volume, earn, avg: volume ? (earn / volume) * 100 : 0 };
+}
+async function loadAffData() {
+  try {
+    const r = await sb("/rest/v1/affiliate_tiers?select=label,min_sales,rate&order=min_sales.asc", { auth: false });
+    if (r.ok) affTiers = await r.json();
+  } catch {}
+  try {
+    if (refInfo && refInfo.status == "approved") {
+      const r = await sb("/rest/v1/rpc/my_affiliate_monthly", { method: "POST", body: {} });
+      if (r.ok) refMonthly = await r.json();
+    }
+  } catch {}
+  if (/^#\/account/.test(location.hash)) render();
+}
+const AFF_CH = [
+  ["telegram", "Telegram"],
+  ["youtube", "YouTube"],
+  ["tiktok", "TikTok"],
+  ["instagram", "Instagram"],
+  ["x", "X (Twitter)"],
+  ["website", "Website"],
+  ["other", "Other"],
+];
 function partnerBox() {
   if (!refInfo) return "";
   const A = lang == "ar",
     st = refInfo.status || "none",
     head = `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}</h3>`;
+  let out = "";
   if (st == "approved") {
     const link = location.origin + location.pathname + "?ref=" + refInfo.code,
-      rate = refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null,
+      custom = refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null,
       stats = [
         [A ? "نقرات" : "Clicks", refInfo.clicks || 0],
         [A ? "تسجيلات" : "Sign-ups", refInfo.signups || 0],
         [A ? "مبيعات" : "Sales", refInfo.sales || 0],
-        [A ? "عمولتك" : "Earned", fmt(+refInfo.total_commission || 0)],
-      ];
-    return `<div class="box ref">${head}<p class="sb">${A ? "أنت شريك معتمد — شارك رابطك واكسب عمولة على كل طلب مدفوع من عملائك." : "You are an approved partner — share your link and earn a commission on every paid order from your referrals."}${rate != null ? ` <b>${A ? "نسبة عمولتك" : "Your rate"}: ${ex(String(rate))}%</b>` : ""}</p> <div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div> <div class="ref-s">${stats.map(([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>`).join("")}</div></div>`;
+        [A ? "إجمالي الأرباح" : "Total earned", fmt(+refInfo.total_commission || 0)],
+      ],
+      key = new Date().toISOString().slice(0, 7),
+      rows = refMonthly || [],
+      now = rows.find((m) => m.month == key),
+      cs = now ? +now.sales : 0,
+      nextRate = affRateAt(cs + 1, custom),
+      tier = custom == null ? affTierAt(cs + 1) : null,
+      nxt = custom == null ? affTierList().find((t) => t.min_sales > cs + 1) : null;
+    out += `<div class="box ref">${head}<p class="sb">${A ? "أنت شريك معتمد — شارك رابطك واكسب عمولة على كل طلب مدفوع من عملائك." : "You are an approved partner — share your link and earn a commission on every paid order from your referrals."}</p> <div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div> <div class="ref-s">${stats.map(([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>`).join("")}</div>
+      <div class="aff-lv"><div><small>${A ? "هذا الشهر" : "This month"}</small><b class="n">${cs} ${A ? "مبيعات" : "sales"}</b></div><div><small>${A ? "عمولة طلبك القادم" : "Next order rate"}</small><b class="n">${nextRate}%${tier ? " · " + ex(tier.label) : custom != null ? (A ? " · نسبة خاصة" : " · custom") : ""}</b></div></div>
+      ${nxt ? `<p class="sb">${A ? `بعد ${nxt.min_sales - cs - 1} مبيعات إضافية هذا الشهر ترتفع عمولتك إلى ${nxt.rate}% (${ex(nxt.label)}).` : `${nxt.min_sales - cs - 1} more sales this month and your rate rises to ${nxt.rate}% (${ex(nxt.label)}).`}</p>` : ""}</div>`;
+    out += `<div class="box ref"><h3>${A ? "أرباحك الشهرية" : "Your monthly earnings"}</h3>${
+      rows.length
+        ? `<div class="aff-tw"><table class="aff-tb"><tr><th>${A ? "الشهر" : "Month"}</th><th>${A ? "المبيعات" : "Sales"}</th><th>${A ? "حجم الطلبات" : "Volume"}</th><th>${A ? "عمولتك" : "Earned"}</th></tr>${rows.map((m) => `<tr><td dir="ltr">${ex(m.month)}</td><td>${+m.sales}</td><td>${money(+m.volume)}</td><td><b>${money(+m.commission)}</b></td></tr>`).join("")}</table></div>`
+        : `<p class="sb">${A ? "لا توجد مبيعات بعد — ستظهر أرباحك هنا شهراً بشهر." : "No sales yet — your earnings will appear here month by month."}</p>`
+    }</div>`;
+  } else if (st == "pending") {
+    out += `<div class="box ref">${head}<p class="sb">${A ? "طلبك قيد المراجعة — سيظهر رابطك هنا فور الموافقة عليه." : "Your application is under review — your link will appear here once it is approved."}</p></div>`;
+  } else {
+    const aud = [
+      ["lt1k", A ? "أقل من 1,000" : "Under 1,000"],
+      ["1k-10k", "1,000 – 10,000"],
+      ["10k-50k", "10,000 – 50,000"],
+      ["gt50k", A ? "أكثر من 50,000" : "Over 50,000"],
+    ];
+    out += `<div class="box ref">${head}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك، وترتفع نسبتك كلما زادت مبيعاتك الشهرية. قدّم طلبك وسنراجعه." : "Join as a partner and earn a commission on every paid order through your link — your rate rises with your monthly sales. Apply and we will review it."}</p>${st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : ""}
+      <label class="fld"><span>${A ? "منصّتك الرئيسية" : "Your main platform"}</span><select class="inp" id="aff-ch">${AFF_CH.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+      <label class="fld"><span>${A ? "رابط قناتك أو حسابك" : "Channel / profile link"}</span><input class="inp" id="aff-url" dir="ltr" maxlength="200" autocomplete="off" placeholder="https://t.me/… / @username"></label>
+      <label class="fld"><span>${A ? "عدد المتابعين" : "Audience size"}</span><select class="inp" id="aff-aud">${aud.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+      <label class="fld"><span>${A ? "كيف ستروّج لنا؟ (اختياري)" : "How will you promote us? (optional)"}</span><textarea class="inp" id="aff-pitch" rows="3" maxlength="400"></textarea></label>
+      <label class="fld"><span>${A ? "محفظة استلام الأرباح" : "Payout wallet"}</span><input class="inp" id="aff-pay" dir="ltr" maxlength="120" autocomplete="off" placeholder="${A ? "معرّف Binance Pay أو عنوان USDT" : "Binance Pay ID or USDT address"}"></label>
+      <button class="b block" data-a="aff-apply">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></div>`;
   }
-  if (st == "pending")
-    return `<div class="box ref">${head}<p class="sb">${A ? "طلبك قيد المراجعة — سيظهر رابطك هنا فور الموافقة عليه." : "Your application is under review — your link will appear here once it is approved."}</p></div>`;
-  return `<div class="box ref">${head}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>${st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : ""} <input class="inp" id="aff-pay" dir="ltr" maxlength="120" autocomplete="off" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"> <button class="b block" data-a="aff-apply">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></div>`;
+  return out + partnerCalc(st == "approved" && refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null);
 }
+/* tiers table + earnings calculator (shown to everyone on the account page) */
+function partnerCalc(custom) {
+  const A = lang == "ar",
+    unit = (R[BASE] || [1, "USD"])[1],
+    tl = affTierList();
+  return `<div class="box ref" id="aff-calc" data-custom="${custom == null ? "" : custom}"><h3>${A ? "حاسبة الأرباح الشهرية" : "Monthly earnings calculator"}</h3>
+    <p class="sb">${A ? "كل طلب مدفوع يُحتسب بنسبة المستوى الذي وصلت إليه هذا الشهر." : "Each paid order is paid at the tier you have reached this month."}${custom != null ? (A ? ` نسبتك الخاصة <b>${custom}%</b> ثابتة على كل الطلبات.` : ` Your custom rate of <b>${custom}%</b> applies to every order.`) : ""}</p>
+    <div class="aff-tw"><table class="aff-tb"><tr><th>${A ? "المستوى" : "Tier"}</th><th>${A ? "من الطلب رقم" : "From order #"}</th><th>${A ? "العمولة" : "Rate"}</th></tr>${tl.map((t) => `<tr><td>${ex(t.label || "—")}</td><td>${Math.max(1, +t.min_sales)}</td><td><b>${+t.rate}%</b></td></tr>`).join("")}</table></div>
+    <div class="aff-sl"><label><span>${A ? "عدد العملاء المُحالين شهرياً" : "Referred customers / month"}</span><b id="ac-n-v">20</b></label><input type="range" data-calc="n" min="1" max="300" step="1" value="20"></div>
+    <div class="aff-sl"><label><span>${A ? "متوسط طلبات العميل شهرياً" : "Avg. orders per customer / month"}</span><b id="ac-p-v">1</b></label><input type="range" data-calc="p" min="0.5" max="10" step="0.5" value="1"></div>
+    <div class="aff-sl"><label><span>${A ? "متوسط قيمة الطلب" : "Avg. order value"} (${ex(unit)})</span><b id="ac-a-v">20</b></label><input type="range" data-calc="a" min="5" max="200" step="5" value="20"></div>
+    <div class="aff-res" id="ac-out">${affCalcHtml(20, 1, 20, custom)}</div></div>`;
+}
+function affCalcHtml(n, p, a, c) {
+  const A = lang == "ar",
+    r = affCalc(n, p, a, c),
+    nx = c == null ? affTierList().find((t) => t.min_sales > r.sales) : null;
+  return `<div><small>${A ? "طلبات مدفوعة شهرياً" : "Paid orders / month"}</small><b class="n">${r.sales}</b></div><div><small>${A ? "حجم الطلبات" : "Order volume"}</small><b class="n">${money(r.volume)}</b></div><div><small>${A ? "متوسط العمولة" : "Avg. rate"}</small><b class="n">${r.avg.toFixed(1)}%</b></div><div class="big"><small>${A ? "أرباحك الشهرية" : "Monthly earnings"}</small><b class="n">${money(r.earn)}</b></div><div class="big"><small>${A ? "أرباحك السنوية" : "Yearly earnings"}</small><b class="n">${money(r.earn * 12)}</b></div>${nx ? `<p class="sb" style="grid-column:1/-1">${A ? `بزيادة ${nx.min_sales - r.sales} طلبات شهرياً تصل إلى ${nx.rate}% (${ex(nx.label)}).` : `${nx.min_sales - r.sales} more orders a month reaches ${nx.rate}% (${ex(nx.label)}).`}</p>` : ""}`;
+}
+document.addEventListener("input", (e) => {
+  const k = e.target.dataset && e.target.dataset.calc,
+    box = k && e.target.closest("#aff-calc");
+  if (!box) return;
+  const g = (x) => +box.querySelector(`[data-calc="${x}"]`).value,
+    n = g("n"),
+    p = g("p"),
+    a = g("a");
+  $("#ac-n-v").textContent = n;
+  $("#ac-p-v").textContent = p;
+  $("#ac-a-v").textContent = a;
+  $("#ac-out").innerHTML = affCalcHtml(n, p, a, box.dataset.custom === "" ? null : +box.dataset.custom);
+});
 async function applyAffiliate(b) {
   const A = lang == "ar",
-    inp = $("#aff-pay"),
-    v = ((inp && inp.value) || "").trim();
-  if (v.length < 3)
+    val = (id) => (($("#" + id) || {}).value || "").trim(),
+    pay = val("aff-pay"),
+    url = val("aff-url");
+  if (url.length < 3)
+    return toast(A ? "أدخل رابط قناتك أو حسابك" : "Enter your channel or profile link", "er");
+  if (pay.length < 3)
     return toast(A ? "أدخل معرّف Binance Pay أو عنوان المحفظة" : "Enter your Binance Pay ID or wallet address", "er");
   b.disabled = true;
   try {
-    const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v } });
+    const r = await sb("/rest/v1/rpc/apply_affiliate", {
+      method: "POST",
+      body: {
+        p_payout: pay,
+        p_channel_type: val("aff-ch"),
+        p_channel_url: url,
+        p_audience: val("aff-aud"),
+        p_pitch: val("aff-pitch"),
+      },
+    });
     if (!r.ok) throw new Error();
     if (refInfo) refInfo.status = "pending";
     toast(A ? "تم إرسال طلبك ✓" : "Application sent ✓");
@@ -3442,6 +3567,7 @@ async function syncProfile() {
         `/rest/v1/affiliates?user_id=eq.${encodeURIComponent( user.id )}&select=status,rate,clicks,signups,sales,total_commission`
       );
       if (ar.ok) Object.assign(refInfo, (await ar.json())[0] || {});
+      loadAffData();
     } else {
       const full_name = nameOf();
       await sb("/rest/v1/profiles", {
