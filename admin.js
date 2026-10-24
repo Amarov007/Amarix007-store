@@ -147,6 +147,7 @@ const TABS = [
   ["social", "التواصل"],
   ["payments", "وسائل الدفع"],
   ["users", "المستخدمين"],
+  ["wallets", "المحافظ"],
   ["staff", "الموظفون"],
   ["activity", "سجل النشاط"],
   ["apis", "إعدادات APIs"],
@@ -170,6 +171,7 @@ const TI = {
   payments:'<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/>',
   activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   staff:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  wallets:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1.2"/>',
   users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>',
   apis:'<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/>',
   affiliates:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
@@ -179,7 +181,7 @@ const TI = {
   push:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'
 };
 const TG = [
-  ["المبيعات", ["orders","payments","coupons","affiliates","users"]],
+  ["المبيعات", ["orders","payments","wallets","coupons","affiliates","users"]],
   ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
   ["التواصل والدعم", ["tickets","push","social"]],
   ["النظام", ["apis","stats","staff","activity"]]
@@ -556,6 +558,116 @@ const VIEW = {
     return `<div class="card"><h2>تذاكر الدعم <small class="od-m" id="tkc"></small></h2><p class="hint">تصل التذكرة هنا فور إرسالها من المتجر، ويصلك إشعار على تلغرام (من إعدادات notify_settings). ردّك يظهر للزبون في صفحة «تذاكر الدعم» ويصله أيضاً على بريده الإلكتروني (يتطلب ضبط البريد في notify_settings). يقيّم الزبون ردّك بـ«تم الحل» أو «لم تُحل»؛ «لم تُحل» تعيد التذكرة إلى «مفتوحة».</p> <div class="fl"><select class="inp" id="tkf"><option value="">كل الحالات</option>${TK_ST.map(([k, n]) => `<option value="${k}" ${tkFilter == k ? "selected" : ""}>${n}</option>`).join("")}<option value="unres" ${tkFilter == "unres" ? "selected" : ""}>تقييم سلبي (لم تُحل)</option></select> <input class="inp" id="tkq" placeholder="بحث: رقم / اسم / بريد / طلب / نص" value="${esc(tkQ)}"><button class="b b2 sm" data-a="reload-tickets">تحديث</button></div> <div id="tkb">${loadingHTML}</div></div>`;
   },
 };
+
+/* ---------- المحافظ (Wallet): إعدادات + طلبات الشحن + الأرصدة (supabase-wallet.sql) ---------- */
+let WL_TOPS = null,
+  WL_BALS = null,
+  WL_TX = null;
+const WL_ST = { pending: ["بانتظار الدفع", ""], review: ["بانتظار المراجعة", "k"], approved: ["تمت الموافقة", "k"], rejected: ["مرفوض", "d"] };
+const WL_KIND = { topup: "شحن", spend: "شراء", refund: "استرجاع", adjust: "تعديل إداري" };
+const wlWho = (x) => esc(((x.profiles || {}).full_name || "—") + " · ") + `<span dir="ltr">${esc((x.profiles || {}).email || x.user_id)}</span>`;
+const wlDate = (d) => (d ? new Date(d).toLocaleString("ar-EG-u-nu-latn", { dateStyle: "medium", timeStyle: "short" }) : "");
+VIEW.wallets = () => {
+  if (!D.wallet || typeof D.wallet != "object") D.wallet = { on: true, min: 1, max: 1000, sections: ["smm"] };
+  setTimeout(loadWallets, 50);
+  return `<div class="card"><h2>إعدادات المحفظة</h2><p class="hint">لكل مستخدم رصيد منفصل لكل قسم. القسم الحالي: <b>smm</b> (خدمات الرشق فقط). الرصيد بالعملة الأساسية للمتجر (USD). بعد التعديل اضغط «نشر» من الرئيسية.</p><div class="g2">${F("تفعيل المحفظة", "wallet.on", { t: "chk" })}${F("أقل مبلغ شحن", "wallet.min", { t: "num", n: 1, d: 1 })}${F("أعلى مبلغ شحن (0 = بلا حد)", "wallet.max", { t: "num", n: 1, d: 1 })}</div></div>
+<div class="card"><h2>طلبات الشحن <small class="od-m" id="wl-c"></small></h2><p class="hint">يضغط العميل «تم الدفع» بعد رفع الإثبات فيظهر هنا بحالة «بانتظار المراجعة». راجع الإثبات ثم وافق (يُضاف الرصيد فوراً) أو ارفض. يمكنك تعديل المبلغ قبل الموافقة إن حوّل العميل مبلغاً مختلفاً.</p><div class="acts"><button class="b b2 sm" data-a="wl-reload">تحديث</button></div><div id="wl-tops">${loadingHTML}</div></div>
+<div class="card"><h2>تعديل رصيد يدوي</h2><p class="hint">أدخل بريد المستخدم ومبلغاً موجباً للإضافة أو سالباً للخصم (بالدولار).</p><div class="g2"><div class="fld"><span>بريد المستخدم</span><input class="inp" id="wl-ae" dir="ltr" placeholder="user@example.com"></div><div class="fld"><span>المبلغ (+/−)</span><input class="inp" id="wl-aa" type="number" step="any" dir="ltr"></div><div class="fld w2"><span>ملاحظة</span><input class="inp" id="wl-an" maxlength="200"></div></div><div class="acts"><button class="b" data-a="wl-adjust-email">تنفيذ</button></div></div>
+<div class="card"><h2>أرصدة المستخدمين</h2><div id="wl-bals">${loadingHTML}</div></div>
+<div class="card"><h2>آخر الحركات</h2><div id="wl-tx">${loadingHTML}</div></div>`;
+};
+async function loadWallets() {
+  const a = $("#wl-tops");
+  if (!a) return;
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      api("/rest/v1/wallet_topups?select=*,profiles(email,full_name)&order=id.desc&limit=100"),
+      api("/rest/v1/wallets?select=user_id,section,balance,updated_at,profiles(email,full_name)&order=updated_at.desc&limit=200"),
+      api("/rest/v1/wallet_transactions?select=*,profiles(email,full_name)&order=id.desc&limit=40"),
+    ]);
+    if ([r1, r2, r3].some((r) => r.status == 404)) throw new Error("setup");
+    if (![r1, r2, r3].every((r) => r.ok)) throw new Error("http");
+    WL_TOPS = await r1.json();
+    WL_BALS = await r2.json();
+    WL_TX = await r3.json();
+    renderWallets();
+  } catch (e) {
+    a.innerHTML = e.message == "setup" ? '<p class="hint warn">⚠ جداول المحفظة غير موجودة. شغّل ملف supabase-wallet.sql في Supabase > SQL Editor ثم حدّث.</p>' : "فشل التحميل";
+    ["wl-bals", "wl-tx"].forEach((i) => $("#" + i) && ($("#" + i).textContent = ""));
+  }
+}
+function wlTopRow(x) {
+  const s = WL_ST[x.status] || [x.status, ""],
+    open = x.status == "pending" || x.status == "review";
+  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
+}
+function renderWallets() {
+  const t = $("#wl-tops");
+  if (!t || !WL_TOPS) return;
+  const rank = { review: 0, pending: 1, approved: 2, rejected: 3 },
+    list = WL_TOPS.slice().sort((x, y) => (rank[x.status] ?? 9) - (rank[y.status] ?? 9) || y.id - x.id);
+  t.innerHTML = list.length ? list.map(wlTopRow).join("") : '<p class="hint">لا توجد طلبات شحن بعد.</p>';
+  const c = $("#wl-c");
+  if (c) c.textContent = `(بانتظار المراجعة: ${WL_TOPS.filter((x) => x.status == "review").length})`;
+  const b = $("#wl-bals");
+  if (b)
+    b.innerHTML = WL_BALS.length
+      ? `<div class="tw"><table class="tb"><tr><th>المستخدم</th><th>القسم</th><th>الرصيد (USD)</th><th>آخر تحديث</th></tr>${WL_BALS.map((x) => `<tr><td>${wlWho(x)}</td><td>${esc(x.section)}</td><td><b>${(+x.balance).toFixed(2)}</b></td><td>${esc(wlDate(x.updated_at))}</td></tr>`).join("")}</table></div>`
+      : '<p class="hint">لا توجد أرصدة بعد.</p>';
+  const x = $("#wl-tx");
+  if (x)
+    x.innerHTML = WL_TX.length
+      ? `<div class="tw"><table class="tb"><tr><th>التاريخ</th><th>المستخدم</th><th>النوع</th><th>المبلغ</th><th>الرصيد بعدها</th><th>المرجع</th></tr>${WL_TX.map((y) => `<tr><td>${esc(wlDate(y.created_at))}</td><td>${wlWho(y)}</td><td>${esc(WL_KIND[y.kind] || y.kind)}</td><td dir="ltr"><b>${+y.amount > 0 ? "+" : ""}${(+y.amount).toFixed(2)}</b></td><td dir="ltr">${(+y.balance_after).toFixed(2)}</td><td dir="ltr">${esc(y.ref || "")}${y.note ? " · " + esc(y.note) : ""}</td></tr>`).join("")}</table></div>`
+      : '<p class="hint">لا توجد حركات بعد.</p>';
+}
+async function wlRpc(name, body) {
+  const r = await api("/rest/v1/rpc/" + name, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.text()).replace(/[{}"]/g, "").slice(0, 120));
+  return r.json().catch(() => null);
+}
+async function wlAct(btn, fn) {
+  busy(btn, true);
+  try {
+    await fn();
+  } catch (e) {
+    toast("فشل — " + (e.message || ""), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
+const wlApprove = (btn) =>
+  wlAct(btn, async () => {
+    const id = +btn.dataset.id,
+      amt = +($("#wla-" + id) || {}).value;
+    if (!(amt > 0)) return toast("أدخل مبلغاً صحيحاً", "e");
+    if (!confirm(`إضافة ${amt} USD إلى رصيد المستخدم؟`)) return;
+    await wlRpc("wallet_topup_approve", { p_id: id, p_amount: amt });
+    toast("تمت إضافة الرصيد ✓");
+    loadWallets();
+  });
+const wlReject = (btn) =>
+  wlAct(btn, async () => {
+    const note = prompt("سبب الرفض (يظهر للعميل):", "");
+    if (note === null) return;
+    await wlRpc("wallet_topup_reject", { p_id: +btn.dataset.id, p_note: note });
+    toast("تم الرفض");
+    loadWallets();
+  });
+const wlAdjust = (btn) =>
+  wlAct(btn, async () => {
+    const em = (($("#wl-ae") || {}).value || "").trim().toLowerCase(),
+      amt = +($("#wl-aa") || {}).value,
+      note = (($("#wl-an") || {}).value || "").trim();
+    if (!em || !amt) return toast("أدخل البريد والمبلغ", "e");
+    const r = await api("/rest/v1/profiles?select=id&email=ilike." + encodeURIComponent(em));
+    const rows = r.ok ? await r.json() : [];
+    if (rows.length != 1) return toast("لم يُعثر على مستخدم بهذا البريد", "e");
+    if (!confirm(`${amt > 0 ? "إضافة" : "خصم"} ${Math.abs(amt)} USD ${amt > 0 ? "إلى" : "من"} ${em}؟`)) return;
+    await wlRpc("wallet_admin_adjust", { p_user: rows[0].id, p_section: "smm", p_amount: amt, p_note: note || null });
+    toast("تم التعديل ✓");
+    ["wl-ae", "wl-aa", "wl-an"].forEach((i) => $("#" + i) && ($("#" + i).value = ""));
+    loadWallets();
+  });
 
 /* ---------- الموظفون (إدارة الحسابات — للأدمن فقط) ---------- */
 const STF_ROLES = [
@@ -1077,6 +1189,10 @@ document.addEventListener("click", (e) => {
   if (a == "exp") return exportBackup();
   if (a == "reload-orders") return loadOrders();
   if (a == "reload-tickets") return loadTickets();
+  if (a == "wl-reload") return loadWallets();
+  if (a == "wl-approve") return wlApprove(b);
+  if (a == "wl-reject") return wlReject(b);
+  if (a == "wl-adjust-email") return wlAdjust(b);
   if (a == "reload-stats") return loadAdminStats();
   if (/^stats-\d+$/.test(a)) {
     STATS_DAYS = +a.slice(6);
@@ -1803,7 +1919,7 @@ function orderRow(o) {
         timeStyle: "short",
       })
     : "";
-  return `<div class="od"><div class="od-h"><div><span class="od-id">${esc( o.id )}</span><div class="od-m">${esc( o.customer_name || "—" )} · <span dir="ltr">${esc( o.customer_email || "" )}</span></div><div class="od-m">${esc(date)} · <b>${(+o.total).toFixed( 2 )} ${esc(curName(o.currency || baseCur()))}</b>${ o.coupon ? ' · كوبون: <span dir="ltr">' + esc(o.coupon) + "</span>" : "" }${o.affiliate_ref ? " · Ref: " + esc(o.affiliate_ref) : ""}</div></div> <div class="od-s"><select class="inp s-${st0}" data-ost="${esc( o.id )}" data-prev="${esc(st0)}">${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${st0 == k ? "selected" : ""}>${n}</option>` ).join("")}</select>${(() => { const ps = PAY_STATUSES.some((x) => x[0] == o.payment_status) ? o.payment_status : "pending"; return `<select class="inp" style="margin-top:6px" data-pst="${esc( o.id )}" data-prev="${esc(ps)}" title="حالة الدفع">${PAY_STATUSES.map( ([k, n]) => `<option value="${k}" ${ps == k ? "selected" : ""}>💳 ${n}</option>` ).join("")}</select>`; })()}</div></div> ${ o.payment_method ? `<div class="od-m">وسيلة الدفع: <b>${esc( (D.payments.find((m) => m.id == o.payment_method) || {}).ar || o.payment_method )}</b></div>` : "" } ${proofBlock(o)}${smmBlock(o, items)} <details><summary>المنتجات (${ items.length })</summary><div class="od-items">${items .map( (i) => `<div><span>${esc(i.ar || i.name || i.id)} × ${esc(i.q)}${ i.link ? '<br><small dir="ltr">' + esc(i.link) + "</small>" : "" }</span><b>${esc(i.price)}</b></div>` ) .join("")}</div></details></div>`;
+  return `<div class="od"><div class="od-h"><div><span class="od-id">${esc( o.id )}</span><div class="od-m">${esc( o.customer_name || "—" )} · <span dir="ltr">${esc( o.customer_email || "" )}</span></div><div class="od-m">${esc(date)} · <b>${(+o.total).toFixed( 2 )} ${esc(curName(o.currency || baseCur()))}</b>${ o.coupon ? ' · كوبون: <span dir="ltr">' + esc(o.coupon) + "</span>" : "" }${o.affiliate_ref ? " · Ref: " + esc(o.affiliate_ref) : ""}</div></div> <div class="od-s"><select class="inp s-${st0}" data-ost="${esc( o.id )}" data-prev="${esc(st0)}">${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${st0 == k ? "selected" : ""}>${n}</option>` ).join("")}</select>${(() => { const ps = PAY_STATUSES.some((x) => x[0] == o.payment_status) ? o.payment_status : "pending"; return `<select class="inp" style="margin-top:6px" data-pst="${esc( o.id )}" data-prev="${esc(ps)}" title="حالة الدفع">${PAY_STATUSES.map( ([k, n]) => `<option value="${k}" ${ps == k ? "selected" : ""}>💳 ${n}</option>` ).join("")}</select>`; })()}</div></div> ${ o.payment_method ? `<div class="od-m">وسيلة الدفع: <b>${esc( o.payment_method == "wallet" ? "المحفظة" : (D.payments.find((m) => m.id == o.payment_method) || {}).ar || o.payment_method )}</b></div>` : "" } ${proofBlock(o)}${smmBlock(o, items)} <details><summary>المنتجات (${ items.length })</summary><div class="od-items">${items .map( (i) => `<div><span>${esc(i.ar || i.name || i.id)} × ${esc(i.q)}${ i.link ? '<br><small dir="ltr">' + esc(i.link) + "</small>" : "" }</span><b>${esc(i.price)}</b></div>` ) .join("")}</div></details></div>`;
 }
 function renderOrderList() {
   const b = $("#ob");
