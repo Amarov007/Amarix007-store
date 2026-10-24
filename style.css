@@ -3546,3 +3546,117 @@ body.qb-open{overflow:hidden}
 @media(min-width:640px){.sb-pls{grid-template-columns:repeat(8,1fr)}}
 @media(min-width:900px){.sb-list{grid-template-columns:1fr 1fr}.sb-r.on{grid-column:1/-1}}
 @media(prefers-reduced-motion:reduce){.sb-f{animation:none}.sb-p,.sb-ch{transition:none}}
+
+/* ---------- Partner panel v2 + accessibility helpers ---------- */
+.skip {
+  position: fixed;
+  top: 8px;
+  inset-inline-start: 8px;
+  z-index: 10000;
+  transform: translateY(-250%);
+  background: var(--ac);
+  color: #06210f;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.skip:focus { transform: none; }
+#m:focus { outline: none; }
+
+.pt-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pt-top h3 { margin: 0; }
+.pt-rf {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--bd);
+  background: var(--bg);
+  color: var(--tx);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.pt-rf:disabled { opacity: 0.7; cursor: progress; }
+.pt-rf.busy svg { animation: ptspin 0.8s linear infinite; }
+@keyframes ptspin { to { transform: rotate(360deg); } }
+
+.pt-hero { background: linear-gradient(135deg, color-mix(in srgb, var(--ac) 14%, var(--card)), var(--card)); }
+.pt-earn { display: flex; flex-direction: column; gap: 2px; }
+.pt-earn small { color: var(--mu); font-size: 12px; }
+.pt-earn b { font-size: 30px; font-weight: 900; line-height: 1.25; color: var(--ac); }
+.pt-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--mu); }
+.pt-meta b { color: var(--tx); }
+.pt-warn {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--wn) 16%, transparent);
+}
+.pt-warn span { flex: 1; min-width: 0; }
+.pt-warn button {
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.pt-err h3 { display: flex; align-items: center; gap: 6px; }
+.pt-rw { display: block; margin-top: 2px; font-size: 11.5px; color: var(--mu); }
+
+.pt-fn { display: flex; flex-direction: column; gap: 14px; }
+.pt-st { display: flex; flex-direction: column; gap: 5px; }
+.pt-st-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.pt-st-h b { font-size: 16px; }
+.pt-bar { height: 8px; border-radius: 99px; background: var(--bg); overflow: hidden; }
+.pt-bar i { display: block; height: 100%; border-radius: inherit; background: var(--ac); transition: width 0.4s ease; }
+.pt-st small { color: var(--mu); font-size: 11.5px; }
+.pt-empty {
+  margin: 0;
+  padding: 14px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--mu);
+  border: 1px dashed var(--bd);
+  border-radius: 12px;
+}
+
+.pt-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pt-steps li { display: flex; gap: 10px; align-items: center; font-size: 13.5px; color: var(--mu); }
+.pt-steps li i {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+}
+.pt-steps li.ok { color: var(--tx); }
+.pt-steps li.ok i { background: var(--ok); border-color: var(--ok); color: #fff; }
+.pt-steps li.now { color: var(--tx); font-weight: 700; }
+.pt-steps li.now i { background: var(--ac); border-color: var(--ac); color: #06210f; }
+
+.pt-h { display: block; margin-top: 4px; color: var(--mu); font-size: 11.5px; }
+#aff-form .err:empty { display: none; }
+.ref-sh a.b, .ref-sh button.b { display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+.ref-sh .b { flex: 1 1 calc(50% - 8px); min-height: 44px; }
+@media (min-width: 560px) { .ref-sh .b { flex-basis: 30%; } }
+.pt-rf, .ref-l .b, .pt-warn button { min-height: 44px; }
+.pt-rf { min-width: 44px; }

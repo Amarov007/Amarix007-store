@@ -1846,6 +1846,7 @@ function drawerRender() {
     ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${n}</span>` : "")}
     ${big("#/fav", "heart", t("fav"))}
     ${big("#/account", user ? "user" : "out", user ? t("acc") : t("login"))}
+    ${user ? big("#/partner", "gift", A ? "برنامج الشركاء" : "Partner program") : ""}
     ${CV.length ? `<div class="dr-h">${A ? "الأقسام" : "Categories"}</div>${CV.map((c) => { const k = P.filter((p) => p.c == c.id).length; return `<a class="dr-r" href="${catHref(c)}"><span class="dr-ic">${ico(c, 18)}</span><span class="dr-lb">${c[lang]}</span>${k ? `<small>${k}</small>` : ""}</a>`; }).join("")}` : ""}
     <div class="dr-h">${A ? "الإعدادات" : "Settings"}</div>
     <button type="button" class="dr-r" data-a="lang"><span class="dr-ic">${ic("globe", 18)}</span><span class="dr-lb">${A ? "اللغة" : "Language"}</span><small>${A ? "English" : "العربية"}</small></button>
@@ -2125,32 +2126,61 @@ function accPage() {
   return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${pushBox()}${partnerRow()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
 }
 /* ---------- Partner (affiliate) program: a status row on the account page + its own page (#/partner) ---------- */
-const partnerLink = () => (refInfo && refInfo.code ? location.origin + "/?ref=" + refInfo.code : "");
+const partnerLink = () => (refInfo && refInfo.code ? (typeof SEO_SITE == "string" && SEO_SITE ? SEO_SITE : location.origin) + "/?ref=" + encodeURIComponent(refInfo.code) : "");
+const partnerMsg = () => (lang == "ar" ? "جرّب AMARIX007 — متجر الأصول الرقمية. سجّل من رابطي:" : "Try AMARIX007 — the digital assets store. Sign up through my link:");
 function partnerRow() {
   if (!refInfo) return "";
   const A = lang == "ar",
-    chip = { approved: [A ? "معتمد" : "Approved", "ok"], pending: [A ? "قيد المراجعة" : "Under review", "wt"] }[refInfo.status || "none"];
-  return `<a class="box row" href="#/partner" style="display:flex"><span>${A ? "برنامج الشركاء" : "Partner program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</span>${ic("gift", 18)}</a>`;
+    st = refInfo.loaded ? refInfo.status || "none" : "none",
+    chip = { approved: [A ? "معتمد" : "Approved", "ok"], pending: [A ? "قيد المراجعة" : "Under review", "wt"] }[st],
+    earned = +refInfo.total_commission || 0,
+    sub = st == "approved" && earned > 0 ? `<small class="pt-rw">${A ? "عمولتك" : "Earned"}: ${money(earned)}</small>` : "";
+  return `<a class="box row" href="#/partner" style="display:flex"><span>${A ? "برنامج الشركاء" : "Partner program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}${sub}</span>${ic("gift", 18)}</a>`;
 }
-/* the numbers move while the page is closed (new clicks, paid orders): refresh them when the page opens, at most every 20 s */
-let partnerAt = 0;
-async function loadPartner() {
-  if (!user || !refInfo || Date.now() - partnerAt < 20000) return;
+/* the numbers move while the page is closed (new clicks, paid orders): refresh them when the page opens (at most every 20 s), on demand, and when the tab becomes visible again */
+let partnerAt = 0,
+  partnerBusy = false,
+  partnerErr = false,
+  partnerOk = 0,
+  partnerSig = "";
+function partnerRerender(force) {
+  if (!/^#\/partner/.test(location.hash)) return;
+  const i = $("#aff-pay"),
+    sig = JSON.stringify([refInfo, partnerBusy, partnerErr, partnerOk]);
+  if (i && i.value) return; // never wipe what the visitor is typing
+  if (!force && sig === partnerSig) return;
+  partnerSig = sig;
+  render();
+}
+async function loadPartner(force) {
+  if (!user || !refInfo || partnerBusy) return;
+  if (!force && Date.now() - partnerAt < 20000) return;
   partnerAt = Date.now();
+  partnerBusy = true;
+  if (force) partnerRerender(true);
   try {
     const r = await sb(`/rest/v1/affiliates?user_id=eq.${encodeURIComponent(user.id)}&select=status,rate,clicks,signups,sales,total_commission,coupon`);
-    if (!r.ok) return;
+    if (!r.ok) throw new Error("http " + r.status);
     const row = (await r.json())[0];
-    if (!row) return;
-    const before = JSON.stringify(refInfo);
-    Object.assign(refInfo, row);
-    if (JSON.stringify(refInfo) !== before && /^#\/partner/.test(location.hash)) render();
-  } catch {}
+    if (row) Object.assign(refInfo, row);
+    refInfo.loaded = true;
+    partnerErr = false;
+    partnerOk = Date.now();
+  } catch {
+    partnerErr = true;
+  }
+  partnerBusy = false;
+  partnerRerender(!!force);
 }
+const partnerSkeleton = () => `<div class="sk sm" style="margin-bottom:12px"></div><div class="sk" style="min-height:150px;margin-bottom:12px"></div><div class="sk" style="min-height:190px"></div>`;
 function partnerPage() {
-  if (!refInfo) return loadingBox();
-  const A = lang == "ar",
-    st = refInfo.status || "none",
+  const A = lang == "ar";
+  if (!refInfo || !refInfo.loaded) {
+    if (refErr || (refInfo && partnerErr))
+      return `<div class="box ref pt-err"><h3>${ic("warn", 16)} ${A ? "تعذّر تحميل بيانات الشريك" : "Couldn't load your partner data"}</h3><p class="sb">${A ? "تحقق من اتصالك بالإنترنت ثم أعد المحاولة. لم يتغيّر شيء في حسابك." : "Check your connection and try again. Nothing changed in your account."}</p><button type="button" class="b block" data-a="aff-retry">${ic("refresh", 16)} ${A ? "إعادة المحاولة" : "Try again"}</button></div><a class="b b2 block" href="#/account">${A ? "رجوع إلى حسابي" : "Back to my account"}</a>`;
+    return partnerSkeleton();
+  }
+  const st = refInfo.status || "none",
     back = `<a class="b b2 block" href="#/account">${A ? "رجوع إلى حسابي" : "Back to my account"}</a>`,
     how = [
       A ? "شارك رابطك الخاص مع أصدقائك أو جمهورك." : "Share your personal link with friends or your audience.",
@@ -2164,61 +2194,119 @@ function partnerPage() {
     ],
     howBody = `<ol class="ref-how">${how.map((x) => `<li>${x}</li>`).join("")}</ol><ul class="ref-how ref-rules">${rules.map((x) => `<li>${x}</li>`).join("")}</ul>`,
     howBox = (open) => `<details class="box ref"${open ? " open" : ""}><summary>${A ? "كيف يعمل البرنامج؟" : "How the program works"}</summary>${howBody}</details>`,
-    title = (chip) => `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</h3>`;
+    title = (chip) => `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</h3>`,
+    refreshBtn = `<button type="button" class="pt-rf${partnerBusy ? " busy" : ""}" data-a="aff-refresh" aria-label="${A ? "تحديث الأرقام" : "Refresh numbers"}"${partnerBusy ? " disabled" : ""}>${ic("refresh", 18)}</button>`;
+  /* ----- approved: link, earnings, funnel, coupon, tips ----- */
   if (st == "approved") {
     const link = partnerLink(),
-      rate = refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null,
+      rate = refInfo.rate != null && refInfo.rate !== "" && !isNaN(+refInfo.rate) ? +refInfo.rate : null,
       clicks = +refInfo.clicks || 0,
       signups = +refInfo.signups || 0,
       sales = +refInfo.sales || 0,
       earned = +refInfo.total_commission || 0,
-      tiles = [
-        [A ? "نقرات" : "Clicks", clicks],
-        [A ? "تسجيلات" : "Sign-ups", signups],
-        [A ? "طلبات مدفوعة" : "Paid orders", sales],
-        [A ? "عمولتك" : "Earned", fmt(earned)],
+      pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0),
+      top = Math.max(clicks, signups, sales, 1),
+      width = (v) => (v > 0 ? Math.max(3, Math.round((v / top) * 100)) : 0),
+      time = partnerOk ? new Date(partnerOk).toLocaleTimeString(A ? "ar-EG-u-nu-latn" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
+      steps = [
+        [A ? "نقرات على رابطك" : "Link clicks", clicks, ""],
+        [A ? "تسجيلات جديدة" : "New sign-ups", signups, clicks > 0 ? `${pct(signups, clicks)}% ${A ? "من النقرات" : "of clicks"}` : ""],
+        [A ? "طلبات مدفوعة" : "Paid orders", sales, signups > 0 && sales > 0 ? (sales <= signups ? `${pct(sales, signups)}% ${A ? "من التسجيلات" : "of sign-ups"}` : `${(sales / signups).toFixed(1)} ${A ? "طلب لكل مسجَّل" : "orders per sign-up"}`) : ""],
       ],
-      extra = [
-        clicks > 0 ? `${A ? "معدل التسجيل" : "Sign-up rate"}: <b>${Math.min(100, Math.round((signups / clicks) * 100))}%</b>` : "",
-        sales > 0 ? `${A ? "متوسط العمولة لكل طلب" : "Average commission per order"}: <b>${fmt(earned / sales)}</b>` : "",
-      ].filter(Boolean),
-      share =
-        `<button type="button" class="b b2" data-a="aff-share" data-w="wa">${A ? "واتساب" : "WhatsApp"}</button>` +
-        `<button type="button" class="b b2" data-a="aff-share" data-w="tg">${A ? "تيليغرام" : "Telegram"}</button>` +
-        (navigator.share ? `<button type="button" class="b b2" data-a="aff-share" data-w="sys">${A ? "مشاركة…" : "Share…"}</button>` : "");
+      msg = partnerMsg(),
+      wa = "https://wa.me/?text=" + encodeURIComponent(msg + "\n" + link),
+      tg = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(msg),
+      tips = [
+        A ? "اشرح لمن تشاركه ماذا سيجد في المتجر بدل إرسال الرابط وحده؛ الرسائل الشخصية تحقق تسجيلات أكثر." : "Tell people what they'll find in the store instead of sending the bare link; personal messages convert better.",
+        A ? "تظهر الطلبات في أرقامك بعد تأكيد الدفع من الفريق، فقد يتأخر ظهورها قليلاً." : "Orders show up in your numbers after the team confirms payment, so they can appear with a short delay.",
+        A ? "لتغيير معرّف استلام الأرباح أو لأي استفسار، تواصل مع الدعم." : "To change your payout details or ask anything, contact support.",
+      ];
     if (!link)
-      return `<div class="box ref">${title([A ? "معتمد" : "Approved", "ok"])}<p class="sb">${A ? "أنت شريك معتمد، لكن رابطك لم يُنشأ بعد. تواصل مع الدعم." : "You are an approved partner, but your link has not been created yet. Please contact support."}</p></div>${back}`;
+      return `<div class="box ref">${title([A ? "معتمد" : "Approved", "ok"])}<p class="sb">${A ? "أنت شريك معتمد، لكن رابطك لم يُنشأ بعد. تواصل مع الدعم." : "You are an approved partner, but your link has not been created yet. Please contact support."}</p><a class="b block" href="#/support">${A ? "تواصل مع الدعم" : "Contact support"}</a></div>${back}`;
     return (
-      `<div class="box ref">${title([A ? "معتمد" : "Approved", "ok"])}<p class="sb">${A ? "شارك رابطك واكسب عمولة على كل طلب مدفوع من عملائك." : "Share your link and earn a commission on every paid order from your referrals."} <b>${A ? "نسبة عمولتك" : "Your rate"}: ${rate != null ? ex(String(rate)) + "%" : A ? "النسبة الافتراضية للمتجر" : "the store's default rate"}</b></p>` +
-      `<div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div><div class="ref-sh">${share}</div></div>` +
-      `<div class="box ref"><h3>${A ? "أداؤك" : "Your performance"}</h3><div class="ref-s">${tiles.map(([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>`).join("")}</div>${extra.length ? `<div class="ref-m">${extra.map((x) => `<span>${x}</span>`).join("")}</div>` : ""}</div>` +
-      (refInfo.coupon ? `<div class="box ref"><h3>${A ? "كوبونك الخاص" : "Your coupon"}</h3><div class="ref-l"><bdi dir="ltr">${ex(refInfo.coupon)}</bdi><button class="b" data-a="copy" data-v="${ex(refInfo.coupon)}">${A ? "نسخ" : "Copy"}</button></div></div>` : "") +
+      /* earnings */
+      `<section class="box ref pt-hero"><div class="pt-top">${title([A ? "معتمد" : "Approved", "ok"])}${refreshBtn}</div>` +
+      `<div class="pt-earn"><small>${A ? "إجمالي عمولتك" : "Your total commission"}</small><b class="n">${money(earned)}</b></div>` +
+      `<div class="pt-meta"><span>${A ? "نسبة العمولة" : "Commission rate"}: <b>${rate != null ? ex(String(rate)) + "%" : A ? "النسبة الافتراضية للمتجر" : "the store's default rate"}</b></span>${sales > 0 ? `<span>${A ? "متوسط العمولة لكل طلب" : "Avg. per order"}: <b>${money(earned / sales)}</b></span>` : ""}${time ? `<span>${A ? "آخر تحديث" : "Updated"}: ${time}</span>` : ""}</div>` +
+      (partnerErr ? `<div class="pt-warn" role="status">${ic("warn", 14)}<span>${A ? "تعذّر تحديث الأرقام الآن، والمعروض قد لا يكون الأحدث." : "Couldn't refresh the numbers; what you see may be out of date."}</span><button type="button" data-a="aff-refresh">${A ? "إعادة المحاولة" : "Retry"}</button></div>` : "") +
+      `</section>` +
+      /* link + share */
+      `<section class="box ref"><h3>${A ? "رابطك الخاص" : "Your personal link"}</h3><div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div>` +
+      `<div class="ref-sh"><a class="b b2" href="${ex(wa)}" target="_blank" rel="noopener">${A ? "واتساب" : "WhatsApp"}</a><a class="b b2" href="${ex(tg)}" target="_blank" rel="noopener">${A ? "تيليغرام" : "Telegram"}</a>${navigator.share ? `<button type="button" class="b b2" data-a="aff-share">${A ? "مشاركة…" : "Share…"}</button>` : ""}<button type="button" class="b b2" data-a="copy" data-v="${ex(msg + "\n" + link)}">${A ? "نسخ رسالة جاهزة" : "Copy ready message"}</button></div></section>` +
+      /* funnel */
+      `<section class="box ref"><h3>${A ? "أداؤك" : "Your performance"}</h3>${
+        clicks + signups + sales == 0
+          ? `<p class="pt-empty">${A ? "لا نقرات بعد. انسخ رابطك وشاركه، وستظهر الأرقام هنا فور وصول أول زائر." : "No clicks yet. Copy your link and share it; the numbers appear here as soon as the first visitor arrives."}</p>`
+          : `<div class="pt-fn">${steps.map(([k, v, n]) => `<div class="pt-st"><div class="pt-st-h"><span>${k}</span><b class="n">${v}</b></div><div class="pt-bar" aria-hidden="true"><i style="width:${width(v)}%"></i></div>${n ? `<small>${n}</small>` : ""}</div>`).join("")}</div>`
+      }</section>` +
+      (refInfo.coupon ? `<section class="box ref"><h3>${A ? "كوبونك الخاص" : "Your coupon"}</h3><div class="ref-l"><bdi dir="ltr">${ex(refInfo.coupon)}</bdi><button class="b" data-a="copy" data-v="${ex(refInfo.coupon)}">${A ? "نسخ" : "Copy"}</button></div></section>` : "") +
+      `<details class="box ref"><summary>${A ? "نصائح" : "Tips"}</summary><ul class="ref-how">${tips.map((x) => `<li>${x}</li>`).join("")}</ul></details>` +
       howBox(false) +
       back
     );
   }
+  /* ----- pending: a clear 3-step status ----- */
   if (st == "pending")
-    return `<div class="box ref">${title([A ? "قيد المراجعة" : "Under review", "wt"])}<p class="sb">${A ? "استلمنا طلبك، وسيظهر رابطك هنا فور الموافقة عليه." : "We received your application. Your link will appear here once it is approved."}</p></div>${howBox(true)}${back}`;
-  return `${howBox(true)}<div class="box ref">${title()}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>${st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : ""} <input class="inp" id="aff-pay" dir="ltr" maxlength="120" autocomplete="off" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"> <button class="b block" data-a="aff-apply">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></div>${back}`;
+    return (
+      `<section class="box ref"><div class="pt-top">${title([A ? "قيد المراجعة" : "Under review", "wt"])}${refreshBtn}</div><ol class="pt-steps">` +
+      `<li class="ok"><i>✓</i><span>${A ? "استلمنا طلبك" : "We received your application"}</span></li>` +
+      `<li class="now"><i>2</i><span>${A ? "الفريق يراجع الطلب" : "The team is reviewing it"}</span></li>` +
+      `<li><i>3</i><span>${A ? "يظهر رابطك هنا فور الموافقة" : "Your link appears here once approved"}</span></li></ol>` +
+      (partnerErr ? `<div class="pt-warn" role="status">${ic("warn", 14)}<span>${A ? "تعذّر التحقق من الحالة الآن." : "Couldn't check the status right now."}</span></div>` : "") +
+      `</section>${howBox(true)}${back}`
+    );
+  /* ----- not applied / rejected: application form ----- */
+  return (
+    `${howBox(true)}<form class="box ref" id="aff-form" novalidate>${title()}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>` +
+    (st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : "") +
+    `<label class="fld"><span>${A ? "معرّف الدفع لاستلام الأرباح" : "Payout ID"}</span><input class="inp" id="aff-pay" name="pay" dir="ltr" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" aria-describedby="aff-er" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"><small class="pt-h">${A ? "تحقق منه جيداً؛ سنرسل الأرباح إليه." : "Double-check it; payouts are sent to it."}</small></label>` +
+    `<p class="err" id="aff-er" role="alert"></p><button class="b block" type="submit">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></form>${back}`
+  );
 }
 async function applyAffiliate(b) {
   const A = lang == "ar",
     inp = $("#aff-pay"),
-    v = ((inp && inp.value) || "").trim();
-  if (v.length < 3)
-    return toast(A ? "أدخل معرّف Binance Pay أو عنوان المحفظة" : "Enter your Binance Pay ID or wallet address", "er");
-  b.disabled = true;
+    er = $("#aff-er"),
+    v = ((inp && inp.value) || "").trim().replace(/\s+/g, " "),
+    fail = (m) => {
+      if (er) er.textContent = m;
+      else toast(m, "er");
+      if (inp) inp.focus();
+    };
+  if (er) er.textContent = "";
+  if (v.length < 6) return fail(A ? "المعرّف أو العنوان قصير جداً (6 أحرف على الأقل)." : "That looks too short (at least 6 characters).");
+  if (!refInfo || !refInfo.loaded || (refInfo.status && refInfo.status != "none" && refInfo.status != "rejected")) return loadPartner(true);
+  setBusy(b, true);
   try {
     const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v } });
-    if (!r.ok) throw new Error();
-    if (refInfo) refInfo.status = "pending";
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      /* an application already exists (double tap, another device): just show the real status */
+      if (j.code == "23505" || /already|exist|pending|approved/i.test(String(j.message || ""))) {
+        setBusy(b, false);
+        toast(A ? "لديك طلب سابق، حدّثنا حالته" : "You already have an application; status refreshed", "wn");
+        return loadPartner(true);
+      }
+      throw new Error("http " + r.status);
+    }
+    refInfo.status = "pending";
+    partnerAt = 0;
     toast(A ? "تم إرسال طلبك ✓" : "Application sent ✓");
     render();
+    scrollTo(0, 0);
   } catch {
-    toast(A ? "تعذّر إرسال الطلب، حاول لاحقاً" : "Couldn't send the application, try again later", "er");
-    b.disabled = false;
+    setBusy(b, false);
+    fail(navigator.onLine === false ? (A ? "لا يوجد اتصال بالإنترنت." : "You're offline.") : A ? "تعذّر إرسال الطلب، حاول لاحقاً." : "Couldn't send the application, try again later.");
   }
 }
+document.addEventListener("submit", (e) => {
+  if (e.target.id != "aff-form") return;
+  e.preventDefault();
+  applyAffiliate(e.target.querySelector("[type=submit]"));
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && /^#\/partner/.test(location.hash)) loadPartner();
+});
 function favPage() {
   const a = P.filter((p) => fav.includes(p.id));
   return a.length
@@ -3105,12 +3193,19 @@ document.addEventListener("click", async (e) => {
   else if (a == "rate") rateItem(b);
   else if (a == "wa-contact") openWhatsApp(`${t("hi")}\n${t("ordno")}: ${id}`);
   else if (a == "aff-share") {
-    const link = partnerLink(),
-      msg = lang == "ar" ? "انضم إلى AMARIX007 — متجر الأصول الرقمية:" : "Join AMARIX007 — the digital assets store:";
-    if (!link) return;
-    if (b.dataset.w == "sys" && navigator.share) navigator.share({ title: "AMARIX007", text: msg, url: link }).catch(() => {});
-    else if (b.dataset.w == "wa") window.open("https://wa.me/?text=" + encodeURIComponent(msg + "\n" + link), "_blank", "noopener");
-    else if (b.dataset.w == "tg") window.open("https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(msg), "_blank", "noopener");
+    const link = partnerLink();
+    if (link && navigator.share) navigator.share({ title: "AMARIX007", text: partnerMsg(), url: link }).catch(() => {});
+  } else if (a == "aff-refresh") loadPartner(true);
+  else if (a == "aff-retry") {
+    refErr = false;
+    render();
+    syncProfile();
+  } else if (a == "skip") {
+    const m = $("#m");
+    if (m) {
+      m.focus();
+      m.scrollIntoView({ block: "start" });
+    }
   } else if (a == "copy") {
     const ok = await copyText(b.dataset.v);
     if (ok) {
@@ -3184,7 +3279,6 @@ document.addEventListener("click", async (e) => {
   } else if (a == "hv-click") {
     if (e.isTrusted) humanRun(900);
   } else if (a == "resend") resendMail(b);
-  else if (a == "aff-apply") applyAffiliate(b);
   else if (a == "push-on") pushEnable(b);
   else if (a == "push-re") location.reload();
   else if (a == "out") {
@@ -3480,16 +3574,17 @@ async function authFail(r) {
     }
   } catch {}
 })();
-let refInfo = null; // { code, clicks, signups, sales, total_commission } for the account page
+let refInfo = null, // { code, status, clicks, signups, sales, total_commission, loaded } for the account + partner pages
+  refErr = false; // the profile could not be read: the partner page offers a retry instead of loading forever
 
 /* Best effort: read (or create) the user's row in `profiles` so the account page can show their name */
-async function syncProfile() {
+async function syncProfile(again) {
   if (!user) return;
   try {
     const r = await sb(
       `/rest/v1/profiles?id=eq.${encodeURIComponent( user.id )}&select=full_name,ref_code`
     );
-    if (!r.ok) return;
+    if (!r.ok) throw new Error("profile " + r.status);
     const row = (await r.json())[0];
     if (row) {
       profileName = row.full_name || "";
@@ -3502,11 +3597,15 @@ async function syncProfile() {
         sales: 0,
         total_commission: 0,
         coupon: null,
+        loaded: false, // true only once the affiliates row was really read: never show "apply" to an approved partner because of a failed request
       };
       const ar = await sb(
         `/rest/v1/affiliates?user_id=eq.${encodeURIComponent( user.id )}&select=status,rate,clicks,signups,sales,total_commission,coupon`
       );
-      if (ar.ok) Object.assign(refInfo, (await ar.json())[0] || {});
+      if (!ar.ok) throw new Error("affiliates " + ar.status);
+      Object.assign(refInfo, (await ar.json())[0] || {});
+      refInfo.loaded = true;
+      refErr = false;
     } else {
       const full_name = nameOf();
       await sb("/rest/v1/profiles", {
@@ -3514,9 +3613,14 @@ async function syncProfile() {
         prefer: "resolution=ignore-duplicates,return=minimal",
         body: { id: user.id, email: user.email, full_name },
       });
+      /* read it back once, so the partner page doesn't wait forever for a row that now exists */
+      if (!again) return syncProfile(true);
+      throw new Error("no profile");
     }
-    if (/^#\/(account|partner)/.test(location.hash)) render();
-  } catch {}
+  } catch {
+    refErr = true;
+  }
+  if (/^#\/(account|partner)/.test(location.hash)) render();
 }
 
 document.addEventListener("submit", async (e) => {
@@ -4283,7 +4387,8 @@ function seoSet(sel, attr, val) {
 }
 function seoHead(r) {
   const pub = SEO_PUBLIC[r],
-    title = pub ? t(pub[0]) + " | AMARIX007" : SEO0.title,
+    pg = { partner: ["برنامج الشركاء", "Partner program"], boost: ["خدمات الرشق", "Boost services"], orders: [t("ord")], cart: [t("cart")], fav: [t("fav")], account: [t("acc")], support: [t("tk_acc")] }[r],
+    title = pub ? t(pub[0]) + " | AMARIX007" : pg ? (pg[lang == "ar" ? 0 : pg.length - 1] || pg[0]) + " | AMARIX007" : SEO0.title,
     desc = pub ? t(pub[1]) : SEO0.desc,
     url = SEO_SITE + (pub ? pub[2] : "/"),
     robots = !r || r == "login" || pub ? "index,follow,max-image-preview:large" : "noindex,nofollow";
@@ -4322,6 +4427,8 @@ function render0() {
   const [h] = (location.hash || "#/").split("?"),
     [, r, id] = h.split("/");
   seoHead(r);
+  const sk = $(".skip");
+  if (sk) sk.textContent = lang == "ar" ? "تخطَّ إلى المحتوى" : "Skip to content";
   const needPush = pushNeeded();
   document.body.classList.toggle("gate", !user || needPush);
   /* Login wall: everything except sign-in, policies and FAQ needs an account */
@@ -4386,7 +4493,13 @@ addEventListener("hashchange", () => {
   scrollTo(0, 0);
   render();
   trackView();
+  /* keyboard / screen-reader users: land on the new page content, not on the link that was pressed */
+  const ae = document.activeElement,
+    m = $("#m");
+  if (m && !(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) && !document.body.classList.contains("gate")) m.focus({ preventScroll: true });
 });
+addEventListener("offline", () => toast(lang == "ar" ? "لا يوجد اتصال بالإنترنت" : "You're offline", "wn"));
+addEventListener("online", () => toast(lang == "ar" ? "عاد الاتصال بالإنترنت" : "Back online"));
 
 /* ---------- Quick buy: the cart as a bottom sheet (product -> payment -> confirm) ---------- */
 function qbEl() {
