@@ -422,7 +422,7 @@ function freeEditor(c, ci) {
 const VIEW = {
   home() {
     const n = D.products.length;
-    return `<div class="stats"><div class="stat"><b>${ D.categories.length }</b><span>الأقسام</span></div><div class="stat"><b>${n}</b><span>المنتجات</span></div><div class="stat"><b>${ D.embeds.length }</b><span>التضمين</span></div><div class="stat"><b>${ D.banners.length }</b><span>البانرات</span></div><div class="stat"><b>${ Object.keys(D.coupons).length }</b><span>الكوبونات</span></div></div> <div class="card qa"><h2>إجراءات سريعة</h2><div class="qa-g"><button class="qa-b" data-tab="orders">${tabIc("orders")}<span>مراجعة الطلبات</span></button><button class="qa-b" data-tab="products">${tabIc("products")}<span>إدارة المنتجات</span></button><button class="qa-b" data-tab="apis">${tabIc("apis")}<span>ربط المزوّد واستيراد الخدمات</span></button><button class="qa-b" data-tab="tickets">${tabIc("tickets")}<span>تذاكر الدعم</span></button></div></div> ${checklistHTML()}<div class="card"><h2>نشر التعديلات</h2><p class="hint">النشر يحفظ إعدادات المتجر في جدول store_config. مفاتيح الـ APIs لا تُنشر أبداً.</p><div class="acts"><button class="b" data-a="pub">نشر الآن</button><button class="b b2" data-a="exp">نسخة احتياطية</button><label class="b b2">استيراد<input type="file" accept=".js,.json" hidden data-imp="1"></label></div></div>`;
+    return `<div class="stats"><div class="stat"><b>${ D.categories.length }</b><span>الأقسام</span></div><div class="stat"><b>${n}</b><span>المنتجات</span></div><div class="stat"><b>${ D.embeds.length }</b><span>التضمين</span></div><div class="stat"><b>${ D.banners.length }</b><span>البانرات</span></div><div class="stat"><b>${ Object.keys(D.coupons).length }</b><span>الكوبونات</span></div></div> <div class="card qa"><h2>إجراءات سريعة</h2><div class="qa-g"><button class="qa-b" data-tab="orders">${tabIc("orders")}<span>مراجعة الطلبات</span></button><button class="qa-b" data-tab="products">${tabIc("products")}<span>إدارة المنتجات</span></button><button class="qa-b" data-tab="apis">${tabIc("apis")}<span>ربط المزوّد واستيراد الخدمات</span></button><button class="qa-b" data-tab="tickets">${tabIc("tickets")}<span>تذاكر الدعم</span></button></div></div> <div id="hs"></div> ${checklistHTML()}<div class="card"><h2>نشر التعديلات</h2><p class="hint">النشر يحفظ إعدادات المتجر في جدول store_config. مفاتيح الـ APIs لا تُنشر أبداً.</p><div class="acts"><button class="b" data-a="pub">نشر الآن</button><button class="b b2" data-a="exp">نسخة احتياطية</button><label class="b b2">استيراد<input type="file" accept=".js,.json" hidden data-imp="1"></label></div></div>`;
   },
   site() {
     const s = "site.";
@@ -556,6 +556,7 @@ function render() {
     "#app"
   ).innerHTML = `<header class="top"><div class="w tr"><b class="ttl"><span class="brand-dot"></span>لوحة التحكم <small>${esc( D.site.n1 + D.site.n2 )}</small></b><span class="bdg" id="bdg"></span><span class="sp"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a><button class="b sm" data-a="pub">نشر الآن</button><button class="b b2 sm" data-a="logout">خروج</button></div></header><div class="w lay"><nav class="sd">${sideNav()}</nav><main>${warn}${(VIEW[tab] || VIEW.home)()}</main></div>`;
   badge();
+  if (tab == "home") setTimeout(homeStats, 0);
 }
 
 /* ---------- 8. Events ---------- */
@@ -796,6 +797,9 @@ document.addEventListener("click", (e) => {
   if (a == "save-api") return saveApis(b);
   if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
   if (a == "smm-imp") return smmImport(b);
+  if (a == "smm-reprice") return smmReprice();
+  if (a == "smm-recheck") { busy(b, true); return smmFetchRates(true).then(() => homeStats()).catch((e) => toast("فشل: " + String(e.message).slice(0, 70), "e")).finally(() => busy(b, false)); }
+  if (a == "autosend-t") { localStorage.setItem("amx_autosend", autoOn() ? "0" : "1"); toast(autoOn() ? "الإرسال التلقائي مفعّل" : "الإرسال التلقائي متوقف"); return homeStats(); }
   if (a == "smm-send" || a == "smm-status") return smmOrder(b);
   if (a == "pub") return publish(b);
   if (a == "exp") return exportBackup();
@@ -1284,6 +1288,7 @@ async function loadOrders() {
     if (!r.ok) throw new Error();
     ORDERS = await r.json();
     renderOrderList();
+    autoSweep();
   } catch {
     b.textContent = "فشل التحميل";
   }
@@ -1656,38 +1661,156 @@ function smmList() {
       : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c"
   );
 }
+/* ---- service -> Arabic title / platform / type (so the store filters work) ---- */
+const SMM_PLAT = [
+  [/insta|\big\b/i, "Instagram", "إنستغرام"], [/tik ?tok/i, "TikTok", "تيك توك"], [/youtube|\byt\b/i, "YouTube", "يوتيوب"],
+  [/telegram|\btg\b/i, "Telegram", "تيليجرام"], [/twitter|\bx\b|tweet/i, "X", "إكس (تويتر)"], [/facebook|\bfb\b/i, "Facebook", "فيسبوك"],
+  [/snap ?chat/i, "Snapchat", "سناب شات"], [/spotify/i, "Spotify", "سبوتيفاي"], [/threads/i, "Threads", "ثريدز"],
+  [/linked ?in/i, "LinkedIn", "لينكدإن"], [/discord/i, "Discord", "ديسكورد"], [/twitch/i, "Twitch", "تويتش"], [/kick/i, "Kick", "كيك"],
+];
+const SMM_TYPE = [
+  [/follower|subscriber|member|subs\b/i, "متابعين"], [/like|reaction|heart/i, "لايكات"], [/view|play|impression|watch|reach/i, "مشاهدات"],
+  [/comment/i, "تعليقات"], [/share|save|repost/i, "مشاركات وحفظ"],
+];
+function smmMeta(x) {
+  const hay = String(x.category || "") + " " + String(x.name || "");
+  const pl = SMM_PLAT.find((r) => r[0].test(hay)) || [0, "Other", "منصات أخرى"];
+  const ty = (SMM_TYPE.find((r) => r[0].test(String(x.name || "") + " " + String(x.category || ""))) || [0, "خدمات أخرى"])[1];
+  let tail = String(x.name || "").replace(/\s+/g, " ").trim();
+  if (tail.length > 70) tail = tail.slice(0, 67) + "…";
+  return { plEn: pl[1], plAr: pl[2], ty, ar: `${ty} ${pl[2]} — ${tail}`, tg: `${pl[1]} ${pl[2]} ${ty}` };
+}
+function smmEnsureFilter(cat, plEn, ty) {
+  const c = D.categories.find((k) => k.id == cat);
+  if (!c || !Array.isArray(c.f) || c.f.length < 2) return;
+  const add = (g, v) => { if (g && Array.isArray(g.o) && v && !g.o.some((o) => String(o).toLowerCase() == String(v).toLowerCase())) g.o.push(v); };
+  if (c.ty == "boost") { add(c.f[0], plEn == "Other" ? "" : plEn); add(c.f[1], ty); }
+}
 /* Turn panel services into store products: 1 package = 1000 units, price = rate x (1 + markup). qmin/qmax are in packages. */
 function smmImport(btn) {
   const mk = Math.max(0, parseFloat(($("#smm-mk") || {}).value) || 0);
   const cat = ($("#smm-cat") || {}).value || SMM_CAT;
-  if (!cat) return toast("\u0627\u062e\u062a\u0631 \u0642\u0633\u0645\u0627\u064b", "e");
+  if (!cat) return toast("اختر قسماً", "e");
+  try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {}
   const src = btn.dataset.id == "*" ? smmFiltered().slice(0, 300) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
   let add = 0, skip = 0;
   src.forEach((x) => {
     const sid = String(x.id), rate = parseFloat(x.rate);
     if (!(rate > 0) || D.products.some((p) => String(p.smm_service) == sid && p.c == cat)) { skip++; return; }
-    const it = NEW.products();
-    const name = String(x.name || ("Service " + sid)).trim();
+    const it = NEW.products(), mt = smmMeta(x), name = String(x.name || ("Service " + sid)).trim();
     Object.assign(it, {
-      id: "smm" + sid,
-      c: cat,
-      k: "buy",
-      ar: name,
-      en: name,
+      id: "smm" + sid, c: cat, k: "buy", ar: mt.ar, en: name,
       p: Math.max(0.01, Math.round(rate * (1 + mk / 100) * 100) / 100),
-      o: 0, d: 0, r: 5, n: 0, bs: 0,
-      tg: String(x.category || ""),
-      sp: String(x.category || "").slice(0, 40),
-      smm_service: sid,
-      smm_qty: 1000,
+      o: 0, d: 0, r: 5, n: 0, bs: 0, tg: mt.tg, sp: mt.plAr + " · " + mt.ty,
+      smm_service: sid, smm_qty: 1000, smm_mk: mk,
       qmin: Math.max(1, Math.ceil((parseFloat(x.min) || 1) / 1000)),
       qmax: Math.max(1, Math.floor((parseFloat(x.max) || 1000) / 1000)),
     });
     D.products.push(it);
+    smmEnsureFilter(cat, mt.plEn, mt.ty);
     add++;
   });
   save();
-  toast(`\u062a\u0645 \u0625\u0636\u0627\u0641\u0629 ${add} \u00b7 \u062a\u062e\u0637\u0651\u064a ${skip}. \u0627\u0636\u063a\u0637 \u0646\u0634\u0631 \u0644\u0644\u062d\u0641\u0638`, add ? "" : "e");
+  toast(`تمت إضافة ${add} · تخطّي ${skip}. اضغط نشر للحفظ`, add ? "" : "e");
+}
+
+/* ---- price sync with the provider (cache is kept 24h; only ids + rates of imported products) ---- */
+const smmCfg = () => D.products.some((p) => p.smm_service);
+const smmCache = () => { try { return JSON.parse(localStorage.getItem("amx_smm_rates") || "null"); } catch (e) { return null; } };
+async function smmFetchRates(force) {
+  const c = smmCache();
+  if (!force && c && Date.now() - c.ts < 864e5) return c;
+  const j = await fn("smm-order", { action: "services" });
+  const L = Array.isArray(j) ? j : j.services || [];
+  const want = new Set(D.products.filter((p) => p.smm_service).map((p) => String(p.smm_service)));
+  const map = {}, ids = [];
+  L.forEach((x) => { const id = String(x.service != null ? x.service : x.id); ids.push(id); if (want.has(id)) map[id] = [parseFloat(x.rate), parseFloat(x.min), parseFloat(x.max)]; });
+  const out = { ts: Date.now(), map, ids };
+  try { localStorage.setItem("amx_smm_rates", JSON.stringify(out)); } catch (e) {}
+  return out;
+}
+const smmMk = (p) => { const v = parseFloat(p.smm_mk); return v >= 0 ? v : parseFloat(localStorage.getItem("amx_smm_mk")) || 30; };
+function smmDrift(c) {
+  const up = [], gone = [];
+  if (!c) return { up, gone };
+  const have = new Set(c.ids || []);
+  D.products.filter((p) => p.smm_service).forEach((p) => {
+    const sid = String(p.smm_service), r = c.map[sid];
+    if (!r) { if (have.size && !have.has(sid)) gone.push(p); return; }
+    const np = Math.max(0.01, Math.round(r[0] * (1 + smmMk(p) / 100) * 100) / 100);
+    if (Math.abs(np - p.p) > 0.009 && Math.abs(np - p.p) / Math.max(p.p, 0.01) > 0.005) up.push({ p, np, rate: r[0] });
+  });
+  return { up, gone };
+}
+function smmReprice() {
+  const c = smmCache(), d = smmDrift(c);
+  d.up.forEach(({ p, np }) => { p.p = np; if (p.smm_mk == null) p.smm_mk = smmMk(p); });
+  if (c) D.products.filter((p) => p.smm_service && c.map[String(p.smm_service)]).forEach((p) => { const r = c.map[String(p.smm_service)]; p.qmin = Math.max(1, Math.ceil((r[1] || 1) / 1000)); p.qmax = Math.max(1, Math.floor((r[2] || 1000) / 1000)); });
+  save();
+  toast(`تم تحديث ${d.up.length} سعراً. اضغط نشر للحفظ`);
+  render();
+}
+
+/* ---- automatic send to the provider + status refresh (runs while the panel is open) ---- */
+const autoOn = () => localStorage.getItem("amx_autosend") !== "0";
+const orderItems = (o) => { let it = o.items; if (typeof it == "string") { try { it = JSON.parse(it); } catch (e) { it = []; } } return Array.isArray(it) ? it : []; };
+const hasSmmItems = (o) => orderItems(o).some((i) => { const p = D.products.find((x) => x.id == i.id); return p && p.smm_service; });
+const smmDone = (o) => /complete|cancel|refund|fail|partial/i.test(String(o.smm_status || ""));
+async function autoSend(o, quiet) {
+  if (!autoOn() || !o || o.smm || o.payment_status != "paid" || !hasSmmItems(o)) return;
+  try {
+    const j = await fn("smm-order", { action: "send", order_id: o.id });
+    o.smm = j.results; o.smm_status = j.smm_status;
+    if (!quiet) toast("أُرسل الطلب تلقائياً إلى المزوّد");
+    if ($("#ob")) renderOrderList();
+  } catch (e) { toast("فشل الإرسال التلقائي: " + String(e.message).slice(0, 70), "e"); }
+}
+async function autoSweep() {
+  if (!autoOn() || !ORDERS) return;
+  for (const o of ORDERS.filter((x) => x.payment_status == "paid" && !x.smm && hasSmmItems(x)).slice(0, 5)) await autoSend(o, true);
+  for (const o of ORDERS.filter((x) => x.smm && !smmDone(x)).slice(0, 8)) {
+    try { const j = await fn("smm-order", { action: "refresh", order_id: o.id }); o.smm = j.results; o.smm_status = j.smm_status; } catch (e) {}
+  }
+  if ($("#ob")) renderOrderList();
+}
+
+/* ---- home dashboard: real numbers ---- */
+const usd = (o) => { const r = D.rates && D.rates[o.currency || baseCur()]; const k = r ? +r[0] : 1; return (+o.total || 0) / (k > 0 ? k : 1); };
+async function homeStats() {
+  const box = $("#hs");
+  if (!box) return;
+  box.innerHTML = '<div class="card"><div class="ld"><span class="spin"></span> جارٍ تحميل الأرقام…</div></div>';
+  let rows = [], bal = null, cache = smmCache(), err = "";
+  try {
+    const r = await api("/rest/v1/orders?select=total,currency,payment_status,status,created_at,items&order=created_at.desc&limit=500");
+    if (r.ok) rows = await r.json();
+  } catch (e) {}
+  if (smmCfg()) {
+    try { const j = await fn("smm-order", { action: "balance" }); bal = { v: parseFloat(j.balance), c: j.currency || "USD" }; } catch (e) { err = String(e.message || "").slice(0, 80); }
+    try { cache = await smmFetchRates(false); } catch (e) {}
+  }
+  const now = new Date(), d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(), w0 = d0 - 6 * 864e5;
+  const paid = rows.filter((o) => o.payment_status == "paid");
+  const sum = (a) => a.reduce((t, o) => t + usd(o), 0);
+  const tdy = paid.filter((o) => new Date(o.created_at).getTime() >= d0), wk = paid.filter((o) => new Date(o.created_at).getTime() >= w0);
+  const rev = (v) => `${v.toFixed(2)} <small>${esc(baseCur())}</small>`;
+  const pend = rows.filter((o) => o.payment_status == "review").length, open = rows.filter((o) => o.status == "new" || o.status == "processing").length;
+  const cnt = {};
+  paid.forEach((o) => orderItems(o).forEach((i) => { const k = i.id; cnt[k] = cnt[k] || { n: 0, t: i.ar || i.name || i.id }; cnt[k].n += +i.q || 1; }));
+  const top = Object.values(cnt).sort((a, b) => b.n - a.n).slice(0, 5);
+  const dr = smmDrift(cache), low = bal && bal.v < (parseFloat(localStorage.getItem("amx_smm_low")) || 5);
+  const kp = (n, l, cl) => `<div class="stat${cl ? " " + cl : ""}"><b>${n}</b><span>${l}</span></div>`;
+  box.innerHTML =
+    `<div class="stats">${kp(rev(sum(tdy)), "مبيعات اليوم")}${kp(rev(sum(wk)), "مبيعات 7 أيام")}${kp(pend, "بانتظار مراجعة الدفع", pend ? "hot" : "")}${kp(open, "طلبات مفتوحة")}${bal ? kp(bal.v.toFixed(2) + " <small>" + esc(bal.c) + "</small>", "رصيدك لدى المزوّد", low ? "hot" : "") : ""}</div>` +
+    (low ? `<div class="card" style="border-color:#f87171"><b>⚠ رصيد المزوّد منخفض.</b> الطلبات ستفشل عند نفاد الرصيد، اشحنه قبل استقبال طلبات جديدة.</div>` : "") +
+    (err && smmCfg() ? `<div class="card hint warn">تعذّر قراءة رصيد المزوّد: ${esc(err)}</div>` : "") +
+    (dr.up.length || dr.gone.length
+      ? `<div class="card" style="border-color:var(--wn)"><h2>تغيّر أسعار المزوّد</h2>` +
+        (dr.up.length ? `<p class="hint">${dr.up.length} منتجاً سعره في متجرك لا يطابق سعر المزوّد الحالي مع هامشك:</p><div class="tw"><table class="tb"><tr><th>المنتج</th><th>سعرك</th><th>الجديد</th></tr>${dr.up.slice(0, 8).map(({ p, np }) => `<tr><td>${esc(p.ar)}</td><td dir="ltr">${p.p}</td><td dir="ltr"><b>${np}</b> ${np > p.p ? "▲" : "▼"}</td></tr>`).join("")}</table></div><div class="acts"><button class="b" data-a="smm-reprice">تطبيق كل الأسعار الجديدة (${dr.up.length})</button></div>` : "") +
+        (dr.gone.length ? `<p class="hint warn" style="margin-top:10px">⚠ ${dr.gone.length} خدمة لم تعد موجودة عند المزوّد: ${dr.gone.slice(0, 4).map((p) => esc(p.ar.slice(0, 30))).join("، ")}. أخفِها أو احذفها.</p>` : "") + `</div>`
+      : smmCfg() ? `<div class="card"><small>✓ أسعار المنتجات المستوردة مطابقة للمزوّد${cache ? " (آخر فحص: " + new Date(cache.ts).toLocaleString("ar") + ")" : ""}.</small> <button class="b b2 sm" data-a="smm-recheck">فحص الآن</button></div>` : "") +
+    `<div class="card"><h2>الأكثر مبيعاً</h2>${top.length ? top.map((t0, i) => `<div class="it"><span class="thm">${i + 1}</span><div class="im"><b>${esc(t0.t)}</b></div><b>${t0.n}</b></div>`).join("") : '<p class="hint">لا توجد طلبات مدفوعة بعد.</p>'}</div>` +
+    `<div class="card"><h2>الأتمتة</h2><p class="hint">عند تأكيد الدفع يُرسَل الطلب للمزوّد تلقائياً وتتحدّث حالته كل مرة تفتح فيها اللوحة. (يعمل أثناء فتح لوحة الإدارة.)</p><div class="acts"><button class="b ${autoOn() ? "" : "b2"}" data-a="autosend-t">الإرسال التلقائي: ${autoOn() ? "مفعّل" : "متوقف"}</button></div></div>`;
 }
 async function smmAction(btn, kind) {
   busy(btn, true);
@@ -1744,6 +1867,7 @@ async function setPayment(sel) {
     if (o) o.payment_status = payment_status;
     sel.dataset.prev = payment_status;
     toast("تم تحديث حالة الدفع");
+    if (o && payment_status == "paid") autoSend(o);
   } catch (e) {
     sel.value = prev;
     toast("فشل تحديث الدفع — " + (e.message || ""), "e");

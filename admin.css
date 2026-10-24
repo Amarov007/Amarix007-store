@@ -217,3 +217,7 @@ h2{font-size:18px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
   .top .sm{padding:6px 10px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.stat small{font-size:12px;font-weight:600;color:var(--mu)}
+.stat.hot{border-color:#f87171}.stat.hot b{color:#fca5a5}
+.hint.warn{color:#fbbf24}

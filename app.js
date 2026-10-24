@@ -2939,6 +2939,11 @@ document.addEventListener("click", async (e) => {
     scrollTo(0, 0);
   } else if (a == "buy") {
     addToCart(id, +b.dataset.n || 1);
+    qbOpen();
+  } else if (a == "qb-x") {
+    qbClose();
+  } else if (a == "qb-cart") {
+    qbClose();
     location.hash = "#/cart";
   } else if (a == "fav") {
     fav = fav.includes(id) ? fav.filter((x) => x != id) : [...fav, id];
@@ -3843,6 +3848,10 @@ function startBanners() {
 
 const AUTH_ROUTES = ["orders", "account", "support"];
 function render() {
+  render0();
+  qbRefresh();
+}
+function render0() {
   if (waitCfg) {
     $("#m").innerHTML = skeletonGrid();
     return;
@@ -3911,6 +3920,45 @@ addEventListener("hashchange", () => {
   render();
   trackView();
 });
+
+/* ---------- Quick buy: the cart as a bottom sheet (product -> payment -> confirm) ---------- */
+function qbEl() {
+  let e = document.getElementById("qb");
+  if (e) return e;
+  e = document.createElement("div");
+  e.id = "qb";
+  e.className = "qb";
+  e.setAttribute("aria-hidden", "true");
+  const A = lang == "ar";
+  e.innerHTML = `<div class="qb-ov" data-a="qb-x"></div><div class="qb-s" role="dialog" aria-modal="true" aria-label="${A ? "إتمام الشراء" : "Checkout"}"><div class="qb-h"><b>${A ? "إتمام الشراء" : "Checkout"}</b><button type="button" class="ib" data-a="qb-x" aria-label="${A ? "إغلاق" : "Close"}">✕</button></div><ol class="qb-st"><li>${A ? "المنتج" : "Item"}</li><li>${A ? "الدفع" : "Payment"}</li><li>${A ? "التأكيد" : "Confirm"}</li></ol><div class="qb-b" id="qb-b"></div><button type="button" class="qb-more" data-a="qb-cart">${A ? "فتح السلة كاملة" : "Open full cart"}</button></div>`;
+  document.body.appendChild(e);
+  return e;
+}
+function qbOpen() {
+  const e = qbEl();
+  $("#qb-b").innerHTML = cartPage();
+  e.classList.add("on");
+  e.setAttribute("aria-hidden", "false");
+  document.body.classList.add("qb-open");
+}
+function qbClose() {
+  const e = document.getElementById("qb");
+  if (!e || !e.classList.contains("on")) return;
+  e.classList.remove("on");
+  e.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("qb-open");
+}
+function qbRefresh() {
+  const e = document.getElementById("qb");
+  if (!e || !e.classList.contains("on")) return;
+  if (!cartLines().length) return qbClose();
+  const sc = e.querySelector(".qb-s").scrollTop;
+  $("#qb-b").innerHTML = cartPage();
+  e.querySelector(".qb-s").scrollTop = sc;
+}
+addEventListener("hashchange", qbClose);
+document.addEventListener("keydown", (ev) => ev.key == "Escape" && qbClose());
+
 
 /* Section strip: mouse drag, vertical wheel -> horizontal scroll, edge fades; press ripple and pointer spotlight on section cards */
 (function sectionFx() {
