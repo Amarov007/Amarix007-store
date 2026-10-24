@@ -2122,19 +2122,45 @@ function donePage(id) {
 function accPage() {
   const name = nameOf(),
     shown = name || user.email.split("@")[0];
-  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${pushBox()}${refBox()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
+  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${pushBox()}${partnerBox()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
 }
-function refBox() {
+function partnerBox() {
   if (!refInfo) return "";
   const A = lang == "ar",
-    link = location.origin + location.pathname + "?ref=" + refInfo.code;
-  const st = [
-    [A ? "نقرات" : "Clicks", refInfo.clicks || 0],
-    [A ? "تسجيلات" : "Sign-ups", refInfo.signups || 0],
-    [A ? "مبيعات" : "Sales", refInfo.sales || 0],
-    [A ? "عمولتك" : "Earned", fmt(+refInfo.total_commission || 0)],
-  ];
-  return `<div class="box ref"><h3>${ A ? "برنامج الإحالة" : "Referral program" }</h3> <p class="sb">${ A ? "شارك رابطك واكسب عمولة على كل طلب يُدفع من أصدقائك." : "Share your link and earn a commission on every paid order from your friends." }</p> <div class="ref-l"><bdi dir="ltr">${ex( link )}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${ A ? "نسخ" : "Copy" }</button></div> <div class="ref-s">${st .map( ([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>` ) .join("")}</div></div>`;
+    st = refInfo.status || "none",
+    head = `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}</h3>`;
+  if (st == "approved") {
+    const link = location.origin + location.pathname + "?ref=" + refInfo.code,
+      rate = refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null,
+      stats = [
+        [A ? "نقرات" : "Clicks", refInfo.clicks || 0],
+        [A ? "تسجيلات" : "Sign-ups", refInfo.signups || 0],
+        [A ? "مبيعات" : "Sales", refInfo.sales || 0],
+        [A ? "عمولتك" : "Earned", fmt(+refInfo.total_commission || 0)],
+      ];
+    return `<div class="box ref">${head}<p class="sb">${A ? "أنت شريك معتمد — شارك رابطك واكسب عمولة على كل طلب مدفوع من عملائك." : "You are an approved partner — share your link and earn a commission on every paid order from your referrals."}${rate != null ? ` <b>${A ? "نسبة عمولتك" : "Your rate"}: ${ex(String(rate))}%</b>` : ""}</p> <div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div> <div class="ref-s">${stats.map(([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>`).join("")}</div></div>`;
+  }
+  if (st == "pending")
+    return `<div class="box ref">${head}<p class="sb">${A ? "طلبك قيد المراجعة — سيظهر رابطك هنا فور الموافقة عليه." : "Your application is under review — your link will appear here once it is approved."}</p></div>`;
+  return `<div class="box ref">${head}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>${st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : ""} <input class="inp" id="aff-pay" dir="ltr" maxlength="120" autocomplete="off" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"> <button class="b block" data-a="aff-apply">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></div>`;
+}
+async function applyAffiliate(b) {
+  const A = lang == "ar",
+    inp = $("#aff-pay"),
+    v = ((inp && inp.value) || "").trim();
+  if (v.length < 3)
+    return toast(A ? "أدخل معرّف Binance Pay أو عنوان المحفظة" : "Enter your Binance Pay ID or wallet address", "er");
+  b.disabled = true;
+  try {
+    const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v } });
+    if (!r.ok) throw new Error();
+    if (refInfo) refInfo.status = "pending";
+    toast(A ? "تم إرسال طلبك ✓" : "Application sent ✓");
+    render();
+  } catch {
+    toast(A ? "تعذّر إرسال الطلب، حاول لاحقاً" : "Couldn't send the application, try again later", "er");
+    b.disabled = false;
+  }
 }
 function favPage() {
   const a = P.filter((p) => fav.includes(p.id));
@@ -3094,6 +3120,7 @@ document.addEventListener("click", async (e) => {
   } else if (a == "hv-click") {
     if (e.isTrusted) humanRun(900);
   } else if (a == "resend") resendMail(b);
+  else if (a == "aff-apply") applyAffiliate(b);
   else if (a == "push-on") pushEnable(b);
   else if (a == "push-re") location.reload();
   else if (a == "out") {
@@ -3370,7 +3397,7 @@ async function authFail(r) {
   throw new Error(j.msg || j.error_description || j.message || "");
 }
 
-/* Referrals: remember ?ref=CODE (query string or hash) and count the click once per browser */
+/* Partner (affiliate) links: remember ?ref=CODE (query string or hash) and count the click once per browser */
 (function () {
   try {
     const m = (location.search + location.hash).match(
@@ -3402,19 +3429,19 @@ async function syncProfile() {
     const row = (await r.json())[0];
     if (row) {
       profileName = row.full_name || "";
-      if (row.ref_code) {
-        refInfo = {
-          code: row.ref_code,
-          clicks: 0,
-          signups: 0,
-          sales: 0,
-          total_commission: 0,
-        };
-        const ar = await sb(
-          `/rest/v1/affiliates?user_id=eq.${encodeURIComponent( user.id )}&select=clicks,signups,sales,total_commission`
-        );
-        if (ar.ok) Object.assign(refInfo, (await ar.json())[0] || {});
-      }
+      refInfo = {
+        code: row.ref_code || "",
+        status: "none",
+        rate: null,
+        clicks: 0,
+        signups: 0,
+        sales: 0,
+        total_commission: 0,
+      };
+      const ar = await sb(
+        `/rest/v1/affiliates?user_id=eq.${encodeURIComponent( user.id )}&select=status,rate,clicks,signups,sales,total_commission`
+      );
+      if (ar.ok) Object.assign(refInfo, (await ar.json())[0] || {});
     } else {
       const full_name = nameOf();
       await sb("/rest/v1/profiles", {

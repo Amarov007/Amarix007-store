@@ -150,7 +150,7 @@ const TABS = [
   ["staff", "الموظفون"],
   ["activity", "سجل النشاط"],
   ["apis", "إعدادات APIs"],
-  ["affiliates", "المسوقين"],
+  ["affiliates", "الشركاء (Affiliate)"],
   ["orders", "الطلبات"],
   ["stats", "الإحصاءات"],
   ["tickets", "تذاكر الدعم"],
@@ -526,7 +526,7 @@ const VIEW = {
   },
   affiliates() {
     setTimeout(loadAffiliates, 50);
-    return `<div class="card"><h2>المسوقين (Affiliates)</h2><div id="aff-list">${loadingHTML}</div></div>`;
+    return `<div class="card"><h2>برنامج الشركاء (Affiliate)</h2><div id="aff-list">${loadingHTML}</div></div>`;
   },
   orders() {
     setTimeout(loadOrders, 50);
@@ -895,6 +895,31 @@ document.addEventListener("click", (e) => {
     D[d.k].splice(+d.i, 1);
     save();
     return render();
+  }
+  if (a == "aff-status") {
+    const rin = b.closest("tr").querySelector("input[data-aff-r]"),
+      rv = ((rin && rin.value) || "").trim().replace(",", "."),
+      rate = rv === "" ? null : +rv;
+    if (rate !== null && !(rate >= 0 && rate <= 100))
+      return toast("النسبة يجب أن تكون بين 0 و 100", "e");
+    const body = { status: d.st, rate };
+    if (d.st == "approved") body.approved_at = new Date().toISOString();
+    b.disabled = true;
+    api("/rest/v1/affiliates?id=eq." + encodeURIComponent(d.id), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(body),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        toast("تم الحفظ ✓");
+        loadAffiliates();
+      })
+      .catch(() => {
+        toast("فشل الحفظ", "e");
+        b.disabled = false;
+      });
+    return;
   }
   if (a == "aff-coupon") {
     const inp = b.closest("tr").querySelector("input[data-aff-c]"),
@@ -1522,14 +1547,26 @@ async function loadUsers() {
     b.textContent = "فشل التحميل";
   }
 }
+const AFF_ST = { none: "لم يقدّم", pending: "بانتظار المراجعة", approved: "معتمد", rejected: "مرفوض" };
 async function loadAffiliates() {
   const b = $("#aff-list");
   if (!b) return;
   try {
     const r = await api("/rest/v1/affiliates?select=*,profiles(email)");
     if (!r.ok) throw new Error();
-    const a = await r.json();
-    b.innerHTML = `<div class="tw"><table class="tb"><tr><th>المسوق</th><th>كوبونه</th><th>النقرات</th><th>المبيعات</th><th>العمولة</th></tr>${a .map( (x) => `<tr><td dir="ltr">${esc( (x.profiles || {}).email || x.user_id )}</td><td style="white-space:nowrap"><input class="inp" data-aff-c dir="ltr" maxlength="40" style="width:110px;display:inline-block" value="${esc(x.coupon || "")}" placeholder="CODE"> <button class="b sm" data-a="aff-coupon" data-id="${esc(x.id)}">حفظ</button></td><td>${x.clicks}</td><td>${ x.sales }</td><td>${(+x.total_commission).toFixed(2)}</td></tr>` ) .join("")}</table></div>`;
+    const rank = { pending: 0, approved: 1, rejected: 2, none: 3 },
+      a = (await r.json()).filter((x) => x.status && x.status != "none" || +x.sales > 0 || x.coupon);
+    a.sort((x, y) => (rank[x.status] ?? 9) - (rank[y.status] ?? 9));
+    if (!a.length) {
+      b.textContent = "لا توجد طلبات انضمام بعد.";
+      return;
+    }
+    b.innerHTML = `<div class="tw"><table class="tb"><tr><th>الشريك</th><th>الحالة</th><th>محفظة الدفع</th><th>النسبة %</th><th>كوبونه</th><th>النقرات</th><th>المبيعات</th><th>العمولة</th><th></th></tr>${a
+      .map(
+        (x) =>
+          `<tr><td dir="ltr">${esc((x.profiles || {}).email || x.user_id)}</td><td>${esc(AFF_ST[x.status] || x.status || "—")}</td><td dir="ltr" style="max-width:160px;word-break:break-all">${esc(x.payout_id || "—")}</td><td><input class="inp" data-aff-r dir="ltr" inputmode="decimal" maxlength="5" style="width:70px;display:inline-block" value="${esc(x.rate == null ? "" : x.rate)}" placeholder="افتراضي"></td><td style="white-space:nowrap"><input class="inp" data-aff-c dir="ltr" maxlength="40" style="width:110px;display:inline-block" value="${esc(x.coupon || "")}" placeholder="CODE"> <button class="b sm" data-a="aff-coupon" data-id="${esc(x.id)}">حفظ</button></td><td>${x.clicks}</td><td>${x.sales}</td><td>${(+x.total_commission).toFixed(2)}</td><td style="white-space:nowrap">${x.status == "approved" ? `<button class="b sm" data-a="aff-status" data-st="approved" data-id="${esc(x.id)}">حفظ النسبة</button> <button class="b b2 sm" data-a="aff-status" data-st="rejected" data-id="${esc(x.id)}">إيقاف</button>` : `<button class="b sm" data-a="aff-status" data-st="approved" data-id="${esc(x.id)}">قبول</button>${x.status == "pending" ? ` <button class="b b2 sm" data-a="aff-status" data-st="rejected" data-id="${esc(x.id)}">رفض</button>` : ""}`}</td></tr>`
+      )
+      .join("")}</table></div>`;
   } catch {
     b.textContent = "فشل التحميل";
   }
