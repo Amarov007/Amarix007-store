@@ -794,6 +794,7 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("change", async (e) => {
   const t = e.target,
     d = t.dataset;
+  if (t.id == "smm-lim") return smmList(); // refresh the "import N results" button
   if (d.up) return upl(t);
   if (d.imp) return imp(t);
   if (d.pst) return setPayment(t);
@@ -2111,6 +2112,14 @@ const smmFiltered = () => {
     (x) => !q || (x.id + " " + x.name + " " + (x.category || "")).toLowerCase().includes(q)
   );
 };
+/* How many services one import / re-import may add. 0 = all of them. Kept in the browser; default 300 (every product is part of the public store config that each visitor downloads). */
+function smmLim() {
+  const el = $("#smm-lim");
+  let v = el ? el.value : (() => { try { return localStorage.getItem("amx_smm_lim"); } catch (e) { return null; } })();
+  v = v === null || v === "" || v === undefined ? 300 : Math.max(0, parseInt(v, 10) || 0);
+  try { localStorage.setItem("amx_smm_lim", String(v)); } catch (e) {}
+  return v || Infinity;
+}
 function smmList() {
   const mk = $("#smm-mk"), ct = $("#smm-cat");
   if (mk) SMM_MK = mk.value;
@@ -2122,15 +2131,16 @@ function smmList() {
     '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641</span><select class="inp" id="smm-cat">' +
     D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("") +
     '</select></label>' +
-    `<label class="fld"><span>\u0647\u0627\u0645\u0634 \u0627\u0644\u0631\u0628\u062d %</span><input class="inp" id="smm-mk" type="number" min="0" step="1" value="${esc(SMM_MK)}" dir="ltr"></label></div>` +
-    `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, 300)})</button>`;
+    `<label class="fld"><span>\u0647\u0627\u0645\u0634 \u0627\u0644\u0631\u0628\u062d %</span><input class="inp" id="smm-mk" type="number" min="0" step="1" value="${esc(SMM_MK)}" dir="ltr"></label>` +
+    `<label class="fld"><span>الحد الأقصى للاستيراد (0 = كل النتائج)</span><input class="inp" id="smm-lim" type="number" min="0" step="100" value="${esc(String(smmLim() === Infinity ? 0 : smmLim()))}" dir="ltr"></label></div>` +
+    `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button>`;
   smmOut(
     L.length
       ? bar +
           '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
           L.map(
             (x) =>
-              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button></td></tr>`
+              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}${x.category ? '<br><small class="od-m">' + esc(x.category) + '</small>' : ''}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button></td></tr>`
           ).join("") +
           "</table>"
       : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c"
@@ -2138,22 +2148,27 @@ function smmList() {
 }
 /* ---- service -> Arabic title / platform / type (so the store filters work) ---- */
 const SMM_PLAT = [
-  [/instagram|\binsta\b|\big\b/i, "Instagram", "إنستغرام"], [/tik ?tok/i, "TikTok", "تيك توك"], [/youtube|\byt\b/i, "YouTube", "يوتيوب"],
-  [/telegram|\btg\b/i, "Telegram", "تيليجرام"], [/twitter|\bx\b|tweet/i, "X", "إكس (تويتر)"], [/facebook|\bfb\b/i, "Facebook", "فيسبوك"],
-  [/snap ?chat/i, "Snapchat", "سناب شات"], [/spotify/i, "Spotify", "سبوتيفاي"], [/threads/i, "Threads", "ثريدز"],
-  [/linked ?in/i, "LinkedIn", "لينكدإن"], [/discord/i, "Discord", "ديسكورد"], [/twitch/i, "Twitch", "تويتش"], [/\bkick\b/i, "Kick", "كيك"],
+  [/instagram|\binsta\b|\big\b|انستغرام|انستجرام|إنستغرام|إنستجرام/i, "Instagram", "إنستغرام"], [/tik ?tok|تيك ?توك/i, "TikTok", "تيك توك"], [/youtube|\byt\b|يوتيوب/i, "YouTube", "يوتيوب"],
+  [/telegram|\btg\b|تيليجرام|تيليغرام/i, "Telegram", "تيليجرام"], [/twitter|\bx\b|tweet|تويتر|إكس|اكس/i, "X", "إكس (تويتر)"], [/facebook|\bfb\b|فيسبوك|فيس بوك/i, "Facebook", "فيسبوك"],
+  [/snap ?chat|سناب/i, "Snapchat", "سناب شات"], [/spotify|سبوتيفاي/i, "Spotify", "سبوتيفاي"], [/threads|ثريدز/i, "Threads", "ثريدز"],
+  [/linked ?in|لينكد/i, "LinkedIn", "لينكدإن"], [/discord|ديسكورد/i, "Discord", "ديسكورد"], [/twitch|تويتش/i, "Twitch", "تويتش"], [/\bkick\b|كيك/i, "Kick", "كيك"],
 ];
 const SMM_TYPE = [
-  [/follower|subscriber|member|subs\b/i, "متابعين"], [/like|reaction|heart/i, "لايكات"], [/view|play|impression|watch|reach/i, "مشاهدات"],
-  [/comment/i, "تعليقات"], [/share|save|repost/i, "مشاركات وحفظ"],
+  [/follower|subscriber|member|subs\b|متابع|مشترك|اعضاء|أعضاء/i, "متابعين"], [/like|reaction|heart|لايك|اعجاب|إعجاب/i, "لايكات"], [/view|play|impression|watch|reach|مشاهد/i, "مشاهدات"],
+  [/comment|تعليق/i, "تعليقات"], [/share|save|repost|مشارك|حفظ/i, "مشاركات وحفظ"],
 ];
+/* Title + features come from svc-parse.js (shared with the store): the provider's long name becomes a short clean title and feature tags,
+   the full original name stays in `en`, so nothing is lost. Platform / type are NOT repeated inside the title (the store shows them as icon / chip). */
 function smmMeta(x) {
   const hay = String(x.category || "") + " " + String(x.name || "");
   const pl = SMM_PLAT.find((r) => r[0].test(hay)) || [0, "Other", "منصات أخرى"];
   const ty = (SMM_TYPE.find((r) => r[0].test(String(x.name || "") + " " + String(x.category || ""))) || [0, "خدمات أخرى"])[1];
-  let tail = String(x.name || "").replace(/\s+/g, " ").trim();
-  if (tail.length > 70) tail = tail.slice(0, 67) + "…";
-  return { plEn: pl[1], plAr: pl[2], ty, ar: `${ty} ${pl[2]} — ${tail}`, tg: `${pl[1]} ${pl[2]} ${ty}` };
+  let sp = null;
+  try { sp = window.AMXSvc ? window.AMXSvc.parse(String(x.name || "")) : null; } catch (e) {}
+  let tail = ((sp && sp.title) || String(x.name || "")).replace(/\s+/g, " ").trim();
+  if (tail.length > 90) tail = tail.slice(0, 90).replace(/\s+\S*$/, "") + "…";
+  const feats = sp ? sp.tags.map((t) => t.ar).join(" ") : "";
+  return { plEn: pl[1], plAr: pl[2], ty, title: tail, tags: sp ? sp.tags : [], ar: pl[1] == "Other" ? tail : `${pl[2]} · ${tail}`, tg: `${pl[1]} ${pl[2]} ${ty} ${feats}`.trim() };
 }
 function smmEnsureFilter(cat, plEn, ty) {
   const c = D.categories.find((k) => k.id == cat);
@@ -2167,7 +2182,7 @@ function smmImport(btn) {
   const cat = ($("#smm-cat") || {}).value || SMM_CAT;
   if (!cat) return toast("اختر قسماً", "e");
   try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {}
-  const src = btn.dataset.id == "*" ? smmFiltered().slice(0, 300) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
+  const src = btn.dataset.id == "*" ? smmFiltered().slice(0, smmLim()) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
   const r = smmImportList(src, cat, mk);
   save();
   toast(`تمت إضافة ${r.add} · تخطّي ${r.skip}. اضغط نشر للحفظ`, r.add ? "" : "e");
@@ -2215,7 +2230,7 @@ async function smmWipe(btn, redo) {
       await smmLoadServices(); // fetch first: if this fails nothing is deleted
       if (!SMM_SVC.length) throw new Error("المزوّد لم يُرجع أي خدمة — لم يُحذف شيء");
     }
-    const n = Math.min(SMM_SVC.length, 300);
+    const n = Math.min(SMM_SVC.length, smmLim());
     const msg = redo
       ? `سيتم حذف ${old.length} منتج رشق ثم استيراد ${n} خدمة جديدة من المزوّد بهامش ${mk}% إلى قسم «${catName(cat)}». متابعة؟`
       : `سيتم حذف ${old.length} منتج رشق (المستوردة والقديمة داخل أقسام الرشق). متابعة؟`;
@@ -2225,7 +2240,7 @@ async function smmWipe(btn, redo) {
     }
     for (let i = D.products.length - 1; i >= 0; i--) if (isBoostProduct(D.products[i])) D.products.splice(i, 1);
     let r = { add: 0, skip: 0 };
-    if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportList(SMM_SVC.slice(0, 300), cat, mk); }
+    if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportList(SMM_SVC.slice(0, smmLim()), cat, mk); }
     save();
     toast(redo ? `حُذف ${old.length} وأُضيف ${r.add} منتج جديد. اضغط نشر للحفظ` : `حُذف ${old.length} منتج. اضغط نشر للحفظ`);
     smmOut(redo ? `✓ حُذف ${old.length} وأُضيف ${r.add} (تخطّي ${r.skip}). اضغط «نشر» لتطبيق التغيير على المتجر.` : `✓ حُذف ${old.length} منتج رشق. اضغط «نشر» لتطبيق التغيير.`);

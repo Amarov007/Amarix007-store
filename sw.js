@@ -5,10 +5,10 @@
    - admin page, Supabase API, auth, storage, fonts: untouched, never cached
    - push notifications: shows the message sent by the send-push edge function; a tap opens the order page */
 const ICONS_CACHE = "amx-icons-v4";
-const SHELL_CACHE = "amx-shell-v8";
+const SHELL_CACHE = "amx-shell-v9";
 const ICONS = ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-64.png", "logo-mark.webp", "logo-word.webp"];
-const SHELL = ["./", "index.html", "boot.js", "app.js", "style.css", "store-data.js", "music.js", "splash.js", "splash.css"];
-const CODE = /\/(boot\.js|app\.js|style\.css|store-data\.js|music\.js|splash\.js|splash\.css)$/;
+const SHELL = ["./", "index.html", "boot.js", "app.js", "style.css", "store-data.js", "music.js", "svc-parse.js", "splash.js", "splash.css"];
+const CODE = /\/(boot\.js|app\.js|style\.css|store-data\.js|music\.js|svc-parse\.js|splash\.js|splash\.css)$/;
 const ADMIN = /\/admin\.(html|js|css)$/;
 
 self.addEventListener("install", (e) => {

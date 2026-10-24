@@ -2048,7 +2048,7 @@ function prodPage(id) {
   const ds = p.ds && (p.ds[lang] || (boost ? p.ds.ar || p.ds.en : ""));
   const rel = boost ? [] : P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
   const back = boost ? `<a class="b b2 sm sb-back" href="#/boost">${ic("chev", 14)} ${lang == "ar" ? "العودة إلى منصة الرشق" : "Back to the Boost panel"}</a>` : "";
-  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
+  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
 }
 
 /* Static pages: FAQ and policies */
@@ -3919,8 +3919,43 @@ function sbMeta(p) {
     h0 = nz(plain(p.en)); // the provider's own service name is the most reliable text: it is tried first, the Arabic title / tags are the fallback
   const pl = SBP.find((r) => r[3].test(h0)) || SBP.find((r) => r[3].test(h)),
     ty = SBT.find((r) => r[3] && r[3].test(h0)) || SBT.find((r) => r[3] && r[3].test(h));
-  return (SBM[p.id] = { pl: pl ? pl[0] : "other", ty: ty ? ty[0] : "other", h });
+  /* the provider's long name split into a short title + feature tags (refill, speed, start time…), see svc-parse.js */
+  let s = null;
+  try {
+    s = window.AMXSvc ? window.AMXSvc.parse(plain(p.en) || plain(p.ar)) : null;
+  } catch {}
+  return (SBM[p.id] = { pl: pl ? pl[0] : "other", ty: ty ? ty[0] : "other", h, s, ft: s ? s.tags.map((x) => x.id) : [] });
 }
+/* Titles made by the importer ("<type> <platform> — <name>" or "<platform> · <name>") repeat the platform on every row: for those the clean title is shown.
+   A title the admin typed by hand is kept as it is. */
+const SBA = new RegExp("^(?:(?:متابعين|لايكات|مشاهدات|تعليقات|مشاركات وحفظ|خدمات أخرى)\\s.+?\\s[—–-]\\s|(?:" + SBP.map((r) => r[1]).concat("منصات أخرى").join("|") + ")\\s·\\s)");
+function sbTitle(p, m) {
+  const s = m && m.s && m.s.title;
+  if (lang == "ar") return s && (!p.ar || SBA.test(p.ar)) ? s : p.ar || s || p.en || "";
+  return s && p.en ? s : p.en || p.ar || "";
+}
+/* Feature chips (refill / speed / start time / new…). max = how many to show in a list row, the rest becomes "+N" */
+function sbChips(m, max) {
+  const a = (m && m.s && m.s.tags) || [];
+  if (!a.length) return "";
+  const show = max ? a.slice(0, max) : a,
+    more = a.length - show.length;
+  return `<span class="sb-tgs">${show.map((x) => `<i class="sb-tg ${ex(x.id)}">${ex(lang == "ar" ? x.ar : x.en)}</i>`).join("")}${more > 0 ? `<i class="sb-tg">+${more}</i>` : ""}</span>`;
+}
+/* The provider's full service name + every feature: shown inside the opened service and on the product page, so nothing is hidden behind a "…" */
+function sbFull(p, m) {
+  const s = m && m.s;
+  if (!s || !s.full) return "";
+  const same = !s.tags.length && s.full === sbTitle(p, m);
+  if (same) return "";
+  return `<div class="sb-full"><small>${sbT("الاسم الكامل للخدمة", "Full service name")}</small><p dir="auto">${ex(s.full)}</p>${sbChips(m)}</div>`;
+}
+const SB_FT = [
+  ["refill", "♻ تعويض", "♻ Refill"],
+  ["nodrop", "🛡 ثابت", "🛡 Non-drop"],
+  ["fast", "⚡ سريع", "⚡ Fast"],
+  ["new", "🆕 جديد", "🆕 New"],
+];
 const sbPl = (id) => SBP.find((r) => r[0] == id) || SBO;
 const sbLabPl = (id) => sbPl(id)[lang == "ar" ? 1 : 2];
 const sbLabTy = (id) => (SBT.find((r) => r[0] == id) || SBT[SBT.length - 1])[lang == "ar" ? 1 : 2];
@@ -3932,7 +3967,7 @@ function sbBadge(id, z) {
   return `<span class="sb-pi" style="background:${bg};color:${r[6] || "#fff"}">${inner}</span>`;
 }
 
-const SB = { pl: "", ty: "", q: "", sort: "def", sel: "", n: 1, link: "", lim: 20, pm: false };
+const SB = { pl: "", ty: "", ft: "", q: "", sort: "def", sel: "", n: 1, link: "", lim: 20, pm: false };
 const sbU = (p) => (+p.smm_qty > 0 ? +p.smm_qty : 1); // real quantity of one package (1 package = sbU units)
 const sbN = (p) => qClamp(p, SB.n);
 const sbPrice = (p) => {
@@ -3948,7 +3983,8 @@ function sbCalc() {
     w = nz(qq).split(/\s+/).filter(Boolean),
     plAll = {},
     plc = {},
-    tyc = {};
+    tyc = {},
+    ftc = {};
   let list = [];
   all.forEach((p) => {
     const m = sbMeta(p);
@@ -3958,11 +3994,14 @@ function sbCalc() {
       okTy = !SB.ty || m.ty == SB.ty;
     if (okTy) plc[m.pl] = (plc[m.pl] || 0) + 1;
     if (okPl) tyc[m.ty] = (tyc[m.ty] || 0) + 1;
-    if (okPl && okTy) list.push(p);
+    if (okPl && okTy) {
+      SB_FT.forEach((r) => m.ft.includes(r[0]) && (ftc[r[0]] = (ftc[r[0]] || 0) + 1));
+      if (!SB.ft || m.ft.includes(SB.ft)) list.push(p);
+    }
   });
   if (SB.sort == "pa") list = [...list].sort((x, y) => sbPrice(x).v - sbPrice(y).v);
   else if (SB.sort == "pd") list = [...list].sort((x, y) => sbPrice(y).v - sbPrice(x).v);
-  return { list, plAll, plc, tyc, n: all.length };
+  return { list, plAll, plc, tyc, ftc, n: all.length };
 }
 
 const SB_PL_SHOWN = 6; // platform icons visible before "More"
@@ -3990,6 +4029,13 @@ function sbTypes(f) {
     .join("")}</div>`;
 }
 
+function sbFeats(f) {
+  const a = SB_FT.filter((r) => f.ftc[r[0]] || SB.ft == r[0]);
+  if (!a.length) return "";
+  return `<div class="fchips sb-fts">${a
+    .map((r) => `<button type="button" class="fchip${SB.ft == r[0] ? " on" : ""}" aria-pressed="${SB.ft == r[0]}" data-a="sbft" data-f="${r[0]}">${ex(r[lang == "ar" ? 1 : 2])} <small class="n">${fmtN(f.ftc[r[0]] || 0)}</small></button>`)
+    .join("")}</div>`;
+}
 function sbForm(p) {
   const u = sbU(p),
     lo = qMin(p),
@@ -4001,7 +4047,7 @@ function sbForm(p) {
     .map((k) => `<button type="button" role="radio" aria-checked="${k == n}" class="qchip${k == n ? " on" : ""}" data-a="sbn" data-n="${k}">${fmtN(k * u)}</button>`)
     .join("");
   const per = sbPrice(p);
-  return `<div class="sb-f">${ds ? `<p class="pd sb-ds">${ex(ds)}</p>` : ""}
+  return `<div class="sb-f">${sbFull(p, sbMeta(p))}${ds ? `<p class="pd sb-ds">${ex(ds)}</p>` : ""}
 <div class="sb-info"><span>${sbT("السعر", "Price")}: <b class="n">${money(per.v)}</b> ${ex(per.l)}</span><span>${sbT("الحد الأدنى", "Min")}: <bdi dir="ltr">${fmtN(lo * u)}</bdi></span>${+p.qmax > 0 ? `<span>${sbT("الحد الأقصى", "Max")}: <bdi dir="ltr">${fmtN(hi * u)}</bdi></span>` : ""}</div>
 <label class="sb-l"><span>${sbT("رابط الحساب أو المنشور", "Account or post link")} *</span><input id="sb-lk" class="inp" type="text" dir="ltr" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" data-a="sblk" value="${ex(SB.link)}" placeholder="https://… / @username"></label>
 <div class="sb-l"><span>${sbT("الكمية", "Quantity")}</span><div class="qchips" role="radiogroup" aria-label="${sbT("الكمية", "Quantity")}">${chips}</div>
@@ -4018,7 +4064,7 @@ function sbRow(p) {
     pp = sbPrice(p),
     lo = qMin(p) * u;
   const rng = fmtN(lo) + (+p.qmax > 0 ? " – " + fmtN(qMax(p) * u) : "+");
-  return `<div class="sb-r${on ? " on" : ""}" id="sbr-${ex(p.id)}"><button type="button" class="sb-h" data-a="sbsel" data-id="${ex(p.id)}" aria-expanded="${on}">${sbBadge(m.pl, 18)}<span class="sb-nm"><b>${ex(p[lang] || p.ar || p.en)}</b><small>${ex(sbLabTy(m.ty))} · <bdi dir="ltr">${rng}</bdi></small></span><span class="sb-pr"><b class="n">${money(pp.v)}</b><small>${ex(pp.l)}</small></span><i class="sb-ch">${ic("chev", 16)}</i></button>${on ? sbForm(p) : ""}</div>`;
+  return `<div class="sb-r${on ? " on" : ""}" id="sbr-${ex(p.id)}"><button type="button" class="sb-h" data-a="sbsel" data-id="${ex(p.id)}" aria-expanded="${on}">${sbBadge(m.pl, 18)}<span class="sb-nm"><b>${ex(sbTitle(p, m))}</b><small>${ex(sbLabTy(m.ty))} · <bdi dir="ltr">${rng}</bdi>${p.smm_service ? ` · <bdi dir="ltr" class="sb-id">#${ex(p.smm_service)}</bdi>` : ""}</small>${sbChips(m, 3)}</span><span class="sb-pr"><b class="n">${money(pp.v)}</b><small>${ex(pp.l)}</small></span><i class="sb-ch">${ic("chev", 16)}</i></button>${on ? sbForm(p) : ""}</div>`;
 }
 function sbRes(f) {
   const a = f.list,
@@ -4045,7 +4091,7 @@ function boostPage() {
   if (!f.n) return head + emptyBox("box", t("catempty"));
   return `${head}<div class="box sb-panel"><div class="sb-lab"><i>1</i>${sbT("المنصة", "Platform")}</div><div id="sb-pls">${sbPlats(f)}</div>
 <div class="sb-s"><span class="sb-si">${ic("search", 18)}</span><input id="sb-q" class="inp" type="search" data-a="sbq" value="${ex(SB.q)}" placeholder="${sbT("ابحث عن خدمة أو رقمها…", "Search a service or its ID…")}" autocomplete="off" enterkeyhint="search" aria-label="${sbT("بحث", "Search")}"></div>
-<div class="sb-lab"><i>2</i>${sbT("نوع الخدمة", "Service type")}</div><div id="sb-tys">${sbTypes(f)}</div></div>
+<div class="sb-lab"><i>2</i>${sbT("نوع الخدمة", "Service type")}</div><div id="sb-tys">${sbTypes(f)}</div><div id="sb-fts">${sbFeats(f)}</div></div>
 <div class="sb-lab out"><i>3</i>${sbT("اختر الخدمة وأكمل الطلب", "Choose a service and order")}</div><div id="sb-res">${sbRes(f)}</div>`;
 }
 /* Redraw only the panel parts (the search box keeps focus while typing) */
@@ -4055,6 +4101,7 @@ function sbDraw() {
   const f = sbCalc();
   g("sb-pls").innerHTML = sbPlats(f);
   g("sb-tys").innerHTML = sbTypes(f);
+  if (g("sb-fts")) g("sb-fts").innerHTML = sbFeats(f);
   g("sb-res").innerHTML = sbRes(f);
 }
 const sbReset = () => {
@@ -4121,7 +4168,7 @@ document.addEventListener("click", (e) => {
   if (a == "sbgo") {
     // from the store search: carry the typed words into the boost panel
     SB.q = q;
-    SB.pl = SB.ty = SB.sel = "";
+    SB.pl = SB.ty = SB.ft = SB.sel = "";
     SB.lim = 20;
     q = "";
     const qi = $("#q");
@@ -4138,11 +4185,15 @@ document.addEventListener("click", (e) => {
     const v = b.dataset.t || "";
     SB.ty = v && SB.ty == v ? "" : v;
     sbReset();
+  } else if (a == "sbft") {
+    const v = b.dataset.f || "";
+    SB.ft = v && SB.ft == v ? "" : v;
+    sbReset();
   } else if (a == "sbmore") {
     SB.lim += 20;
     sbDraw();
   } else if (a == "sbclr") {
-    SB.pl = SB.ty = SB.q = "";
+    SB.pl = SB.ty = SB.ft = SB.q = "";
     const i = $("#sb-q");
     if (i) i.value = "";
     sbReset();
@@ -4691,9 +4742,28 @@ async function pushOff(tk) {
     await sub.unsubscribe();
   } catch {}
 }
-/* Required step after sign-in: browsers only show the permission prompt from a tap, and a "denied" choice can only be undone from the browser's site settings */
+/* Is the page running inside the installed app (Android TWA, installed PWA, iOS home-screen app) rather than a normal browser tab?
+   - TWA: Chrome opens it with referrer "android-app://<package>" (kept in sessionStorage because a reload loses the referrer; sessionStorage is
+     per window, so it does not leak into a normal Chrome tab the way localStorage would, TWA and Chrome share the same origin storage)
+   - installed PWA / TWA window: display-mode is standalone / fullscreen / minimal-ui, iOS exposes navigator.standalone
+   - optional hint: opening the site with ?source=twa or ?app=1 (e.g. set as the TWA launch URL) */
+const isApp = () => {
+  try {
+    if (/^android-app:\/\//i.test(document.referrer || "") || /[?&](?:source=(?:twa|app|pwa)|app=1)(?:&|$|#)/.test(location.search)) sessionStorage.setItem("amx_inapp", "1");
+    if (sessionStorage.getItem("amx_inapp") === "1") return true;
+  } catch {}
+  try {
+    return (
+      ["standalone", "fullscreen", "minimal-ui"].some((m) => matchMedia("(display-mode: " + m + ")").matches) || navigator.standalone === true
+    );
+  } catch {
+    return false;
+  }
+};
+/* Required step after sign-in, inside the APP only: browsers only show the permission prompt from a tap, and a "denied" choice can only be undone from the browser's / app's site settings.
+   On the website (normal browser tab) notifications are optional: the account page shows an "Enable" box (pushBox) instead of blocking the store. */
 function pushNeeded() {
-  return !!user && pushReady() && Notification.permission !== "granted";
+  return !!user && pushReady() && Notification.permission !== "granted" && isApp();
 }
 function pushGatePage() {
   const denied = Notification.permission === "denied";
