@@ -3400,7 +3400,7 @@ document.addEventListener("input", (e) => {
 /* Human check: a branded verification box (client-side deterrent; enable CAPTCHA in Supabase for real protection) */
 let hvTimer;
 /* Cloudflare Turnstile (real CAPTCHA). Put the SITE key here AND enable Captcha protection in Supabase > Auth > Attack Protection with the matching secret. Left empty, the built-in client-side check is used. */
-const TURNSTILE_SITE_KEY = "";
+const TURNSTILE_SITE_KEY = "0x4AAAAAAFkSn0TWqJH_GMRW";
 let tsToken = "",
   tsId = null;
 function tsReset() {

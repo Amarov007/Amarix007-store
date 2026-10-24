@@ -1332,10 +1332,37 @@ async function api(path, o = {}) {
     },
   });
 }
+/* Cloudflare Turnstile on the admin login (Supabase Auth > Attack Protection > Captcha applies to every password login, this one included) */
+const TS_ADMIN_KEY = "0x4AAAAAAFkSn0TWqJH_GMRW";
+let tsAdminTok = "",
+  tsAdminId = null;
+function adminTs() {
+  const w = $("#ts-a");
+  if (!w) return;
+  tsAdminTok = "";
+  const go = () => {
+    try {
+      tsAdminId = window.turnstile.render(w, {
+        sitekey: TS_ADMIN_KEY,
+        theme: "auto",
+        callback: (k) => (tsAdminTok = k),
+        "expired-callback": () => (tsAdminTok = ""),
+        "error-callback": () => (tsAdminTok = ""),
+      });
+    } catch {}
+  };
+  if (window.turnstile) return go();
+  const sc = document.createElement("script");
+  sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+  sc.async = true;
+  sc.onload = go;
+  document.head.appendChild(sc);
+}
 function loginView(msg = "") {
   $(
     "#app"
-  ).innerHTML = `<div class="w" style="max-width:380px;margin-top:12vh"><form class="card" id="lf"><h2 style="text-align:center">⚙ لوحة التحكم</h2><div class="fld"><span>البريد</span><input class="inp" name="e" type="email" dir="ltr" autocomplete="username" required></div><div class="fld"><span>كلمة المرور</span><input class="inp" name="p" type="password" dir="ltr" autocomplete="current-password" required></div><p id="le" style="color:var(--er);font-size:12px">${esc( msg )}</p><button class="b" style="width:100%">دخول</button></form></div>`;
+  ).innerHTML = `<div class="w" style="max-width:380px;margin-top:12vh"><form class="card" id="lf"><h2 style="text-align:center">⚙ لوحة التحكم</h2><div class="fld"><span>البريد</span><input class="inp" name="e" type="email" dir="ltr" autocomplete="username" required></div><div class="fld"><span>كلمة المرور</span><input class="inp" name="p" type="password" dir="ltr" autocomplete="current-password" required></div><div id="ts-a" style="display:flex;justify-content:center;margin:12px 0"></div><p id="le" style="color:var(--er);font-size:12px">${esc( msg )}</p><button class="b" style="width:100%">دخول</button></form></div>`;
+  adminTs();
 }
 document.addEventListener("submit", async (e) => {
   if (e.target.id != "lf") return;
@@ -1344,10 +1371,18 @@ document.addEventListener("submit", async (e) => {
     b = e.target.querySelector(".b");
   busy(b, true);
   try {
-    await auth({ email: f.get("e").trim(), password: f.get("p") }, "password");
+    if (!tsAdminTok) throw new Error("أكمل التحقق (CAPTCHA) أولاً");
+    await auth(
+      { email: f.get("e").trim(), password: f.get("p"), gotrue_meta_security: { captcha_token: tsAdminTok } },
+      "password"
+    );
     await boot();
   } catch (x) {
     busy(b, false);
+    tsAdminTok = "";
+    try {
+      if (window.turnstile && tsAdminId != null) window.turnstile.reset(tsAdminId);
+    } catch {}
     $("#le").textContent = x.message;
   }
 });
