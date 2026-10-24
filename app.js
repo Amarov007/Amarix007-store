@@ -1785,7 +1785,7 @@ function footer() {
 
 function nav() {
   const r = (location.hash || "#/").split("?")[0].split("/")[1] || "",
-    active = r == "c" || r == "p" ? "" : r == "done" ? "orders" : r;
+    active = r == "c" || r == "p" ? "" : r == "done" ? "orders" : r == "partner" ? "account" : r;
   const n = cartCount(),
     v = $("#nv");
   const items = [
@@ -2035,7 +2035,7 @@ function prodPage(id) {
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "",
     imgs = [p.img, ...(p.images || [])].filter(Boolean);
   const gallery = imgs.length
-    ? `<div class="main-img zoomable" data-a="zoom" role="button" tabindex="0" aria-label="${t("zoom")}"><img src="${ex(imgs[0])}" id="main-img" alt="" fetchpriority="high" decoding="async" data-ph="${ex(p.id)}"><span class="zm" aria-hidden="true">${ic("search", 18)}</span></div>${imgs.length > 1 ? `<div class="thumbs">${imgs.map((u, i) => `<img src="${ex(u)}" alt="" class="${i ? "" : "on"}" data-a="thumb" loading="lazy" decoding="async">`).join("")}</div>` : ""}`
+    ? `<div class="main-img zoomable" data-a="zoom" role="button" tabindex="0" aria-label="${t("zoom")}"><img src="${ex(imgs[0])}" id="main-img" alt="${ex(p[lang] || "")}" fetchpriority="high" decoding="async" data-ph="${ex(p.id)}"><span class="zm" aria-hidden="true">${ic("search", 18)}</span></div>${imgs.length > 1 ? `<div class="thumbs">${imgs.map((u, i) => `<img src="${ex(u)}" alt="" class="${i ? "" : "on"}" data-a="thumb" loading="lazy" decoding="async">`).join("")}</div>` : ""}`
     : `<div class="main-img">${placeholder(p, c)}</div>`;
   const vis = isVisit(p),
     boost = !vis && needsLink(p),
@@ -2122,162 +2122,94 @@ function donePage(id) {
 function accPage() {
   const name = nameOf(),
     shown = name || user.email.split("@")[0];
-  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${pushBox()}${partnerBox()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
+  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${pushBox()}${partnerRow()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
 }
-/* ---- Partner (affiliate) program: tiers, calculator, monthly earnings ---- */
-const AFF_DEF = [
-  { min_sales: 0, rate: 5, label: "Bronze" },
-  { min_sales: 10, rate: 7, label: "Silver" },
-  { min_sales: 30, rate: 10, label: "Gold" },
-  { min_sales: 100, rate: 12, label: "Platinum" },
-];
-let affTiers = null, // rows of public.affiliate_tiers
-  refMonthly = null; // [{month, sales, volume, commission}] for an approved partner
-const affTierList = () =>
-  (affTiers && affTiers.length ? affTiers : AFF_DEF).slice().sort((x, y) => x.min_sales - y.min_sales);
-/* rate that applies to the i-th paid order of the month (a custom partner rate wins) */
-function affRateAt(i, custom) {
-  if (custom != null && custom !== "") return +custom;
-  let r = 0;
-  for (const t of affTierList()) if (t.min_sales <= i) r = +t.rate;
-  return r;
-}
-function affTierAt(i) {
-  let x = null;
-  for (const t of affTierList()) if (t.min_sales <= i) x = t;
-  return x;
-}
-function affCalc(clients, per, aov, custom) {
-  const sales = Math.max(0, Math.round(clients * per));
-  let earn = 0;
-  for (let i = 1; i <= sales; i++) earn += (aov * affRateAt(i, custom)) / 100;
-  const volume = sales * aov;
-  return { sales, volume, earn, avg: volume ? (earn / volume) * 100 : 0 };
-}
-async function loadAffData() {
-  try {
-    const r = await sb("/rest/v1/affiliate_tiers?select=label,min_sales,rate&order=min_sales.asc", { auth: false });
-    if (r.ok) affTiers = await r.json();
-  } catch {}
-  try {
-    if (refInfo && refInfo.status == "approved") {
-      const r = await sb("/rest/v1/rpc/my_affiliate_monthly", { method: "POST", body: {} });
-      if (r.ok) refMonthly = await r.json();
-    }
-  } catch {}
-  if (/^#\/account/.test(location.hash)) render();
-}
-const AFF_CH = [
-  ["telegram", "Telegram"],
-  ["youtube", "YouTube"],
-  ["tiktok", "TikTok"],
-  ["instagram", "Instagram"],
-  ["x", "X (Twitter)"],
-  ["website", "Website"],
-  ["other", "Other"],
-];
-function partnerBox() {
+/* ---------- Partner (affiliate) program: a status row on the account page + its own page (#/partner) ---------- */
+const partnerLink = () => (refInfo && refInfo.code ? location.origin + "/?ref=" + refInfo.code : "");
+function partnerRow() {
   if (!refInfo) return "";
   const A = lang == "ar",
+    chip = { approved: [A ? "معتمد" : "Approved", "ok"], pending: [A ? "قيد المراجعة" : "Under review", "wt"] }[refInfo.status || "none"];
+  return `<a class="box row" href="#/partner" style="display:flex"><span>${A ? "برنامج الشركاء" : "Partner program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</span>${ic("gift", 18)}</a>`;
+}
+/* the numbers move while the page is closed (new clicks, paid orders): refresh them when the page opens, at most every 20 s */
+let partnerAt = 0;
+async function loadPartner() {
+  if (!user || !refInfo || Date.now() - partnerAt < 20000) return;
+  partnerAt = Date.now();
+  try {
+    const r = await sb(`/rest/v1/affiliates?user_id=eq.${encodeURIComponent(user.id)}&select=status,rate,clicks,signups,sales,total_commission,coupon`);
+    if (!r.ok) return;
+    const row = (await r.json())[0];
+    if (!row) return;
+    const before = JSON.stringify(refInfo);
+    Object.assign(refInfo, row);
+    if (JSON.stringify(refInfo) !== before && /^#\/partner/.test(location.hash)) render();
+  } catch {}
+}
+function partnerPage() {
+  if (!refInfo) return loadingBox();
+  const A = lang == "ar",
     st = refInfo.status || "none",
-    head = `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}</h3>`;
-  let out = "";
+    back = `<a class="b b2 block" href="#/account">${A ? "رجوع إلى حسابي" : "Back to my account"}</a>`,
+    how = [
+      A ? "شارك رابطك الخاص مع أصدقائك أو جمهورك." : "Share your personal link with friends or your audience.",
+      A ? "يُنشئ العميل حساباً جديداً عبر رابطك." : "The customer creates a new account through your link.",
+      A ? "تُحتسب لك عمولة على كل طلب يتأكد دفعه." : "You earn a commission on every order whose payment is confirmed.",
+    ],
+    rules = [
+      A ? "تُحتسب العمولة بعد تأكيد الدفع فقط، وتُخصم إن أُلغي تأكيد الدفع لاحقاً." : "Commission is counted once payment is confirmed, and removed if the confirmation is later reversed.",
+      A ? "لا تُحتسب الإحالة على حسابك أنت." : "Your own account never counts as a referral.",
+      A ? "تُسجَّل الإحالة عند إنشاء الحساب الجديد عبر رابطك." : "The referral is recorded when the new account is created through your link.",
+    ],
+    howBody = `<ol class="ref-how">${how.map((x) => `<li>${x}</li>`).join("")}</ol><ul class="ref-how ref-rules">${rules.map((x) => `<li>${x}</li>`).join("")}</ul>`,
+    howBox = (open) => `<details class="box ref"${open ? " open" : ""}><summary>${A ? "كيف يعمل البرنامج؟" : "How the program works"}</summary>${howBody}</details>`,
+    title = (chip) => `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</h3>`;
   if (st == "approved") {
-    const link = location.origin + location.pathname + "?ref=" + refInfo.code,
-      custom = refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null,
-      stats = [
-        [A ? "نقرات" : "Clicks", refInfo.clicks || 0],
-        [A ? "تسجيلات" : "Sign-ups", refInfo.signups || 0],
-        [A ? "مبيعات" : "Sales", refInfo.sales || 0],
-        [A ? "إجمالي الأرباح" : "Total earned", fmt(+refInfo.total_commission || 0)],
+    const link = partnerLink(),
+      rate = refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null,
+      clicks = +refInfo.clicks || 0,
+      signups = +refInfo.signups || 0,
+      sales = +refInfo.sales || 0,
+      earned = +refInfo.total_commission || 0,
+      tiles = [
+        [A ? "نقرات" : "Clicks", clicks],
+        [A ? "تسجيلات" : "Sign-ups", signups],
+        [A ? "طلبات مدفوعة" : "Paid orders", sales],
+        [A ? "عمولتك" : "Earned", fmt(earned)],
       ],
-      key = new Date().toISOString().slice(0, 7),
-      rows = refMonthly || [],
-      now = rows.find((m) => m.month == key),
-      cs = now ? +now.sales : 0,
-      nextRate = affRateAt(cs + 1, custom),
-      tier = custom == null ? affTierAt(cs + 1) : null,
-      nxt = custom == null ? affTierList().find((t) => t.min_sales > cs + 1) : null;
-    out += `<div class="box ref">${head}<p class="sb">${A ? "أنت شريك معتمد — شارك رابطك واكسب عمولة على كل طلب مدفوع من عملائك." : "You are an approved partner — share your link and earn a commission on every paid order from your referrals."}</p> <div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div> <div class="ref-s">${stats.map(([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>`).join("")}</div>
-      <div class="aff-lv"><div><small>${A ? "هذا الشهر" : "This month"}</small><b class="n">${cs} ${A ? "مبيعات" : "sales"}</b></div><div><small>${A ? "عمولة طلبك القادم" : "Next order rate"}</small><b class="n">${nextRate}%${tier ? " · " + ex(tier.label) : custom != null ? (A ? " · نسبة خاصة" : " · custom") : ""}</b></div></div>
-      ${nxt ? `<p class="sb">${A ? `بعد ${nxt.min_sales - cs - 1} مبيعات إضافية هذا الشهر ترتفع عمولتك إلى ${nxt.rate}% (${ex(nxt.label)}).` : `${nxt.min_sales - cs - 1} more sales this month and your rate rises to ${nxt.rate}% (${ex(nxt.label)}).`}</p>` : ""}</div>`;
-    out += `<div class="box ref"><h3>${A ? "أرباحك الشهرية" : "Your monthly earnings"}</h3>${
-      rows.length
-        ? `<div class="aff-tw"><table class="aff-tb"><tr><th>${A ? "الشهر" : "Month"}</th><th>${A ? "المبيعات" : "Sales"}</th><th>${A ? "حجم الطلبات" : "Volume"}</th><th>${A ? "عمولتك" : "Earned"}</th></tr>${rows.map((m) => `<tr><td dir="ltr">${ex(m.month)}</td><td>${+m.sales}</td><td>${money(+m.volume)}</td><td><b>${money(+m.commission)}</b></td></tr>`).join("")}</table></div>`
-        : `<p class="sb">${A ? "لا توجد مبيعات بعد — ستظهر أرباحك هنا شهراً بشهر." : "No sales yet — your earnings will appear here month by month."}</p>`
-    }</div>`;
-  } else if (st == "pending") {
-    out += `<div class="box ref">${head}<p class="sb">${A ? "طلبك قيد المراجعة — سيظهر رابطك هنا فور الموافقة عليه." : "Your application is under review — your link will appear here once it is approved."}</p></div>`;
-  } else {
-    const aud = [
-      ["lt1k", A ? "أقل من 1,000" : "Under 1,000"],
-      ["1k-10k", "1,000 – 10,000"],
-      ["10k-50k", "10,000 – 50,000"],
-      ["gt50k", A ? "أكثر من 50,000" : "Over 50,000"],
-    ];
-    out += `<div class="box ref">${head}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك، وترتفع نسبتك كلما زادت مبيعاتك الشهرية. قدّم طلبك وسنراجعه." : "Join as a partner and earn a commission on every paid order through your link — your rate rises with your monthly sales. Apply and we will review it."}</p>${st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : ""}
-      <label class="fld"><span>${A ? "منصّتك الرئيسية" : "Your main platform"}</span><select class="inp" id="aff-ch">${AFF_CH.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
-      <label class="fld"><span>${A ? "رابط قناتك أو حسابك" : "Channel / profile link"}</span><input class="inp" id="aff-url" dir="ltr" maxlength="200" autocomplete="off" placeholder="https://t.me/… / @username"></label>
-      <label class="fld"><span>${A ? "عدد المتابعين" : "Audience size"}</span><select class="inp" id="aff-aud">${aud.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
-      <label class="fld"><span>${A ? "كيف ستروّج لنا؟ (اختياري)" : "How will you promote us? (optional)"}</span><textarea class="inp" id="aff-pitch" rows="3" maxlength="400"></textarea></label>
-      <label class="fld"><span>${A ? "محفظة استلام الأرباح" : "Payout wallet"}</span><input class="inp" id="aff-pay" dir="ltr" maxlength="120" autocomplete="off" placeholder="${A ? "معرّف Binance Pay أو عنوان USDT" : "Binance Pay ID or USDT address"}"></label>
-      <button class="b block" data-a="aff-apply">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></div>`;
+      extra = [
+        clicks > 0 ? `${A ? "معدل التسجيل" : "Sign-up rate"}: <b>${Math.min(100, Math.round((signups / clicks) * 100))}%</b>` : "",
+        sales > 0 ? `${A ? "متوسط العمولة لكل طلب" : "Average commission per order"}: <b>${fmt(earned / sales)}</b>` : "",
+      ].filter(Boolean),
+      share =
+        `<button type="button" class="b b2" data-a="aff-share" data-w="wa">${A ? "واتساب" : "WhatsApp"}</button>` +
+        `<button type="button" class="b b2" data-a="aff-share" data-w="tg">${A ? "تيليغرام" : "Telegram"}</button>` +
+        (navigator.share ? `<button type="button" class="b b2" data-a="aff-share" data-w="sys">${A ? "مشاركة…" : "Share…"}</button>` : "");
+    if (!link)
+      return `<div class="box ref">${title([A ? "معتمد" : "Approved", "ok"])}<p class="sb">${A ? "أنت شريك معتمد، لكن رابطك لم يُنشأ بعد. تواصل مع الدعم." : "You are an approved partner, but your link has not been created yet. Please contact support."}</p></div>${back}`;
+    return (
+      `<div class="box ref">${title([A ? "معتمد" : "Approved", "ok"])}<p class="sb">${A ? "شارك رابطك واكسب عمولة على كل طلب مدفوع من عملائك." : "Share your link and earn a commission on every paid order from your referrals."} <b>${A ? "نسبة عمولتك" : "Your rate"}: ${rate != null ? ex(String(rate)) + "%" : A ? "النسبة الافتراضية للمتجر" : "the store's default rate"}</b></p>` +
+      `<div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div><div class="ref-sh">${share}</div></div>` +
+      `<div class="box ref"><h3>${A ? "أداؤك" : "Your performance"}</h3><div class="ref-s">${tiles.map(([k, v]) => `<div><b class="n">${ex(String(v))}</b><small>${k}</small></div>`).join("")}</div>${extra.length ? `<div class="ref-m">${extra.map((x) => `<span>${x}</span>`).join("")}</div>` : ""}</div>` +
+      (refInfo.coupon ? `<div class="box ref"><h3>${A ? "كوبونك الخاص" : "Your coupon"}</h3><div class="ref-l"><bdi dir="ltr">${ex(refInfo.coupon)}</bdi><button class="b" data-a="copy" data-v="${ex(refInfo.coupon)}">${A ? "نسخ" : "Copy"}</button></div></div>` : "") +
+      howBox(false) +
+      back
+    );
   }
-  return out + partnerCalc(st == "approved" && refInfo.rate != null && refInfo.rate !== "" ? +refInfo.rate : null);
+  if (st == "pending")
+    return `<div class="box ref">${title([A ? "قيد المراجعة" : "Under review", "wt"])}<p class="sb">${A ? "استلمنا طلبك، وسيظهر رابطك هنا فور الموافقة عليه." : "We received your application. Your link will appear here once it is approved."}</p></div>${howBox(true)}${back}`;
+  return `${howBox(true)}<div class="box ref">${title()}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>${st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : ""} <input class="inp" id="aff-pay" dir="ltr" maxlength="120" autocomplete="off" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"> <button class="b block" data-a="aff-apply">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></div>${back}`;
 }
-/* tiers table + earnings calculator (shown to everyone on the account page) */
-function partnerCalc(custom) {
-  const A = lang == "ar",
-    unit = (R[BASE] || [1, "USD"])[1],
-    tl = affTierList();
-  return `<div class="box ref" id="aff-calc" data-custom="${custom == null ? "" : custom}"><h3>${A ? "حاسبة الأرباح الشهرية" : "Monthly earnings calculator"}</h3>
-    <p class="sb">${A ? "كل طلب مدفوع يُحتسب بنسبة المستوى الذي وصلت إليه هذا الشهر." : "Each paid order is paid at the tier you have reached this month."}${custom != null ? (A ? ` نسبتك الخاصة <b>${custom}%</b> ثابتة على كل الطلبات.` : ` Your custom rate of <b>${custom}%</b> applies to every order.`) : ""}</p>
-    <div class="aff-tw"><table class="aff-tb"><tr><th>${A ? "المستوى" : "Tier"}</th><th>${A ? "من الطلب رقم" : "From order #"}</th><th>${A ? "العمولة" : "Rate"}</th></tr>${tl.map((t) => `<tr><td>${ex(t.label || "—")}</td><td>${Math.max(1, +t.min_sales)}</td><td><b>${+t.rate}%</b></td></tr>`).join("")}</table></div>
-    <div class="aff-sl"><label><span>${A ? "عدد العملاء المُحالين شهرياً" : "Referred customers / month"}</span><b id="ac-n-v">20</b></label><input type="range" data-calc="n" min="1" max="300" step="1" value="20"></div>
-    <div class="aff-sl"><label><span>${A ? "متوسط طلبات العميل شهرياً" : "Avg. orders per customer / month"}</span><b id="ac-p-v">1</b></label><input type="range" data-calc="p" min="0.5" max="10" step="0.5" value="1"></div>
-    <div class="aff-sl"><label><span>${A ? "متوسط قيمة الطلب" : "Avg. order value"} (${ex(unit)})</span><b id="ac-a-v">20</b></label><input type="range" data-calc="a" min="5" max="200" step="5" value="20"></div>
-    <div class="aff-res" id="ac-out">${affCalcHtml(20, 1, 20, custom)}</div></div>`;
-}
-function affCalcHtml(n, p, a, c) {
-  const A = lang == "ar",
-    r = affCalc(n, p, a, c),
-    nx = c == null ? affTierList().find((t) => t.min_sales > r.sales) : null;
-  return `<div><small>${A ? "طلبات مدفوعة شهرياً" : "Paid orders / month"}</small><b class="n">${r.sales}</b></div><div><small>${A ? "حجم الطلبات" : "Order volume"}</small><b class="n">${money(r.volume)}</b></div><div><small>${A ? "متوسط العمولة" : "Avg. rate"}</small><b class="n">${r.avg.toFixed(1)}%</b></div><div class="big"><small>${A ? "أرباحك الشهرية" : "Monthly earnings"}</small><b class="n">${money(r.earn)}</b></div><div class="big"><small>${A ? "أرباحك السنوية" : "Yearly earnings"}</small><b class="n">${money(r.earn * 12)}</b></div>${nx ? `<p class="sb" style="grid-column:1/-1">${A ? `بزيادة ${nx.min_sales - r.sales} طلبات شهرياً تصل إلى ${nx.rate}% (${ex(nx.label)}).` : `${nx.min_sales - r.sales} more orders a month reaches ${nx.rate}% (${ex(nx.label)}).`}</p>` : ""}`;
-}
-document.addEventListener("input", (e) => {
-  const k = e.target.dataset && e.target.dataset.calc,
-    box = k && e.target.closest("#aff-calc");
-  if (!box) return;
-  const g = (x) => +box.querySelector(`[data-calc="${x}"]`).value,
-    n = g("n"),
-    p = g("p"),
-    a = g("a");
-  $("#ac-n-v").textContent = n;
-  $("#ac-p-v").textContent = p;
-  $("#ac-a-v").textContent = a;
-  $("#ac-out").innerHTML = affCalcHtml(n, p, a, box.dataset.custom === "" ? null : +box.dataset.custom);
-});
 async function applyAffiliate(b) {
   const A = lang == "ar",
-    val = (id) => (($("#" + id) || {}).value || "").trim(),
-    pay = val("aff-pay"),
-    url = val("aff-url");
-  if (url.length < 3)
-    return toast(A ? "أدخل رابط قناتك أو حسابك" : "Enter your channel or profile link", "er");
-  if (pay.length < 3)
+    inp = $("#aff-pay"),
+    v = ((inp && inp.value) || "").trim();
+  if (v.length < 3)
     return toast(A ? "أدخل معرّف Binance Pay أو عنوان المحفظة" : "Enter your Binance Pay ID or wallet address", "er");
   b.disabled = true;
   try {
-    const r = await sb("/rest/v1/rpc/apply_affiliate", {
-      method: "POST",
-      body: {
-        p_payout: pay,
-        p_channel_type: val("aff-ch"),
-        p_channel_url: url,
-        p_audience: val("aff-aud"),
-        p_pitch: val("aff-pitch"),
-      },
-    });
+    const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v } });
     if (!r.ok) throw new Error();
     if (refInfo) refInfo.status = "pending";
     toast(A ? "تم إرسال طلبك ✓" : "Application sent ✓");
@@ -3172,7 +3104,14 @@ document.addEventListener("click", async (e) => {
   } else if (a == "claim") claimPayment(b, id);
   else if (a == "rate") rateItem(b);
   else if (a == "wa-contact") openWhatsApp(`${t("hi")}\n${t("ordno")}: ${id}`);
-  else if (a == "copy") {
+  else if (a == "aff-share") {
+    const link = partnerLink(),
+      msg = lang == "ar" ? "انضم إلى AMARIX007 — متجر الأصول الرقمية:" : "Join AMARIX007 — the digital assets store:";
+    if (!link) return;
+    if (b.dataset.w == "sys" && navigator.share) navigator.share({ title: "AMARIX007", text: msg, url: link }).catch(() => {});
+    else if (b.dataset.w == "wa") window.open("https://wa.me/?text=" + encodeURIComponent(msg + "\n" + link), "_blank", "noopener");
+    else if (b.dataset.w == "tg") window.open("https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(msg), "_blank", "noopener");
+  } else if (a == "copy") {
     const ok = await copyText(b.dataset.v);
     if (ok) {
       toast(t("copied"));
@@ -3562,12 +3501,12 @@ async function syncProfile() {
         signups: 0,
         sales: 0,
         total_commission: 0,
+        coupon: null,
       };
       const ar = await sb(
-        `/rest/v1/affiliates?user_id=eq.${encodeURIComponent( user.id )}&select=status,rate,clicks,signups,sales,total_commission`
+        `/rest/v1/affiliates?user_id=eq.${encodeURIComponent( user.id )}&select=status,rate,clicks,signups,sales,total_commission,coupon`
       );
       if (ar.ok) Object.assign(refInfo, (await ar.json())[0] || {});
-      loadAffData();
     } else {
       const full_name = nameOf();
       await sb("/rest/v1/profiles", {
@@ -3576,7 +3515,7 @@ async function syncProfile() {
         body: { id: user.id, email: user.email, full_name },
       });
     }
-    if (/^#\/account/.test(location.hash)) render();
+    if (/^#\/(account|partner)/.test(location.hash)) render();
   } catch {}
 }
 
@@ -4331,6 +4270,44 @@ function startBanners() {
   mark(0);
 }
 
+/* ---------- SEO: <head> per route (title, description, canonical, robots, social tags) ----------
+   Only the home page, /policies/ and /faq/ are public; every other route sits behind the login wall and is marked noindex. */
+const metaVal = (n) => ((document.head.querySelector('meta[name="' + n + '"]') || {}).content || "");
+/* defaults for every non-public route; the static pages carry them in amx-home-* meta tags because their own title/description differ */
+const SEO0 = { title: metaVal("amx-home-title") || document.title, desc: metaVal("amx-home-desc") || metaVal("description") };
+const SEO_SITE = "https://amarix007.store";
+const SEO_PUBLIC = { policies: ["pol", "polh", "/policies/"], faq: ["faq", "faqh", "/faq/"] };
+function seoSet(sel, attr, val) {
+  const e = document.head.querySelector(sel);
+  if (e && e.getAttribute(attr) !== val) e.setAttribute(attr, val);
+}
+function seoHead(r) {
+  const pub = SEO_PUBLIC[r],
+    title = pub ? t(pub[0]) + " | AMARIX007" : SEO0.title,
+    desc = pub ? t(pub[1]) : SEO0.desc,
+    url = SEO_SITE + (pub ? pub[2] : "/"),
+    robots = !r || r == "login" || pub ? "index,follow,max-image-preview:large" : "noindex,nofollow";
+  if (document.title != title) document.title = title;
+  seoSet('meta[name="description"]', "content", desc);
+  seoSet('link[rel="canonical"]', "href", url);
+  seoSet('meta[name="robots"]', "content", robots);
+  seoSet('meta[property="og:title"]', "content", title);
+  seoSet('meta[property="og:description"]', "content", desc);
+  seoSet('meta[property="og:url"]', "content", url);
+  seoSet('meta[name="twitter:title"]', "content", title);
+  seoSet('meta[name="twitter:description"]', "content", desc);
+}
+/* the static pages (/policies/, /faq/) use <base href="/">, so a plain "#/x" link would leave the page: keep it a hash change */
+document.addEventListener("click", (e) => {
+  if (e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (document.baseURI.split("#")[0] === location.href.split("#")[0]) return;
+  const a = e.target.closest && e.target.closest('a[href^="#/"]');
+  if (!a || (a.target && a.target != "_self")) return;
+  e.preventDefault();
+  const h = a.getAttribute("href");
+  if (location.hash != h) location.hash = h;
+});
+
 const AUTH_ROUTES = ["orders", "account", "support"];
 function render() {
   render0();
@@ -4344,6 +4321,7 @@ function render0() {
   const seq = ++routeSeq;
   const [h] = (location.hash || "#/").split("?"),
     [, r, id] = h.split("/");
+  seoHead(r);
   const needPush = pushNeeded();
   document.body.classList.toggle("gate", !user || needPush);
   /* Login wall: everything except sign-in, policies and FAQ needs an account */
@@ -4382,6 +4360,8 @@ function render0() {
       ? prodPage(dec(id || ""))
       : r == "boost"
       ? boostPage()
+      : r == "partner"
+      ? (loadPartner(), partnerPage())
       : r == "cart"
       ? cartPage()
       : r == "fav"
