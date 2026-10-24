@@ -57,7 +57,8 @@ let D = clone(PUB),
   pq = "",
   pcat = "",
   SES = null,
-  IS_ADMIN = null;
+  IS_ADMIN = null,
+  STAFF = null; // STAFF: مصفوفة صلاحيات الموظف المفعّل (null = ليس موظفاً)
 let BASE_TS = 0,
   CFG_OK = false,
   API_LOADED = false; // BASE_TS: version of store_config when this page loaded; CFG_OK: config really came from the server; API_LOADED: api_settings really loaded
@@ -146,6 +147,8 @@ const TABS = [
   ["social", "التواصل"],
   ["payments", "وسائل الدفع"],
   ["users", "المستخدمين"],
+  ["staff", "الموظفون"],
+  ["activity", "سجل النشاط"],
   ["apis", "إعدادات APIs"],
   ["affiliates", "المسوقين"],
   ["orders", "الطلبات"],
@@ -165,6 +168,8 @@ const TI = {
   coupons:'<path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 0 0-6V6H3z"/><path d="M9 6v12" stroke-dasharray="2 2"/>',
   social:'<circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/>',
   payments:'<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/>',
+  activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  staff:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
   users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>',
   apis:'<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/>',
   affiliates:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
@@ -177,12 +182,16 @@ const TG = [
   ["المبيعات", ["orders","payments","coupons","affiliates","users"]],
   ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
   ["التواصل والدعم", ["tickets","push","social"]],
-  ["النظام", ["apis","stats"]]
+  ["النظام", ["apis","stats","staff","activity"]]
 ];
 const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
+/* ---------- الموظفون: ما يراه كل حساب ---------- */
+const TAB_PERM = { orders: "orders", tickets: "tickets", users: "users", products: "products" };
+const isStaffOnly = () => IS_ADMIN === false && Array.isArray(STAFF);
+const canTab = (k) => !isStaffOnly() || (!!TAB_PERM[k] && STAFF.includes(TAB_PERM[k]));
 const sideNav = () => {
   const nm = Object.fromEntries(TABS);
-  return TG.map(([g, ks]) => `<div class="sg"><span class="sgl">${g}</span>${ks.filter((k) => nm[k]).map((k) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("")}</div>`).join("");
+  return TG.map(([g, ks]) => `<div class="sg"><span class="sgl">${g}</span>${ks.filter((k) => nm[k] && canTab(k)).map((k) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("")}</div>`).join("");
 };
 const SOCIAL = [
   ["whatsapp", "wa", "واتساب", "https://wa.me/9665XXXXXXXX"],
@@ -545,16 +554,204 @@ const VIEW = {
   },
 };
 
+/* ---------- الموظفون (إدارة الحسابات — للأدمن فقط) ---------- */
+const STF_ROLES = [
+  ["support", "مشرف دعم", ["tickets", "users"]],
+  ["orders", "مسؤول طلبات", ["orders", "users"]],
+  ["content", "مدير محتوى", ["products"]],
+  ["ops", "مدير عمليات", ["orders", "tickets", "users"]],
+];
+const roleOpts = (cur) =>
+  '<option value="">مخصص (حدّد الصلاحيات يدوياً)</option>' +
+  STF_ROLES.map(([k, l]) => `<option value="${k}"${cur == l ? " selected" : ""}>${l}</option>`).join("");
+const roleFor = (v, perms) => {
+  const r = STF_ROLES.find((x) => x[0] == v);
+  return r && r[2].length == perms.length && r[2].every((k) => perms.includes(k)) ? r[1] : null;
+};
+const STF_PERMS = [
+  ["orders", "الطلبات (عرض وتغيير الحالة)"],
+  ["tickets", "تذاكر الدعم (عرض والرد)"],
+  ["users", "المستخدمين (عرض فقط)"],
+  ["products", "المنتجات (تعديل ونشر)"],
+];
+VIEW.none = () =>
+  '<div class="card"><h2>لا توجد صلاحيات</h2><p class="hint">حسابك مسجّل كموظف لكن لا توجد صلاحيات مفعّلة له. اطلب من المدير تفعيلها.</p></div>';
+VIEW.staff = () => {
+  setTimeout(loadStaff, 50);
+  return `<div class="card"><h2>إضافة موظف</h2><p class="hint">الموظف يسجّل حساباً عادياً في المتجر أولاً، ثم تكتب بريده هنا وتحدد ما يستطيع فعله. الموظف لا يرى الإعدادات ولا المفاتيح ولا الكوبونات ولا يستطيع النشر. يمكنك إيقافه أو حذفه في أي وقت.</p><div class="fl"><input class="inp" id="stf-e" type="email" dir="ltr" placeholder="بريد الموظف المسجّل في المتجر" autocomplete="off"></div><div class="fl"><select class="inp" id="stf-role" data-stf-role>${roleOpts("")}</select></div>${STF_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-stf-new="${k}"> ${l}</label>`).join("")}<div class="acts"><button class="b" data-a="stf-add">إضافة موظف</button></div></div><div class="card"><h2>الموظفون الحاليون <small class="od-m" id="stf-c"></small></h2><div id="stf-list">${loadingHTML}</div></div>`;
+};
+async function loadStaff() {
+  const b = $("#stf-list");
+  if (!b) return;
+  try {
+    const r = await api("/rest/v1/staff_members?select=*&order=created_at.desc");
+    if (!r.ok) throw new Error(r.status);
+    const rows = await r.json();
+    const c = $("#stf-c");
+    if (c) c.textContent = rows.length ? "(" + rows.length + ")" : "";
+    b.innerHTML = rows.length
+      ? rows
+          .map(
+            (x) =>
+              `<div class="od" data-stf-row="${esc(x.user_id)}"><div class="od-h"><b>${esc(x.full_name || "—")}</b><small class="od-m" dir="ltr">${esc(x.email)}</small>${x.role ? `<small class="od-m">· ${esc(x.role)}</small>` : ""}</div><div class="fl"><select class="inp" data-stf-role>${roleOpts(x.role)}</select></div>${STF_PERMS.map(([k, l]) => `<label class="chk"><input type="checkbox" data-stf-p="${k}"${(x.perms || []).includes(k) ? " checked" : ""}> ${l}</label>`).join("")}<label class="chk"><input type="checkbox" data-stf-active${x.active ? " checked" : ""}> الحساب مفعّل</label><div class="acts"><button class="b sm" data-a="stf-save" data-id="${esc(x.user_id)}">حفظ</button><button class="b b2 sm" data-a="stf-del" data-id="${esc(x.user_id)}">حذف</button></div></div>`
+          )
+          .join("")
+      : '<p class="hint">لا يوجد موظفون بعد.</p>';
+  } catch (e) {
+    b.innerHTML =
+      '<p class="hint">فشل التحميل — تأكد من تنفيذ supabase-staff.sql في قاعدة البيانات، وأن حسابك مضاف في جدول admins.</p>';
+  }
+}
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest('button[data-a^="stf-"]');
+  if (!btn) return;
+  const a = btn.dataset.a;
+  const jh = { "Content-Type": "application/json", Prefer: "return=minimal" };
+  try {
+    if (a == "stf-add") {
+      const em = ($("#stf-e").value || "").trim().toLowerCase();
+      if (!/^[^\s@%*]+@[^\s@%*]+\.[^\s@%*]+$/.test(em)) return toast("اكتب بريداً صحيحاً", "e");
+      const perms = [...document.querySelectorAll("[data-stf-new]")].filter((i) => i.checked).map((i) => i.dataset.stfNew);
+      const role = roleFor(($("#stf-role") || {}).value, perms);
+      if (!perms.length && !confirm("لم تحدد أي صلاحية — سيُضاف الموظف دون القدرة على فعل شيء. متابعة؟")) return;
+      busy(btn, true);
+      const pr = await api("/rest/v1/profiles?select=id,email,full_name&limit=1&email=ilike." + encodeURIComponent(em.replace(/_/g, "\\_")));
+      const rows = pr.ok ? await pr.json() : [];
+      if (!rows.length) {
+        busy(btn, false);
+        return toast("هذا البريد غير مسجّل في المتجر — اطلب منه إنشاء حساب أولاً", "e");
+      }
+      const u = rows[0];
+      const r = await api("/rest/v1/staff_members", {
+        method: "POST",
+        headers: jh,
+        body: JSON.stringify({ user_id: u.id, email: u.email || em, full_name: u.full_name || null, perms, role, active: true }),
+      });
+      busy(btn, false);
+      if (r.status == 409) return toast("هذا الموظف مضاف مسبقاً", "e");
+      if (!r.ok) return toast("فشلت الإضافة (" + r.status + ")", "e");
+      $("#stf-e").value = "";
+      document.querySelectorAll("[data-stf-new]").forEach((i) => (i.checked = false));
+      if ($("#stf-role")) $("#stf-role").value = "";
+      toast("تمت إضافة الموظف", "k");
+      loadStaff();
+    } else if (a == "stf-save") {
+      const row = btn.closest("[data-stf-row]");
+      const perms = [...row.querySelectorAll("[data-stf-p]")].filter((i) => i.checked).map((i) => i.dataset.stfP);
+      const active = row.querySelector("[data-stf-active]").checked;
+      const role = roleFor(row.querySelector("[data-stf-role]").value, perms);
+      busy(btn, true);
+      const r = await api("/rest/v1/staff_members?user_id=eq." + encodeURIComponent(btn.dataset.id), {
+        method: "PATCH",
+        headers: jh,
+        body: JSON.stringify({ perms, active, role }),
+      });
+      busy(btn, false);
+      toast(r.ok ? "تم الحفظ" : "فشل الحفظ (" + r.status + ")", r.ok ? "k" : "e");
+    } else if (a == "stf-del") {
+      if (!confirm("حذف هذا الموظف؟ سيفقد وصوله للوحة فوراً، وحسابه كعميل يبقى كما هو.")) return;
+      busy(btn, true);
+      const r = await api("/rest/v1/staff_members?user_id=eq." + encodeURIComponent(btn.dataset.id), { method: "DELETE" });
+      busy(btn, false);
+      toast(r.ok ? "تم الحذف" : "فشل الحذف (" + r.status + ")", r.ok ? "k" : "e");
+      if (r.ok) loadStaff();
+    }
+  } catch (err) {
+    busy(btn, false);
+    toast("حدث خطأ — حاول مجدداً", "e");
+  }
+});
+
+/* ---------- سجل النشاط (للأدمن فقط) ---------- */
+const ACT_L = {
+  order_status: "تغيير حالة طلب", order_paid: "تأكيد دفع طلب", order_payment: "تغيير حالة دفع",
+  order_delivery: "تحديث تسليم طلب", ticket_reply: "رد على تذكرة", ticket_status: "تغيير حالة تذكرة",
+  product_add: "إضافة منتج", product_edit: "تعديل منتج", product_price: "تغيير سعر/خصم",
+  product_remove: "حذف منتج", smm_send: "إرسال للرشق", staff_added: "إضافة موظف",
+  staff_updated: "تعديل موظف", staff_removed: "حذف موظف",
+};
+let ACT = [];
+VIEW.activity = () => {
+  setTimeout(loadActivity, 50);
+  return `<div class="card"><h2>سجل النشاط <small class="od-m" id="act-c"></small></h2><p class="hint">يسجَّل تلقائياً من قاعدة البيانات نفسها (لا يمكن للموظف تعطيله): تغيير حالات الطلبات والدفع، الرد على التذاكر، تعديل المنتجات والأسعار، الإرسال للرشق، وإدارة الموظفين. لا تُسجَّل نصوص الردود ولا بيانات التسليم. يُحذف ما هو أقدم من 180 يوماً تلقائياً. تصلك رسالة تلغرام عند أفعال الموظف الحساسة (تأكيد دفع، إرسال للرشق، تغيير سعر، إضافة/حذف منتج).</p><div class="fl"><select class="inp" id="act-who"><option value="">كل المنفّذين</option></select><select class="inp" id="act-act"><option value="">كل الإجراءات</option>${Object.entries(ACT_L).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select><button class="b b2 sm" data-a="act-reload">تحديث</button></div><div id="act-list">${loadingHTML}</div></div>`;
+};
+const actDetail = (x) => {
+  const d = x.details || {};
+  switch (x.action) {
+    case "order_status": case "ticket_status": case "order_payment": return (d.from || "—") + " ← " + (d.to || "—");
+    case "order_paid": return (d.total != null ? d.total : "—") + " " + (d.currency || "");
+    case "order_delivery": return d.set ? "تم تعيين نص التسليم" : "تم مسح التسليم";
+    case "product_price": return (d.name || "") + " | السعر " + (d.p_from ?? "—") + " ← " + (d.p_to ?? "—") + " | الخصم " + (d.d_from ?? "—") + " ← " + (d.d_to ?? "—");
+    case "product_add": case "product_edit": case "product_remove": return d.name || "";
+    case "smm_send": return (d.status || "") + (d.items ? " · " + d.items + " عنصر" : "");
+    case "staff_added": case "staff_updated": return (d.role ? d.role + " · " : "") + (d.perms || []).map((k) => (STF_PERMS.find((p) => p[0] == k) || [k, k])[1].split(" (")[0]).join("، ") + (d.active === false ? " · موقوف" : "");
+    default: return "";
+  }
+};
+function renderActivity() {
+  const b = $("#act-list");
+  if (!b) return;
+  const who = ($("#act-who") || {}).value || "", act = ($("#act-act") || {}).value || "";
+  const rows = ACT.filter((x) => (!who || x.actor_email == who) && (!act || x.action == act));
+  const c = $("#act-c");
+  if (c) c.textContent = "(" + rows.length + ")";
+  b.innerHTML = rows.length
+    ? `<div class="tw"><table class="tb"><tr><th>الوقت</th><th>المنفّذ</th><th>الإجراء</th><th>الهدف</th><th>التفاصيل</th></tr>${rows
+        .map((x) => `<tr><td style="white-space:nowrap">${esc(new Date(x.at).toLocaleString("ar-EG-u-nu-latn", { dateStyle: "short", timeStyle: "short" }))}</td><td dir="ltr">${esc(x.actor_email || "—")}${x.actor_kind == "admin" ? " <small class=\"od-m\">(مدير)</small>" : ""}</td><td>${esc(ACT_L[x.action] || x.action)}</td><td dir="ltr">${esc(x.target || "")}</td><td>${esc(actDetail(x))}</td></tr>`)
+        .join("")}</table></div>`
+    : '<p class="hint">لا توجد سجلات مطابقة.</p>';
+}
+async function loadActivity() {
+  const b = $("#act-list");
+  if (!b) return;
+  try {
+    const r = await api("/rest/v1/staff_activity?select=*&order=at.desc&limit=300");
+    if (!r.ok) throw new Error(r.status);
+    ACT = await r.json();
+    const sel = $("#act-who");
+    if (sel) {
+      const cur = sel.value;
+      const emails = [...new Set(ACT.map((x) => x.actor_email).filter(Boolean))];
+      sel.innerHTML = '<option value="">كل المنفّذين</option>' + emails.map((e) => `<option value="${esc(e)}"${e == cur ? " selected" : ""}>${esc(e)}</option>`).join("");
+    }
+    renderActivity();
+  } catch (e) {
+    b.innerHTML = '<p class="hint">فشل التحميل — هذا السجل للمدير فقط.</p>';
+  }
+}
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.id == "act-who" || t.id == "act-act") return renderActivity();
+  if (t.matches && t.matches("select[data-stf-role]")) {
+    const r = STF_ROLES.find((x) => x[0] == t.value);
+    if (!r) return;
+    const scope = t.closest("[data-stf-row]") || document;
+    scope.querySelectorAll("[data-stf-new],[data-stf-p]").forEach((i) => (i.checked = r[2].includes(i.dataset.stfNew || i.dataset.stfP)));
+  }
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest('button[data-a="act-reload"]');
+  if (b) loadActivity();
+});
+
 function render() {
-  const warn =
-    IS_ADMIN === false
+  if (!canTab(tab)) {
+    const f = TABS.find(([k]) => canTab(k));
+    tab = f ? f[0] : "none";
+  }
+  const staffOnly = isStaffOnly();
+  const warn = staffOnly
+    ? '<div class="card"><small>حساب موظف — الصلاحيات المفعّلة: ' +
+      (STAFF.length ? esc(STAFF.map((k) => (STF_PERMS.find((x) => x[0] == k) || [k, k])[1].split(" (")[0]).join("، ")) : "لا شيء") +
+      "</small></div>"
+    : IS_ADMIN === false
       ? '<div class="card" style="border-color:var(--wn)"><small>⚠ حسابك الحالي (' +
         esc(SES && SES.email) +
         ") غير مضاف في جدول admins؛ قد تفشل عمليات النشر وتغيير الحالات بسبب سياسات RLS.</small></div>"
       : "";
   $(
     "#app"
-  ).innerHTML = `<header class="top"><div class="w tr"><b class="ttl"><span class="brand-dot"></span>لوحة التحكم <small>${esc( D.site.n1 + D.site.n2 )}</small></b><span class="bdg" id="bdg"></span><span class="sp"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a><button class="b sm" data-a="pub">نشر الآن</button><button class="b b2 sm" data-a="logout">خروج</button></div></header><div class="w lay"><nav class="sd">${sideNav()}</nav><main>${warn}${(VIEW[tab] || VIEW.home)()}</main></div>`;
+  ).innerHTML = `<header class="top"><div class="w tr"><b class="ttl"><span class="brand-dot"></span>لوحة التحكم <small>${esc( D.site.n1 + D.site.n2 )}</small></b><span class="bdg" id="bdg"></span><span class="sp"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a>${staffOnly && !STAFF.includes("products") ? "" : '<button class="b sm" data-a="pub">نشر الآن</button>'}<button class="b b2 sm" data-a="logout">خروج</button></div></header><div class="w lay"><nav class="sd">${sideNav()}</nav><main>${warn}${(VIEW[tab] || VIEW.home)()}</main></div>`;
   badge();
   if (tab == "home") setTimeout(homeStats, 0);
 }
@@ -1083,6 +1280,7 @@ document.addEventListener("submit", async (e) => {
 /* Soft check only: real protection is RLS. Calls the existing public.is_admin() function (based on the `admins` table) and shows a warning banner if the account is not an admin. */
 async function checkRole() {
   IS_ADMIN = null;
+  STAFF = null;
   if (!SES) return;
   try {
     const r = await api("/rest/v1/rpc/is_admin", {
@@ -1093,6 +1291,17 @@ async function checkRole() {
     if (r.ok) {
       const v = await r.json();
       if (typeof v == "boolean") IS_ADMIN = v;
+    }
+    if (IS_ADMIN === false) {
+      const r2 = await api("/rest/v1/rpc/my_staff_perms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (r2.ok) {
+        const v2 = await r2.json();
+        if (Array.isArray(v2)) STAFF = v2;
+      }
     }
   } catch {}
 }
@@ -1117,7 +1326,59 @@ async function loadCfg() {
   fix();
   BASE_TS = +D.ts || 0;
 }
+/* الموظف: يقرأ الإعدادات العامة (بلا كوبونات سرية) ويحفظ المنتجات فقط عبر دالة مخصصة */
+async function loadCfgStaff() {
+  try {
+    const r = await api("/rest/v1/rpc/public_config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    if (!d || !Array.isArray(d.products)) throw new Error();
+    D = clone(d);
+    dirty = false;
+    CFG_OK = true;
+  } catch {
+    return;
+  }
+  delete D.api;
+  fix();
+  BASE_TS = +D.ts || 0;
+}
+async function publishStaff(btn) {
+  if (!CFG_OK || !STAFF.includes("products")) {
+    toast("تعذّر تحميل المتجر من الخادم — حدّث الصفحة قبل النشر", "e");
+    return;
+  }
+  if (!confirm("نشر تعديلات المنتجات الآن؟")) return;
+  busy(btn, true);
+  try {
+    const r = await api("/rest/v1/rpc/staff_save_products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_products: D.products, p_base_ts: BASE_TS }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      if (/stale/.test(t)) return toast("تم تعديل المتجر من مكان آخر — حدّث الصفحة ثم أعد التعديل", "e");
+      throw new Error(t.slice(0, 120));
+    }
+    const ts = await r.json();
+    D.ts = ts;
+    BASE_TS = ts;
+    dirty = false;
+    badge();
+    toast("تم النشر");
+  } catch (e) {
+    toast("فشل النشر: " + (e.message || "").slice(0, 80), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
 async function publish(btn) {
+  if (isStaffOnly()) return publishStaff(btn);
   // Never publish a copy that did not come from the server (it would overwrite the live store with stale embedded data)
   if (!CFG_OK) {
     toast(
@@ -1917,6 +2178,7 @@ async function boot() {
   }
   if (!SES) return loginView();
   await Promise.all([loadCfg(), checkRole()]);
+  if (isStaffOnly()) await loadCfgStaff();
   render();
 }
 boot();
