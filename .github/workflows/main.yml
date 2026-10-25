@@ -1,25 +1,38 @@
-name: Wipe Everything
+name: Unzip Inner Folder to Root
 on:
   push:
     branches: [ main, master ]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  wipe:
+  unzip:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Delete all files
+      - name: Extract inner folder directly to root
         run: |
           shopt -s dotglob nullglob
-          for item in *; do
-            if [ "$item" != ".git" ] && [ "$item" != ".github" ]; then
-              rm -rf "$item"
+          for z in *.zip; do
+            if [ -f "$z" ]; then
+              mkdir -p /tmp/extracted
+              unzip -q -o "$z" -d /tmp/extracted
+              rm -f "$z"
+              
+              # التحقق مما إذا كان هناك مجلد واحد داخل الـ ZIP ونقل ما بداخله للرئيسية
+              items=(/tmp/extracted/*)
+              if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
+                cp -rf "${items[0]}"/* .
+              else
+                cp -rf /tmp/extracted/* .
+              fi
+              
+              rm -rf /tmp/extracted
             fi
           done
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add -A
-          git diff --staged --quiet || (git commit -m "Wipe repository clean" && git push)
+          git diff --staged --quiet || (git commit -m "Extract inner folder files to root" && git push)
