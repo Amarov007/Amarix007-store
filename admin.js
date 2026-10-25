@@ -421,12 +421,129 @@ function addFilterOpt(b) {
 /* Numbers section: free public numbers kept inside the category (category.free). One country per card; numbers one per line: number | optional link to its public messages page. Paid numbers are ordinary products of this category. */
 function freeEditor(c, ci) {
   const fr = Array.isArray(c.free) ? c.free : [];
-  return `<div class="card fed" style="background:var(--bg)"><h3>الأرقام المجانية (${fr.length} دولة)</h3><p class="hint">كل دولة لها قائمة أرقام، كل رقم في سطر. يمكنك إضافة رابط صفحة رسائل الرقم بعد الرمز | مثال: <span dir="ltr">+15551234567 | https://example.com/messages</span></p>${fr
+  return numSyncBox(c, ci) + `<div class="card fed" style="background:var(--bg)"><h3>الأرقام المجانية (${fr.length} دولة)</h3><p class="hint">كل دولة لها قائمة أرقام، كل رقم في سطر. يمكنك إضافة رابط صفحة رسائل الرقم بعد الرمز | مثال: <span dir="ltr">+15551234567 | https://example.com/messages</span></p>${fr
     .map((x, fi) => {
       const k = `categories.${ci}.free.${fi}.`;
       return `<div class="fg"><div class="g2">${F("اسم الدولة (عربي)", k + "ar")}${F("اسم الدولة (إنجليزي)", k + "en", { d: 1 })}${F("العلم (إيموجي)", k + "fl", { d: 1 })}</div>${F("الأرقام (رقم في كل سطر)", k + "txt", { t: "area", w: 1, d: 1, r: 5 })}<button type="button" class="b bd2 sm" data-a="free-del" data-ci="${ci}" data-fi="${fi}">حذف الدولة</button></div>`;
     })
     .join("")}<button type="button" class="b b2 sm" data-a="free-add" data-ci="${ci}">+ دولة بأرقام مجانية</button><p class="hint">الأرقام المدفوعة: أضف منتجات في تبويب «المنتجات» ضمن هذا القسم، وضع في حقل «وسوم» اسم الخدمة والدولة مطابقَين لخيارات الفلاتر أعلاه (مثال: <span dir="ltr">WhatsApp أمريكا</span>).</p></div>`;
+}
+
+/* ---------- جلب الأرقام تلقائياً من مزوّد الأرقام (أمر من الأدمن) ----------
+   زر واحد: يجلب كل الخدمات × الدول × الأسعار × المتوفر، ينشئ/يحدّث منتجات القسم، يبني فلاتر الخدمة والدولة، ثم تضغط «نشر».
+   المنتجات التي ينشئها الجلب تحمل ns = معرّف المزوّد، فيحدّثها أو يخفيها (يحذفها) الجلب التالي دون أن يمسّ منتجاتك اليدوية. */
+const NS_AR = {
+  "russia":"روسيا","ukraine":"أوكرانيا","kazakhstan":"كازاخستان","china":"الصين","philippines":"الفلبين","myanmar":"ميانمار","indonesia":"إندونيسيا","malaysia":"ماليزيا",
+  "kenya":"كينيا","tanzania":"تنزانيا","vietnam":"فيتنام","kyrgyzstan":"قرغيزستان","usa":"أمريكا","united states":"أمريكا","united states virtual":"أمريكا (افتراضي)","israel":"إسرائيل","hong kong":"هونغ كونغ","poland":"بولندا",
+  "england":"بريطانيا","united kingdom":"بريطانيا","uk":"بريطانيا","madagascar":"مدغشقر","dr congo":"الكونغو الديمقراطية","congo":"الكونغو","nigeria":"نيجيريا","macao":"ماكاو","egypt":"مصر","india":"الهند","ireland":"أيرلندا",
+  "cambodia":"كمبوديا","laos":"لاوس","lao people's":"لاوس","haiti":"هايتي","ivory coast":"ساحل العاج","gambia":"غامبيا","serbia":"صربيا","yemen":"اليمن","south africa":"جنوب أفريقيا","romania":"رومانيا","colombia":"كولومبيا",
+  "estonia":"إستونيا","azerbaijan":"أذربيجان","canada":"كندا","morocco":"المغرب","ghana":"غانا","argentina":"الأرجنتين","uzbekistan":"أوزبكستان","cameroon":"الكاميرون","chad":"تشاد","germany":"ألمانيا","lithuania":"ليتوانيا",
+  "croatia":"كرواتيا","sweden":"السويد","iraq":"العراق","netherlands":"هولندا","latvia":"لاتفيا","austria":"النمسا","belarus":"بيلاروسيا","thailand":"تايلاند","saudi arabia":"السعودية","mexico":"المكسيك","taiwan":"تايوان",
+  "spain":"إسبانيا","iran":"إيران","algeria":"الجزائر","slovenia":"سلوفينيا","bangladesh":"بنغلاديش","senegal":"السنغال","turkey":"تركيا","czech republic":"التشيك","sri lanka":"سريلانكا","peru":"بيرو","pakistan":"باكستان",
+  "new zealand":"نيوزيلندا","guinea":"غينيا","mali":"مالي","venezuela":"فنزويلا","ethiopia":"إثيوبيا","mongolia":"منغوليا","brazil":"البرازيل","afghanistan":"أفغانستان","uganda":"أوغندا","angola":"أنغولا","cyprus":"قبرص",
+  "france":"فرنسا","papua new guinea":"بابوا غينيا الجديدة","mozambique":"موزمبيق","nepal":"نيبال","belgium":"بلجيكا","bulgaria":"بلغاريا","hungary":"المجر","moldova":"مولدوفا","italy":"إيطاليا","paraguay":"باراغواي",
+  "honduras":"هندوراس","tunisia":"تونس","nicaragua":"نيكاراغوا","timor-leste":"تيمور الشرقية","bolivia":"بوليفيا","costa rica":"كوستاريكا","guatemala":"غواتيمالا","uae":"الإمارات","united arab emirates":"الإمارات","zimbabwe":"زيمبابوي",
+  "puerto rico":"بورتوريكو","sudan":"السودان","togo":"توغو","kuwait":"الكويت","salvador":"السلفادور","el salvador":"السلفادور","libya":"ليبيا","jamaica":"جامايكا","trinidad and tobago":"ترينيداد وتوباغو","ecuador":"الإكوادور",
+  "eswatini":"إسواتيني","oman":"عُمان","bosnia and herzegovina":"البوسنة والهرسك","dominican republic":"الجمهورية الدومينيكان","syria":"سوريا","qatar":"قطر","panama":"بنما","cuba":"كوبا","mauritania":"موريتانيا","sierra leone":"سيراليون",
+  "jordan":"الأردن","portugal":"البرتغال","barbados":"بربادوس","burundi":"بوروندي","benin":"بنين","brunei":"بروناي","bahamas":"الباهاما","botswana":"بوتسوانا","belize":"بيليز","car":"أفريقيا الوسطى","dominica":"دومينيكا",
+  "grenada":"غرينادا","georgia":"جورجيا","greece":"اليونان","guinea-bissau":"غينيا بيساو","guyana":"غيانا","iceland":"آيسلندا","comoros":"جزر القمر","saint kitts and nevis":"سانت كيتس ونيفيس","liberia":"ليبيريا","lesotho":"ليسوتو",
+  "malawi":"ملاوي","namibia":"ناميبيا","niger":"النيجر","rwanda":"رواندا","slovakia":"سلوفاكيا","suriname":"سورينام","tajikistan":"طاجيكستان","monaco":"موناكو","bahrain":"البحرين","reunion":"ريونيون","zambia":"زامبيا","armenia":"أرمينيا",
+  "somalia":"الصومال","congo (brazzaville)":"الكونغو برازافيل","chile":"تشيلي","burkina faso":"بوركينا فاسو","lebanon":"لبنان","gabon":"الغابون","albania":"ألبانيا","uruguay":"أوروغواي","mauritius":"موريشيوس","bhutan":"بوتان",
+  "maldives":"المالديف","guadeloupe":"غوادلوب","turkmenistan":"تركمانستان","french guiana":"غيانا الفرنسية","finland":"فنلندا","saint lucia":"سانت لوسيا","luxembourg":"لوكسمبورغ","saint vincent and the grenadines":"سانت فنسنت",
+  "equatorial guinea":"غينيا الاستوائية","djibouti":"جيبوتي","cape verde":"الرأس الأخضر","denmark":"الدنمارك","norway":"النرويج","australia":"أستراليا","japan":"اليابان","south korea":"كوريا الجنوبية","singapore":"سنغافورة",
+  "ukraine ":"أوكرانيا","north macedonia":"مقدونيا الشمالية","macedonia":"مقدونيا","montenegro":"الجبل الأسود","kosovo":"كوسوفو","malta":"مالطا","palestine":"فلسطين","seychelles":"سيشل","new caledonia":"كاليدونيا الجديدة"
+};
+const nsAr = (en) => NS_AR[String(en || "").trim().toLowerCase()] || "";
+let NS_NAMES_LOADED = false;
+function numSyncBox(c, ci) {
+  if (!NS_NAMES_LOADED) { NS_NAMES_LOADED = true; loadProviders(true).then(() => { if (tab == "categories") render(); }).catch(() => {}); }
+  const opts = Object.keys(PROV_KIND).filter((id) => PROV_KIND[id] == "smsactivate");
+  const sel = opts.length
+    ? opts.map((id) => `<option value="${esc(id)}">${esc((PROV_NAME[id] || id) + " (" + id + ")")}</option>`).join("")
+    : '<option value="">— لا يوجد مزوّد أرقام: أضفه من تبويب APIs بنوع «أرقام تفعيل» —</option>';
+  const cnt = D.products.filter((p) => p.c == c.id && p.ns).length;
+  return `<div class="card fed" style="background:var(--bg)"><h3>⚡ جلب الأرقام المدفوعة تلقائياً من المزوّد</h3>
+<p class="hint">يجلب كل الخدمات والدول والأسعار والكمية المتاحة بضغطة واحدة، وينشئ منتجات القسم ويبني فلاتر «الخدمة / الدولة» بنفسه. أعد الضغط في أي وقت لتحديث الأسعار وإضافة الجديد وإخفاء ما نفد. بعدها اضغط «نشر». منتجات هذا القسم الناتجة عن الجلب الآن: <b>${cnt}</b>.</p>
+<label class="fld"><span>مزوّد الأرقام</span><select class="inp" id="ns-prov">${sel}</select></label>
+<div class="g2"><label class="fld"><span>هامش الربح %</span><input class="inp" id="ns-mk" type="number" min="0" value="${esc(localStorage.getItem("amx_ns_mk") || "50")}" dir="ltr"></label>
+<label class="fld"><span>أقل كمية متاحة لعرض العرض</span><input class="inp" id="ns-min" type="number" min="0" value="${esc(localStorage.getItem("amx_ns_min") || "5")}" dir="ltr"></label>
+<label class="fld"><span>أقصى عدد منتجات (0 = بلا حد)</span><input class="inp" id="ns-lim" type="number" min="0" value="${esc(localStorage.getItem("amx_ns_lim") || "600")}" dir="ltr"></label>
+<label class="fld"><span>الحد الأدنى للسعر بعد الهامش ($)</span><input class="inp" id="ns-floor" type="number" min="0" step="0.001" value="${esc(localStorage.getItem("amx_ns_floor") || "0.02")}" dir="ltr"></label></div>
+<div class="g2"><label class="fld"><span>خدمات محددة فقط (رموزها، مفصولة بفاصلة — اتركه فارغاً للكل)</span><input class="inp" id="ns-svc" placeholder="wa,tg,fb,ig" dir="ltr" value="${esc(localStorage.getItem("amx_ns_svc") || "")}"></label>
+<label class="fld"><span>دول محددة فقط (أرقامها، مفصولة بفاصلة — فارغ للكل)</span><input class="inp" id="ns-cty" placeholder="0,22,187" dir="ltr" value="${esc(localStorage.getItem("amx_ns_cty") || "")}"></label></div>
+<div class="acts"><button class="b" type="button" data-a="num-sync" data-ci="${ci}">⚡ جلب وتحديث الأرقام الآن</button><button class="b b2" type="button" data-a="num-diag">🩺 فحص الاتصال والتشخيص</button></div>
+<div id="ns-out" class="hint" style="margin-top:8px;max-height:300px;overflow:auto"></div></div>`;
+}
+const nsOut = (h) => { const o = $("#ns-out"); if (o) o.innerHTML = h; };
+async function numDiag(b) {
+  const pv = ($("#ns-prov") || {}).value;
+  if (!pv) return toast("اختر مزوّد أرقام أولاً", "e");
+  busy(b, true);
+  try {
+    const j = await fn("smm-order", { action: "numbers_diag", provider: pv });
+    nsOut(j.tests.map((t) => `<div style="padding:6px 0;border-bottom:1px solid var(--bd,#ddd)">${t.ok ? "✅" : "❌"} <bdi dir="ltr">${esc(t.url)}</bdi><br>${t.http ? "HTTP " + t.http + " · " : ""}${t.ms != null ? t.ms + "ms · " : ""}<b>${esc(t.note || "")}</b>${t.reply ? `<br><small dir="ltr">${esc(t.reply)}</small>` : ""}</div>`).join("") +
+      (j.tests.some((t) => t.ok) ? "" : '<p>لم ينجح أي عنوان: افتح قسم «API الأرقام» عند المزوّد وانسخ رابط الواجهة بالضبط، ثم ضعه في رابط المزوّد (APIs) أو ضع <bdi dir="ltr">{"base_path":"/المسار/الصحيح"}</bdi> في الإعدادات.</p>'));
+  } catch (e) { nsOut("✗ " + esc(e.message)); toast("فشل: " + String(e.message).slice(0, 80), "e"); }
+  finally { busy(b, false); }
+}
+async function numSync(b) {
+  const ci = +b.dataset.ci, c = D.categories[ci];
+  if (!c) return;
+  const pv = ($("#ns-prov") || {}).value;
+  if (!pv) return toast("أضف مزوّد أرقام (نوع «أرقام تفعيل») من تبويب APIs أولاً", "e");
+  const num = (id, d) => { const v = parseFloat(($(id) || {}).value); return v >= 0 ? v : d; };
+  const mk = num("#ns-mk", 50), minc = Math.floor(num("#ns-min", 5)), lim = Math.floor(num("#ns-lim", 600)), floor = num("#ns-floor", 0.02);
+  const csv = (id) => String(($(id) || {}).value || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const wantS = csv("#ns-svc"), wantC = csv("#ns-cty");
+  try { localStorage.setItem("amx_ns_mk", mk); localStorage.setItem("amx_ns_min", minc); localStorage.setItem("amx_ns_lim", lim); localStorage.setItem("amx_ns_floor", floor); localStorage.setItem("amx_ns_svc", wantS.join(",")); localStorage.setItem("amx_ns_cty", wantC.join(",")); } catch (e) {}
+  busy(b, true);
+  nsOut("⏳ جارٍ الجلب من المزوّد…");
+  try {
+    const inf = await fn("smm-order", { action: "info" });
+    if (!inf || !inf.numbers) throw new Error("دالة smm-order المنشورة قديمة — انشر النسخة الجديدة (supabase functions deploy smm-order) ثم أعد المحاولة");
+    const j = await fn("smm-order", { action: "numbers_catalog", provider: pv, services: wantS, countries: wantC, min_count: minc });
+    if (!j || !Array.isArray(j.offers)) throw new Error((j && j.error) || "رد غير متوقع من المزوّد");
+    if (!j.offers.length) throw new Error("المزوّد لم يُرجع أي رقم بهذه الشروط — لم يتغيّر شيء (جرّب تخفيض «أقل كمية» أو افحص الاتصال)");
+    const sName = new Map(j.services.map((x) => [String(x.code), String(x.name || x.code)]));
+    const cName = new Map(j.countries.map((x) => [String(x.id), x]));
+    // الأرخص أولاً داخل كل خدمة، ثم نقطع على الحد الأقصى
+    let offers = j.offers.slice().sort((a, b2) => (sName.get(a.s) || a.s).localeCompare(sName.get(b2.s) || b2.s) || a.p - b2.p);
+    if (lim > 0 && offers.length > lim) offers = offers.slice(0, lim);
+    const have = new Map(D.products.filter((p) => p.c == c.id && p.ns == pv).map((p) => [p.id, p]));
+    const seen = new Set();
+    let add = 0, upd = 0;
+    const svcOpts = new Set(), ctyOpts = new Set();
+    offers.forEach((o) => {
+      const sn = sName.get(o.s) || o.s, cn = cName.get(o.c) || { name: o.c };
+      const cAr = nsAr(cn.name) || cn.name, id = "num_" + pv + "_" + o.s + "_" + o.c;
+      const price = Math.max(floor, Math.round(o.p * (1 + mk / 100) * 1e4) / 1e4);
+      seen.add(id);
+      svcOpts.add(sn); ctyOpts.add(cAr);
+      let it = have.get(id);
+      if (it) { if (Math.abs(it.p - price) > 1e-6) { it.p = price; upd++; } }
+      else {
+        it = NEW.products();
+        Object.assign(it, { id, c: c.id, k: "buy", ar: `${sn} · ${cAr}`, en: `${sn} · ${cn.name}`, p: price, o: 0, d: 0, r: 5, n: 0, bs: 0, t: 0,
+          tg: `${sn} ${cAr} ${cn.name}`, sp: "", smm_service: o.s, smm_qty: 1, smm_mk: mk, smm_country: String(o.c), smm_input: "none", qmin: 1, qmax: 1, ns: pv,
+          ...(pv == "main" ? {} : { smm_provider: pv }) });
+        D.products.push(it); add++;
+      }
+    });
+    // ما لم يعد عند المزوّد (أو نفد): يُحذف من منتجات الجلب فقط
+    let gone = 0;
+    for (let i = D.products.length - 1; i >= 0; i--) { const p = D.products[i]; if (p.c == c.id && p.ns == pv && !seen.has(p.id)) { D.products.splice(i, 1); gone++; } }
+    // فلاتر الخدمة والدولة تُبنى من الجلب (تُبقي اختياراتك السابقة غير المرتبطة بالمزوّد)
+    const mkGroup = (ar, en) => ({ ar, en, o: [] });
+    if (!Array.isArray(c.f)) c.f = [];
+    while (c.f.length < 2) c.f.push(c.f.length ? mkGroup("الدولة", "Country") : mkGroup("الخدمة", "Service"));
+    const fill = (g, set) => { const keep = (g.o || []).filter((x) => D.products.some((p) => p.c == c.id && !p.ns && String(p.tg || "").toLowerCase().includes(String(x).toLowerCase()))); g.o = [...new Set([...keep, ...[...set].sort((a, b2) => a.localeCompare(b2, "ar"))])]; };
+    fill(c.f[0], svcOpts); fill(c.f[1], ctyOpts);
+    save();
+    nsOut(`✓ تم: أُضيف <b>${add}</b> · تحدّث سعر <b>${upd}</b> · أُخفي <b>${gone}</b> · الإجمالي المعروض <b>${offers.length}</b> من ${j.total} عرضاً (${svcOpts.size} خدمة، ${ctyOpts.size} دولة).<br><b>اضغط «نشر» لتطبيق ذلك على المتجر.</b>`);
+    toast(`أُضيف ${add} · حُدّث ${upd} · أُخفي ${gone}. اضغط نشر للحفظ`);
+    render();
+  } catch (e) { nsOut("✗ " + esc(e.message)); toast("فشل: " + String(e.message).slice(0, 80), "e"); }
+  finally { busy(b, false); }
 }
 /* ---------- 7. Views (one function per sidebar tab) ---------- */
 const VIEW = {
@@ -1179,6 +1296,8 @@ document.addEventListener("click", (e) => {
   if (a == "prov-save") return provSave(b);
   if (a == "prov-test") return provTest(b);
   if (a == "prov-del") return provDel(b);
+  if (a == "num-sync") return numSync(b);
+  if (a == "num-diag") return numDiag(b);
   if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
   if (a == "smm-imp") return smmImport(b);
   if (a == "smm-wipe") return smmWipe(b, false);

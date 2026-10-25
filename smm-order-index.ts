@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// smm-order v3 — بوابة موحّدة لمزوّدي الخدمات: رشق (SMM) + أرقام تفعيل + أي خدمة أخرى (شحن ألعاب، اشتراكات، ذكاء اصطناعي).
+// smm-order v4 — بوابة موحّدة لمزوّدي الخدمات: رشق (SMM) + أرقام تفعيل + أي خدمة أخرى (شحن ألعاب، اشتراكات، ذكاء اصطناعي).
 //
 // المزوّد الرئيسي  (id = "main")  : جدول api_settings (smm_api_url / smm_api_key) — دائماً من نوع smm كما كان.
 // مزوّدون إضافيون (id = أي معرّف) : جدول smm_providers (id, name, kind, api_url, api_key, config, enabled).
@@ -40,7 +40,7 @@ const json = (b: unknown, s = 200) =>
 const clean = (t: string) => t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 const PID = /^[a-z0-9_-]{1,30}$/;
 const MAIN = "main";
-const VERSION = 3;
+const VERSION = 4;
 const KINDS = ["smm", "smsactivate", "custom"];
 const UA = "Mozilla/5.0 (compatible; AMARIX007/1.0)";
 const lower = (v: unknown) => String(v ?? "").trim().toLowerCase();
@@ -131,7 +131,7 @@ Deno.serve(async (req: Request) => {
 
     // capability probe (no secrets): the admin panel checks which version is deployed.
     // An older version answers "unknown action" (v1) or multi_site without `kinds` (v2).
-    if (action === "info") return json({ multi_site: true, version: VERSION, kinds: KINDS });
+    if (action === "info") return json({ multi_site: true, version: VERSION, kinds: KINDS, numbers: true });
 
     // Admin: everything. Staff: only what their permission allows (send/refresh/poll -> 'orders', services -> 'products').
     // Owner (the customer who placed the order): send / poll on their OWN paid order, and only for self-service sites.
@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
     const orderAct = action === "send" || action === "refresh" || action === "poll";
     let role: "admin" | "staff" | "owner" = "admin";
     if (!isAdmin) {
-      const need = orderAct ? "orders" : action === "services" ? "products" : null;
+      const need = orderAct ? "orders" : (action === "services" || action === "numbers_catalog" || action === "numbers_diag") ? "products" : null;
       let ok = false;
       if (need) {
         const { data } = await userClient.rpc("has_perm", { p: need });
@@ -212,7 +212,7 @@ Deno.serve(async (req: Request) => {
           else {
             let base: string;
             if (kind === "smm") base = normBase(u.toString());
-            else if (kind === "smsactivate") base = u.pathname === "/" || u.pathname === "" ? u.origin + "/stubs/handler_api.php" : u.toString().replace(/\/+$/, "");
+            else if (kind === "smsactivate") base = u.pathname === "/" || u.pathname === "" ? u.origin + String(row.config?.base_path || "/stubs/handler_api.php") : u.toString().replace(/\/+$/, "");
             else base = u.toString().replace(/\/+$/, "");
             out = {
               site: {
@@ -229,14 +229,33 @@ Deno.serve(async (req: Request) => {
     };
 
     // ---------- HTTP مشترك (extra sites: never follow redirects — a redirect could point to an internal host) ----------
+    const sameSite = (a: string, b: string) => a.replace(/^www\./, "") === b.replace(/^www\./, "");
     const http = async (s: Site, target: string | URL, init: RequestInit): Promise<{ status: number; text: string } | { error: string }> => {
       try {
-        const r = await fetch(target, {
-          ...init,
-          redirect: s.id === MAIN ? "follow" : "manual",
-          signal: AbortSignal.timeout(30000),
-        });
-        return { status: r.status, text: (await r.text()).slice(0, 200000) };
+        let cur = new URL(target.toString());
+        let method = String(init.method ?? "GET").toUpperCase();
+        let bodyInit: any = init.body;
+        for (let hop = 0; hop <= 4; hop++) {
+          const r = await fetch(cur, {
+            ...init, method, body: bodyInit,
+            redirect: s.id === MAIN ? "follow" : "manual",
+            signal: AbortSignal.timeout(30000),
+          });
+          const loc = r.headers.get("location");
+          if (s.id !== MAIN && r.status >= 300 && r.status < 400 && loc) {
+            // extra sites: a redirect is followed ONLY to https, a public host and the same site (www / non-www, http -> https, trailing slash)
+            const nu = safeUrl(new URL(loc, cur).toString());
+            if (!nu || !sameSite(nu.hostname.toLowerCase(), cur.hostname.toLowerCase())) {
+              return { error: `Provider ${s.id} redirected (HTTP ${r.status}) to an address that is not allowed` };
+            }
+            if (!nu.search && cur.search) nu.search = cur.search; // some servers drop the query string (the API key) when they redirect
+            if (r.status === 303 || ((r.status === 301 || r.status === 302) && method === "POST")) { method = "GET"; bodyInit = undefined; }
+            cur = nu;
+            continue;
+          }
+          return { status: r.status, text: (await r.text()).slice(0, 200000) };
+        }
+        return { error: `Provider ${s.id}: too many redirects` };
       } catch (e) {
         return { error: `Network error contacting provider ${s.id}: ${String((e as Error).message ?? e).slice(0, 120)}` };
       }
@@ -286,6 +305,35 @@ Deno.serve(async (req: Request) => {
       if (h === "STATUS_CANCEL") return { status: "Canceled" };
       return { status: "", error: saFail(t) };
     };
+
+
+    // ---------- جدول الأسعار: يقبل {دولة:{خدمة:{cost,count}}} و{خدمة:{دولة:{...}}} وقائمة مسطّحة ----------
+    type Offer = { service: string; country: string; cost: number; count: number | null };
+    const parseOffers = (prices: any, svcSet: Set<string>, ctySet: Set<string>): Offer[] => {
+      const out: Offer[] = [];
+      const put = (service: unknown, country: unknown, v: any) => {
+        const cost = parseFloat(typeof v === "object" && v !== null ? (v.cost ?? v.price ?? v.rate) : v);
+        if (!(cost > 0) || service === undefined || country === undefined) return;
+        const c = Number(typeof v === "object" && v !== null ? (v.count ?? v.physicalCount ?? v.qty ?? v.available ?? v.stock) : NaN);
+        out.push({ service: String(service), country: String(country), cost, count: Number.isFinite(c) ? c : null });
+      };
+      if (Array.isArray(prices)) {
+        for (const x of prices) put(x?.service ?? x?.code ?? x?.app, x?.country ?? x?.country_id ?? x?.cc, x);
+        return out;
+      }
+      if (!prices || typeof prices !== "object") return out;
+      const top = Object.keys(prices);
+      let score = top.filter((k) => ctySet.has(k)).length - top.filter((k) => svcSet.has(k)).length;
+      if (score === 0) score = top.filter((k) => /^\d+$/.test(k)).length > top.length / 2 ? 1 : -1;
+      for (const [k1, v1] of Object.entries(prices as Record<string, any>)) {
+        if (!v1 || typeof v1 !== "object") continue;
+        for (const [k2, v2] of Object.entries(v1 as Record<string, any>)) {
+          if (score > 0) put(k2, k1, v2); else put(k1, k2, v2);
+        }
+      }
+      return out;
+    };
+    const jsonOrNull = (t: string): any => { try { return JSON.parse(t); } catch { return null; } };
 
     // ===================== نوع custom =====================
     const customCall = async (s: Site, spec: any, vars: Record<string, string>): Promise<{ data: any; status: number } | { error: string }> => {
@@ -381,14 +429,13 @@ Deno.serve(async (req: Request) => {
             if (Array.isArray(j?.services)) for (const x of j.services) if (x?.code) names.set(String(x.code), String(x.name ?? x.code));
           } catch { /* الأسماء اختيارية */ }
         }
-        const bag = prices && typeof prices === "object" ? (prices[country] ?? prices) : {};
         const fx = Number(s.cfg?.rate_factor) > 0 ? Number(s.cfg.rate_factor) : 1; // provider currency -> store base currency
+        const offers = parseOffers(prices, new Set(names.keys()), new Set([country]));
+        const wanted = offers.filter((o) => o.country === country);
         const out: any[] = [];
-        for (const [code, v] of Object.entries(bag as Record<string, any>)) {
-          const cost = parseFloat(v?.cost);
-          if (!(cost > 0)) continue;
-          // rate = سعر الألف كما في واجهة الرشق: سعر الرقم الواحد = rate / 1000
-          out.push({ service: code, name: names.get(code) || code, category: "Numbers", rate: String(cost * 1000 * fx), min: 1, max: 1, type: "Number", country, count: v?.count ?? null });
+        // rate = سعر الألف كما في واجهة الرشق: سعر الرقم الواحد = rate / 1000
+        for (const o of (wanted.length ? wanted : offers)) {
+          out.push({ service: o.service, name: names.get(o.service) || o.service, category: "Numbers", rate: String(o.cost * 1000 * fx), min: 1, max: 1, type: "Number", country: o.country, count: o.count });
         }
         return out;
       }
@@ -485,6 +532,88 @@ Deno.serve(async (req: Request) => {
       // surface provider-side errors (wrong key, blocked IP, ...) instead of returning them as a normal 200
       if (res && !Array.isArray(res) && (res as any).error) return json({ error: String((res as any).error) }, 502);
       return json(res);
+    }
+
+    // ---------- numbers_catalog: كل الخدمات × الدول × الأسعار × المتوفر بطلب واحد (للأدمن) ----------
+    if (action === "numbers_catalog") {
+      const g = await getSite(body.provider);
+      if (!g.site) return json({ error: g.err!.error }, g.err!.status);
+      const s = g.site;
+      if (s.kind !== "smsactivate") return json({ error: "this provider is not a numbers provider (kind must be smsactivate)" }, 400);
+      const params: Record<string, string> = { action: "getPrices" };
+      if (body.country !== undefined && String(body.country) !== "") params.country = String(body.country);
+      const [pr, sv, ct] = await Promise.all([
+        saCall(s, params), saCall(s, { action: "getServicesList" }), saCall(s, { action: "getCountries" }),
+      ]);
+      if ("error" in pr) return json({ error: pr.error }, 502);
+      const prices = jsonOrNull(pr.text);
+      if (prices === null) return json({ error: saFail(pr.text), hint: "the provider did not return a JSON price table — run the connection diagnosis" }, 502);
+      const svcName = new Map<string, string>();
+      if (!("error" in sv)) {
+        const j = jsonOrNull(sv.text);
+        const arr = Array.isArray(j?.services) ? j.services : Array.isArray(j) ? j : [];
+        for (const x of arr) { const c = x?.code ?? x?.id; if (c !== undefined) svcName.set(String(c), String(x?.name ?? x?.title ?? c)); }
+      }
+      const ctyName = new Map<string, { name: string; ru: string }>();
+      if (!("error" in ct)) {
+        const j = jsonOrNull(ct.text);
+        const arr = Array.isArray(j) ? j : j && typeof j === "object" ? Object.values(j) : [];
+        for (const x of arr as any[]) {
+          if (x?.id === undefined) continue;
+          ctyName.set(String(x.id), { name: String(x.eng ?? x.name ?? x.title ?? x.id), ru: String(x.rus ?? "") });
+        }
+      }
+      let offers = parseOffers(prices, new Set(svcName.keys()), new Set(ctyName.keys()));
+      const wantS = Array.isArray(body.services) && body.services.length ? new Set(body.services.map(String)) : null;
+      const wantC = Array.isArray(body.countries) && body.countries.length ? new Set(body.countries.map(String)) : null;
+      const minCount = Math.max(0, Number(body.min_count) || 0);
+      offers = offers.filter((o) => (!wantS || wantS.has(o.service)) && (!wantC || wantC.has(o.country)) && (o.count === null || o.count >= minCount));
+      const fx = Number(s.cfg?.rate_factor) > 0 ? Number(s.cfg.rate_factor) : 1;
+      const total = offers.length;
+      offers = offers.slice(0, 20000);
+      const used = new Set(offers.map((o) => o.service)), usedC = new Set(offers.map((o) => o.country));
+      return json({
+        total, fx, currency: String(s.cfg?.currency ?? ""),
+        services: [...used].map((c) => ({ code: c, name: svcName.get(c) || c })),
+        countries: [...usedC].map((c) => ({ id: c, name: ctyName.get(c)?.name || c, ru: ctyName.get(c)?.ru || "" })),
+        offers: offers.map((o) => ({ s: o.service, c: o.country, p: o.cost * fx, n: o.count })),
+      });
+    }
+
+    // ---------- numbers_diag: يجرّب عناوين الواجهة المحتملة ويقول بالضبط ماذا يرد المزوّد (بلا كشف المفتاح) ----------
+    if (action === "numbers_diag") {
+      const g = await getSite(body.provider);
+      if (!g.site) return json({ error: g.err!.error }, g.err!.status);
+      const s = g.site;
+      const origin = new URL(s.base).origin;
+      const cands = [...new Set([s.base, origin + "/stubs/handler_api.php", origin + "/api/stubs/handler_api.php", origin + "/handler_api.php", origin + "/api/handler_api.php"])];
+      const tests: any[] = [];
+      for (const c of cands) {
+        const u = safeUrl(c);
+        if (!u) { tests.push({ url: c, ok: false, note: "not https / not a public host" }); continue; }
+        const t0 = Date.now();
+        const call = new URL(u.toString());
+        call.searchParams.set("api_key", s.key);
+        call.searchParams.set("action", "getBalance");
+        try {
+          const r = await fetch(call, { redirect: "manual", headers: { "Accept": "text/plain, application/json", "User-Agent": UA }, signal: AbortSignal.timeout(15000) });
+          const txt = (await r.text()).slice(0, 4000);
+          const snip = clean(txt).slice(0, 110);
+          let note = "";
+          if (/ACCESS_BALANCE/.test(txt)) note = "OK: هذا هو العنوان الصحيح (واجهة SMS-Activate)";
+          else if (/BAD_KEY/.test(txt)) note = "العنوان صحيح لكن مفتاح API مرفوض";
+          else if (r.status >= 300 && r.status < 400) note = "تحويل (redirect) إلى " + String(r.headers.get("location") ?? "?").slice(0, 80);
+          else if (/just a moment|cf-chl|cloudflare|attention required/i.test(txt)) note = "المزوّد محمي بجدار Cloudflare ويحجب خوادم Supabase — اطلب منه فتح الوصول للـAPI";
+          else if (r.status === 404) note = "العنوان غير موجود (404)";
+          else if (r.status === 403) note = "محظور (403): قد يكون حظر IP أو مفتاح خاطئ";
+          else if (/<html|<!doctype/i.test(txt)) note = "ردّ صفحة HTML وليس API — العنوان خاطئ";
+          else note = "ردّ غير معروف";
+          tests.push({ url: u.origin + u.pathname, ok: /ACCESS_BALANCE/.test(txt), http: r.status, ms: Date.now() - t0, reply: snip, note });
+        } catch (e) {
+          tests.push({ url: u.origin + u.pathname, ok: false, ms: Date.now() - t0, note: "فشل الاتصال: " + String((e as Error).message ?? e).slice(0, 100) });
+        }
+      }
+      return json({ provider: s.id, kind: s.kind, tests });
     }
 
     // ---------- send / refresh ----------
