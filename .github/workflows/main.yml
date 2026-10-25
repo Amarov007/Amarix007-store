@@ -1,4 +1,4 @@
-name: Unzip Inner Folder to Root
+name: Unzip Inner Folder Safely
 on:
   push:
     branches: [ main, master ]
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Extract inner folder directly to root
+      - name: Extract files ignoring .github folder
         run: |
           shopt -s dotglob nullglob
           for z in *.zip; do
@@ -21,18 +21,22 @@ jobs:
               unzip -q -o "$z" -d /tmp/extracted
               rm -f "$z"
               
-              # التحقق مما إذا كان هناك مجلد واحد داخل الـ ZIP ونقل ما بداخله للرئيسية
               items=(/tmp/extracted/*)
               if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
-                cp -rf "${items[0]}"/* .
+                src="${items[0]}"
               else
-                cp -rf /tmp/extracted/* .
+                src="/tmp/extracted"
               fi
               
+              # حذف مجلد .github من الملفات المستخرجة حتى لا يرفض GitHub عملية الرفع
+              rm -rf "$src/.github"
+              rm -rf "$src/.git"
+              
+              cp -rf "$src"/* .
               rm -rf /tmp/extracted
             fi
           done
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add -A
-          git diff --staged --quiet || (git commit -m "Extract inner folder files to root" && git push)
+          git diff --staged --quiet || (git commit -m "Extract project files to root" && git push)
