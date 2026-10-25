@@ -1998,10 +1998,15 @@ function numPaid(c) {
   const sub = all.filter((p) => nHit(p, c, 0, si));
   if (step == 1) {
     const h = c.f[1].o.map((_, oi) => pick(1, sub, oi)).join("");
-    return `${numStepper(1, c)}<div class="box nsel">${ex(c.f[0].o[si])}</div><h2 class="nh">${t("n_pickC")}</h2>${h ? `<div class="ngrid">${h}</div>` : emptyBox("box", t("catempty"))}`;
+    /* none of this service's products names a country (e.g. a custom provider that sells "WhatsApp" with no country): skip the country step and list them directly instead of an empty page */
+    if (!h) {
+      const a0 = catList(c);
+      return `${numStepper(2, c)}<div class="box nsel">${ex(c.f[0].o[si])}</div>${a0.length ? grid(a0) : emptyBox("box", t("catempty"), "", `<button class="b b2" data-a="nstep" data-c="${ex(c.id)}" data-s="0">${t("n_back")}</button>`)}`;
+    }
+    return `${numStepper(1, c)}<div class="box nsel">${ex(c.f[0].o[si])}</div><h2 class="nh">${t("n_pickC")}</h2><div class="ngrid">${h}</div>`;
   }
   const a = catList(c);
-  return `${numStepper(2, c)}<div class="box nsel">${ex(c.f[0].o[si])} · ${ex(c.f[1].o[ci])}</div>${a.length ? grid(a) : emptyBox("search", t("nofilt"), "", `<button class="b b2" data-a="nstep" data-c="${ex(c.id)}" data-s="1">${t("n_back")}</button>`)}`;
+  return `${numStepper(2, c)}<div class="box nsel">${ex(c.f[0].o[si])} · ${ex(c.f[1].o[ci])}</div>${a.length ? grid(a) : emptyBox("search", t("nofilt"), "", `<button class="b b2" data-a="nstep" data-c="${ex(c.id)}" data-s="${sub.some((p) => c.f[1].o.some((_, oi) => nHit(p, c, 1, oi))) ? 1 : 0}">${t("n_back")}</button>`)}`;
 }
 function numFree(c) {
   const free = freeOf(c),
