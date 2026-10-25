@@ -41,33 +41,9 @@ begin
 end $$;
 
 -- ---------- طلب الانضمام (المستخدم لا يستطيع تعديل جدول affiliates مباشرة) ----------
-create or replace function public.apply_affiliate(p_payout text) returns text
-language plpgsql security definer set search_path = public as $function$
-declare
-  uid uuid := auth.uid();
-  pay text := left(trim(coalesce(p_payout, '')), 120);
-  st  text;
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if length(pay) < 3 then raise exception 'payout_required'; end if;
-  if not public.rl_hit('affapply:' || uid::text, 5, 3600) then raise exception 'rate_limited'; end if;
+-- [moved] public.apply_affiliate() is defined only in supabase-affiliate-tiers.sql (one definition per function; see tests/verify-project.py check 5).
 
-  insert into public.affiliates (user_id)
-    select id from public.profiles where id = uid
-  on conflict (user_id) do nothing;
-
-  select status into st from public.affiliates where user_id = uid;
-  if st is null then raise exception 'no_profile'; end if;
-  if st in ('pending', 'approved') then return st; end if;
-
-  update public.affiliates
-     set status = 'pending', payout_id = pay, applied_at = now()
-   where user_id = uid;
-  return 'pending';
-end $function$;
-
-revoke all on function public.apply_affiliate(text) from public, anon;
-grant execute on function public.apply_affiliate(text) to authenticated;
+-- [moved] apply_affiliate grants -> supabase-affiliate-tiers.sql / supabase-final-grants.sql
 
 -- ---------- النقرات: تُحتسب للشركاء المعتمدين فقط ----------
 create or replace function public.track_ref_click(p_code text) returns void
@@ -108,6 +84,9 @@ begin
   return new;
 end $function$;
 
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
+
 -- ---------- ربط كود بحساب موجود (تسجيل Google): للشركاء المعتمدين فقط ----------
 create or replace function public.profiles_protect_referral() returns trigger
 language plpgsql security definer set search_path = public as $function$
@@ -134,33 +113,8 @@ begin
   return new;
 end $function$;
 
+drop trigger if exists profiles_protect_referral_trg on public.profiles;
+create trigger profiles_protect_referral_trg before update of ref_code, referred_by on public.profiles for each row execute function public.profiles_protect_referral();
+
 -- ---------- العمولة: شريك معتمد فقط + نسبته الخاصة ----------
-create or replace function public.orders_affiliate() returns trigger
-language plpgsql security definer set search_path = public as $function$
-declare ref_code_ text; ref_id uuid; arate numeric; rate numeric; amt numeric;
-begin
-  if new.payment_status = 'paid' and old.payment_status is distinct from 'paid' and new.user_id is not null then
-    select p2.id, p2.ref_code, a.rate into ref_id, ref_code_, arate
-      from public.profiles p
-      join public.profiles p2 on p2.ref_code = p.referred_by
-      join public.affiliates a on a.user_id = p2.id and a.status = 'approved'
-     where p.id = new.user_id and p2.id <> new.user_id;
-    if ref_id is not null then
-      select coalesce(arate, (data->>'affiliate_rate')::numeric, 5) into rate
-        from public.store_config where id = 1;
-      rate := coalesce(rate, arate, 5);
-      amt := round(coalesce(new.total, 0) * rate / 100, 2);
-      new.affiliate_ref := ref_code_; new.affiliate_commission := amt;
-      update public.affiliates
-         set sales = coalesce(sales, 0) + 1, total_commission = coalesce(total_commission, 0) + amt
-       where user_id = ref_id;
-    end if;
-  elsif old.payment_status = 'paid' and new.payment_status is distinct from 'paid' and coalesce(old.affiliate_commission, 0) > 0 then
-    update public.affiliates
-       set sales = greatest(coalesce(sales, 0) - 1, 0),
-           total_commission = greatest(coalesce(total_commission, 0) - old.affiliate_commission, 0)
-     where user_id = (select id from public.profiles where ref_code = old.affiliate_ref);
-    new.affiliate_commission := 0;
-  end if;
-  return new;
-end $function$;
+-- [moved] public.orders_affiliate() is defined only in supabase-affiliate-tiers.sql (one definition per function; see tests/verify-project.py check 5).

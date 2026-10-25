@@ -90,3 +90,6 @@ begin
   end if;
   return new;
 end $function$;
+
+drop trigger if exists orders_enforce_pricing on public.orders;
+create trigger orders_enforce_pricing before insert on public.orders for each row execute function public.orders_enforce_pricing();

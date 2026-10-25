@@ -49,6 +49,17 @@ create table if not exists public.wallet_topups (
   reviewed_at timestamptz
 );
 create index if not exists wallet_topups_user_idx   on public.wallet_topups (user_id, created_at desc);
+-- أعمدة أُضيفت في القاعدة الحية (مزامنة 2026-10-25): مرجع العملية، بصمة الإثبات، المراجعون، الموافقة المزدوجة
+alter table public.wallet_topups add column if not exists tx_ref            text;
+alter table public.wallet_topups add column if not exists proof_hash        text;
+alter table public.wallet_topups add column if not exists reviewed_by       uuid;
+alter table public.wallet_topups add column if not exists first_approved_by uuid;
+alter table public.wallet_topups add column if not exists first_approved_at timestamptz;
+create unique index if not exists wallet_topups_proof_hash_uq on public.wallet_topups (proof_hash)
+  where proof_hash is not null and status <> 'rejected';
+create unique index if not exists wallet_topups_txref_uq on public.wallet_topups (lower(tx_ref))
+  where tx_ref is not null and status <> 'rejected';
+
 create index if not exists wallet_topups_status_idx on public.wallet_topups (status, created_at desc);
 
 alter table public.wallets             enable row level security;
@@ -157,7 +168,7 @@ begin
 end $$;
 
 -- 2) إرفاق إثبات الدفع (صورة في حاوية payment-proofs داخل مجلد المستخدم)
-create or replace function public.wallet_topup_set_proof(p_id bigint, p_path text) returns void
+create or replace function public.wallet_topup_set_proof(p_id bigint, p_path text, p_hash text default null) returns void
 language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid();
 begin
@@ -166,29 +177,42 @@ begin
      or p_path !~ ('^' || uid::text || '/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$') then
     raise exception 'invalid_path';
   end if;
+  if p_hash is not null and p_hash !~ '^[a-f0-9]{64}$' then raise exception 'invalid_path'; end if;
   if not exists (select 1 from storage.objects where bucket_id = 'payment-proofs' and name = p_path) then
     raise exception 'proof_missing';
   end if;
-  update public.wallet_topups set payment_proof = p_path
-   where id = p_id and user_id = uid and status = 'pending';
+  begin
+    update public.wallet_topups set payment_proof = p_path, proof_hash = p_hash
+     where id = p_id and user_id = uid and status = 'pending';
+  exception when unique_violation then
+    raise exception 'duplicate_proof';
+  end;
   if not found then raise exception 'not_allowed'; end if;
 end $$;
 
 -- 3) «تم الدفع» -> مراجعة المدير
-create or replace function public.wallet_topup_claim(p_id bigint) returns void
+create or replace function public.wallet_topup_claim(p_id bigint, p_tx_ref text default null) returns void
 language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); r public.wallet_topups%rowtype; nm text; em text;
+declare uid uuid := auth.uid(); r public.wallet_topups%rowtype; nm text; em text; ref text := nullif(btrim(coalesce(p_tx_ref, '')), '');
 begin
   if uid is null then raise exception 'not_allowed'; end if;
+  if ref is not null and (length(ref) < 6 or length(ref) > 100 or ref !~ '^[A-Za-z0-9_:.\\- ]+$') then
+    raise exception 'invalid_reference';
+  end if;
   select * into r from public.wallet_topups where id = p_id and user_id = uid for update;
   if not found then raise exception 'not_allowed'; end if;
   if r.status in ('review','approved') then return; end if;
   if r.status <> 'pending' then raise exception 'not_allowed'; end if;
   if coalesce(r.payment_proof, '') = '' then raise exception 'proof_required'; end if;
-  update public.wallet_topups set status = 'review' where id = p_id;
+  begin
+    update public.wallet_topups set status = 'review', tx_ref = coalesce(ref, tx_ref) where id = p_id;
+  exception when unique_violation then
+    raise exception 'duplicate_reference';
+  end;
   select full_name, email into nm, em from public.profiles where id = uid;
-  perform public.notify_telegram('💸 شحن محفظة يحتاج مراجعة #' || p_id || E'\n👤 ' || coalesce(nm, '') || ' (' || coalesce(em, '') || ')'
-                                 || E'\n💰 ' || r.amount || ' USD · ' || r.section || E'\n💳 ' || coalesce(r.payment_method, '') || E'\n🧾 إثبات: مرفق');
+  perform public.notify_telegram('💸 شحن محفظة يحتاج مراجعة #' || p_id || E'\\n👤 ' || coalesce(nm, '') || ' (' || coalesce(em, '') || ')'
+                                 || E'\\n💰 ' || r.amount || ' USD · ' || r.section || E'\\n💳 ' || coalesce(r.payment_method, '')
+                                 || E'\\n🧾 إثبات: مرفق' || case when coalesce(ref, r.tx_ref) is not null then E'\\n🔖 رقم العملية: ' || coalesce(ref, r.tx_ref) else '' end);
 end $$;
 
 -- 4) الدفع من المحفظة لطلب موجود (يخص المستخدم وبانتظار الدفع)
@@ -219,15 +243,27 @@ end $$;
 -- ---------- دوال المدير ----------
 create or replace function public.wallet_topup_approve(p_id bigint, p_amount numeric default null) returns numeric
 language plpgsql security definer set search_path = public as $$
-declare r public.wallet_topups%rowtype; amt numeric; nb numeric;
+declare uid uuid := auth.uid(); r public.wallet_topups%rowtype; amt numeric; nb numeric; cfg jsonb; thr numeric;
 begin
   if not public.is_admin() then raise exception 'not_allowed'; end if;
   select * into r from public.wallet_topups where id = p_id for update;
   if not found or r.status not in ('pending','review') then raise exception 'not_allowed'; end if;
+  if coalesce(r.payment_proof, '') = '' then raise exception 'proof_required'; end if;
   amt := round(coalesce(p_amount, r.amount), 2);
   if amt <= 0 or amt > 100000 then raise exception 'invalid_amount'; end if;
+  select data into cfg from public.store_config where id = 1;
+  thr := coalesce(nullif(cfg->'wallet'->>'dual_threshold', '')::numeric, 0);
+  if thr > 0 and amt >= thr then
+    if r.first_approved_by is null then
+      update public.wallet_topups set first_approved_by = uid, first_approved_at = now(), status = 'review' where id = p_id;
+      perform public.notify_telegram('🕒 موافقة أولى على شحن #' || p_id || ' بمبلغ ' || amt || ' USD — بانتظار أدمن ثانٍ');
+      return -1;
+    elsif r.first_approved_by = uid then
+      raise exception 'second_approver_required';
+    end if;
+  end if;
   nb := public.wallet_apply(r.user_id, r.section, amt, 'topup', 'TOPUP-' || r.id, null);
-  update public.wallet_topups set status = 'approved', amount = amt, reviewed_at = now() where id = p_id;
+  update public.wallet_topups set status = 'approved', amount = amt, reviewed_at = now(), reviewed_by = uid where id = p_id;
   return nb;
 end $$;
 
@@ -235,9 +271,23 @@ create or replace function public.wallet_topup_reject(p_id bigint, p_note text d
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_admin() then raise exception 'not_allowed'; end if;
-  update public.wallet_topups set status = 'rejected', admin_note = left(p_note, 300), reviewed_at = now()
+  update public.wallet_topups set status = 'rejected', admin_note = left(p_note, 300), reviewed_at = now(), reviewed_by = auth.uid()
    where id = p_id and status in ('pending','review');
   if not found then raise exception 'not_allowed'; end if;
+end $$;
+
+-- تدقيق: أرصدة لا تطابق مجموع دفتر الحركات (فارغ = سليم)
+create or replace function public.wallet_reconcile()
+returns table(user_id uuid, section text, balance numeric, ledger_sum numeric, diff numeric)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'not_allowed'; end if;
+  return query
+  select w.user_id, w.section, w.balance, coalesce(t.s, 0), w.balance - coalesce(t.s, 0)
+    from public.wallets w
+    left join (select x.user_id, x.section, sum(x.amount) s from public.wallet_transactions x group by 1, 2) t
+      on t.user_id = w.user_id and t.section = w.section
+   where w.balance <> coalesce(t.s, 0);
 end $$;
 
 create or replace function public.wallet_admin_adjust(p_user uuid, p_section text, p_amount numeric, p_note text default null) returns numeric
@@ -278,18 +328,20 @@ revoke execute on function public.wallet_order_section(jsonb, jsonb)         fro
 revoke execute on function public.wallet_apply(uuid, text, numeric, text, text, text) from public, anon, authenticated;
 revoke execute on function public.orders_wallet_refund()                     from public, anon, authenticated;
 revoke execute on function public.wallet_topup_create(numeric, text, text, text) from public, anon;
-revoke execute on function public.wallet_topup_set_proof(bigint, text)       from public, anon;
-revoke execute on function public.wallet_topup_claim(bigint)                 from public, anon;
+revoke execute on function public.wallet_topup_set_proof(bigint, text, text) from public, anon;
+revoke execute on function public.wallet_topup_claim(bigint, text)       from public, anon;
 revoke execute on function public.pay_order_with_wallet(text)                from public, anon;
 revoke execute on function public.wallet_topup_approve(bigint, numeric)      from public, anon;
 revoke execute on function public.wallet_topup_reject(bigint, text)          from public, anon;
 revoke execute on function public.wallet_admin_adjust(uuid, text, numeric, text) from public, anon;
+revoke execute on function public.wallet_reconcile()                        from public, anon;
 
 grant execute on function public.wallet_topup_create(numeric, text, text, text) to authenticated;
-grant execute on function public.wallet_topup_set_proof(bigint, text)       to authenticated;
-grant execute on function public.wallet_topup_claim(bigint)                 to authenticated;
+grant execute on function public.wallet_topup_set_proof(bigint, text, text) to authenticated;
+grant execute on function public.wallet_topup_claim(bigint, text)       to authenticated;
 grant execute on function public.pay_order_with_wallet(text)                to authenticated;
 grant execute on function public.wallet_topup_approve(bigint, numeric)      to authenticated;   -- تتحقق is_admin() داخلياً
 grant execute on function public.wallet_topup_reject(bigint, text)          to authenticated;
 grant execute on function public.wallet_admin_adjust(uuid, text, numeric, text) to authenticated;
+grant execute on function public.wallet_reconcile()                        to authenticated;   -- تتحقق is_admin() داخلياً
 grant execute on all functions in schema public to service_role;

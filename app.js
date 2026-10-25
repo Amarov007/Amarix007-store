@@ -120,7 +120,7 @@ const PAYG = {
 };
 /* The store's own mark (same drawing as the header logo) */
 const LOGO_SVG =
-  '<svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 25.5L14 7L16.5 12" stroke="#A7E8BD" stroke-width="2.75"/><path d="M10 18.5H19" stroke="#52B788" stroke-width="2.25"/><path d="M16.5 12L20.5 18L26 8" stroke="#A7E8BD" stroke-width="2.75"/><circle cx="26" cy="8" r="1.75" fill="#A7E8BD"/></svg>';
+  '<svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 25.5L14 7L16.5 12" stroke="#B9FF66" stroke-width="2.75"/><path d="M10 18.5H19" stroke="#F3F3F3" stroke-width="2.25"/><path d="M16.5 12L20.5 18L26 8" stroke="#B9FF66" stroke-width="2.75"/><circle cx="26" cy="8" r="1.75" fill="#B9FF66"/></svg>';
 
 /* ---------- 3. Translations ---------- */
 const T = {
@@ -968,10 +968,19 @@ const hasSmm = (p) => {
   const v = String(p.smm_service ?? "").trim();
   return v !== "" && v !== "0";
 };
+/* Items fulfilled through a provider that are NOT boost services (activation numbers, game top-ups, subscriptions).
+   The admin marks them with smm_input: "none" = nothing to type (number / ready code), "text" = the buyer types a player ID or an email. */
+const apiMode = (p) => hasSmm(p) && !!String(p.smm_input ?? "").trim();
+const apiInput = (p) => apiMode(p) && String(p.smm_input).trim() != "none";
+const inputOk = (v) => {
+  v = String(v || "").trim();
+  return v.length >= 2 && v.length <= 120 && !/[\u0000-\u001f<>]/.test(v);
+};
 const needsLink = (p) => {
   const c = cat(p.c);
-  return (c && c.ty == "boost") || hasSmm(p);
+  return !apiMode(p) && ((c && c.ty == "boost") || hasSmm(p));
 };
+const qLimited = (p) => needsLink(p) || apiMode(p); // products whose quantity follows the product's own min / max
 function linkOk(v) {
   v = String(v || "").trim();
   if (!v || v.length > 500 || /\s/.test(v)) return false;
@@ -1227,7 +1236,7 @@ function payLogo(m, size = 44) {
     .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
     .trim();
   if (!nm)
-    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#08694a" };color:#fff">${ic("card", size * 0.5)}</span>`;
+    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff">${ic("card", size * 0.5)}</span>`;
   const ini = ex(
     [
       ...plain(m.en || m.ar || pmReadable(m) || "?")
@@ -1241,7 +1250,7 @@ function payLogo(m, size = 44) {
       .join("")
       .toUpperCase() || "?"
   );
-  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#08694a" };color:#fff"><b>${ini}</b></span>`;
+  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff"><b>${ini}</b></span>`;
 }
 
 /* ---------- 6. Supabase client (anon key + user JWT) ---------- */
@@ -1438,10 +1447,10 @@ function addToCart(id, n = 1) {
   if (isVisit(prod(id))) return; // visit-only items are never ordered
   const pp = prod(id);
   n = Math.max(1, Math.min(QCAP, Math.floor(+n) || 1));
-  if (pp && needsLink(pp)) n = qClamp(pp, n);
+  if (pp && qLimited(pp)) n = qClamp(pp, n);
   const x = cart.find((c) => c.id == id);
   x ? (x.q = Math.min(QCAP, x.q + n)) : cart.push({ id, q: n });
-  if (pp && needsLink(pp)) {
+  if (pp && qLimited(pp)) {
     const y = cart.find((c) => c.id == id);
     if (y && y.q > qMax(pp)) y.q = qMax(pp);
   }
@@ -1481,7 +1490,7 @@ const qMax = (p) => {
 };
 const qClamp = (p, n) => Math.min(qMax(p), Math.max(qMin(p), Math.floor(+n) || qMin(p)));
 const fmtN = (n) => Number(n).toLocaleString("en-US");
-const qUnit1 = (p) => !!(p && p.smm_service && !(+p.smm_qty > 1)); // boost service sold per single unit (quantity = real units)
+const qUnit1 = (p) => !!(p && p.smm_service && !apiMode(p) && !(+p.smm_qty > 1)); // boost service sold per single unit (quantity = real units)
 const qPresets = (p) => {
   const lo = qMin(p),
     hi = qMax(p),
@@ -1632,7 +1641,7 @@ function card(p) {
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "";
   const rating = ratingHtml(p);
   const vis = isVisit(p);
-  return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${p.smm_service ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div> <button class="b add" data-a="add" data-id="${ex(p.id)}">${ic( "cart", 15 )} ${t("add")}</button>`}</div></div>`;
+  return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div> <button class="b add" data-a="add" data-id="${ex(p.id)}">${ic( "cart", 15 )} ${t("add")}</button>`}</div></div>`;
 }
 const grid = (a) =>
   a.length
@@ -1726,11 +1735,15 @@ function head() {
   root.dir = lang == "ar" ? "rtl" : "ltr";
   root.dataset.theme = th;
   // Brand colours edited in the admin panel
+  // Only a deliberately customised colour overrides the theme. The previous default greens (still saved in many live
+  // configs) and the current defaults are ignored so the light/dark palette in style.css always applies.
+  const DEFAULT_COL = { g: ["#08694a", "#191a23"], m: ["#a7e8bd", "#b9ff66"], ac: ["#52b788", "#b9ff66"] };
   ["g", "m", "ac"].forEach((k) => {
-    if (safeColor(col[k])) root.style.setProperty("--" + k, col[k]);
+    const v = safeColor(col[k]);
+    if (v && DEFAULT_COL[k].indexOf(String(v).toLowerCase()) < 0) root.style.setProperty("--" + k, v);
   });
   const meta = document.querySelector("meta[name=theme-color]");
-  if (meta) meta.content = th == "dark" ? "#121212" : "#F8FAF9";
+  if (meta) meta.content = th == "dark" ? "#12131A" : "#FFFFFF";
   const logo = CFG.site.logo;
   if (logo) $(".logo .tile").innerHTML = `<img src="${ex(logo)}" alt="">`;
   $("#bn").innerHTML = `${ex(CFG.site.n1)}<b>${ex(CFG.site.n2)}</b>`;
@@ -2066,7 +2079,7 @@ function prodPage(id) {
   const ds = p.ds && (p.ds[lang] || (boost ? p.ds.ar || p.ds.en : ""));
   const rel = boost ? [] : P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
   const back = boost ? `<a class="b b2 sm sb-back" href="#/boost">${ic("chev", 14)} ${lang == "ar" ? "العودة إلى منصة الرشق" : "Back to the Boost panel"}</a>` : "";
-  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${p.smm_service ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
+  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
 }
 
 /* Static pages: FAQ and policies */
@@ -2103,7 +2116,7 @@ function cartPage() {
     cp = cpOf(coupon);
   const rows = lines
     .map(
-      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${p.smm_service ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
+      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? (lang == "ar" ? "المعرّف أو الإيميل" : "ID or email") : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
     )
     .join("");
   const couponBox = cp
@@ -2693,7 +2706,17 @@ async function placeOrder(btn, viaWhatsApp = false) {
   if (viaWhatsApp && !waNumber()) return toast(t("waunset"), "wn");
   const badL = lines.find((l) => needsLink(l.p) && !linkOk(l.x.l));
   if (badL) return flagLink(badL);
-  const badQ = lines.find((l) => needsLink(l.p) && (l.x.q < qMin(l.p) || l.x.q > qMax(l.p)));
+  const badI = lines.find((l) => apiInput(l.p) && !inputOk(l.x.l));
+  if (badI) {
+    toast(lang == "ar" ? "أدخل المعرّف أو الإيميل المطلوب لهذا المنتج" : "Enter the ID or email this product needs", "wn");
+    const el = [...document.querySelectorAll("input[data-a=lk]")].find((e) => e.dataset.id == badI.p.id);
+    if (el) {
+      el.setAttribute("aria-invalid", "true");
+      el.focus();
+    }
+    return;
+  }
+  const badQ = lines.find((l) => qLimited(l.p) && (l.x.q < qMin(l.p) || l.x.q > qMax(l.p)));
   if (badQ) {
     badQ.x.q = qClamp(badQ.p, badQ.x.q);
     save();
@@ -3006,10 +3029,94 @@ function ordersHTML(rows) {
         const total = `<bdi dir="ltr">${( (o.total * R[cur][0]) / R[cur0][0] ).toFixed(2)} ${ex(R[cur][1])}</bdi>`;
         const m = o.payment_method ? pmOf(o.payment_method) : null;
         const canClaim = pay == "pending" && st != "cancelled";
-        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } <details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
+        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } ${apiBlock(o)}<details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
       })
       .join("")
   );
+}
+/* ---------- provider-fulfilled items: delivery (number / SMS code / voucher / note) + automatic send and polling ----------
+   The smm-order function writes each line's result into orders.smm: { kind, order, error, provider:{status}, delivery:{number,code,text,...} }.
+   Boost lines (kind "smm") are handled by the admin panel as before and are not shown here. */
+const orderItemsOf = (o) => {
+  let it = o.items;
+  if (typeof it == "string") {
+    try {
+      it = JSON.parse(it);
+    } catch {
+      it = [];
+    }
+  }
+  return Array.isArray(it) ? it : [];
+};
+const apiLinesOf = (o) => (Array.isArray(o.smm) ? o.smm.filter((r) => r && r.kind && r.kind != "smm") : []);
+const apiPending = (r) => !!r.order && !(r.provider && (r.provider.status == "Completed" || r.provider.status == "Canceled"));
+const DLV_LABELS = { number: ["الرقم", "Number"], code: ["الرمز", "Code"], email: ["الإيميل", "Email"], password: ["كلمة المرور", "Password"], pin: ["PIN", "PIN"], serial: ["الرقم التسلسلي", "Serial"], link: ["الرابط", "Link"] };
+function apiBlock(o) {
+  const L = apiLinesOf(o);
+  if (!L.length) return "";
+  const A = lang == "ar";
+  return (
+    `<div class="dlv">` +
+    L.map((r) => {
+      const d = r.delivery || {},
+        stt = r.provider && r.provider.status,
+        p = prod(r.item_id),
+        rows = Object.keys(DLV_LABELS)
+          .filter((k) => d[k])
+          .map((k) => `<div class="dlv-r"><span>${DLV_LABELS[k][A ? 0 : 1]}</span><b class="n" dir="ltr">${ex(d[k])}</b></div>`)
+          .join("");
+      const wait = r.order && !r.error && stt != "Completed" && stt != "Canceled" && !d.code && r.kind == "smsactivate";
+      const msg = r.error
+        ? A ? "تعذّر تنفيذ هذا البند — تواصل مع الدعم" : "This item could not be fulfilled — contact support"
+        : stt == "Canceled"
+        ? A ? "أُلغي هذا البند — تواصل مع الدعم" : "This item was cancelled — contact support"
+        : wait
+        ? A ? "⏳ بانتظار وصول الرمز… يتحدّث تلقائياً" : "⏳ Waiting for the code… updates automatically"
+        : stt == "Completed"
+        ? A ? "✓ تم التسليم" : "✓ Delivered"
+        : A ? "⏳ قيد التنفيذ" : "⏳ In progress";
+      return `<div class="dlv-i"><small>${ex(p ? plain(p[lang] || p.ar || p.en) : r.item_id)}</small>${rows}${d.text ? `<p class="dlv-t">${ex(d.text)}</p>` : ""}<div class="dlv-s">${msg}</div></div>`;
+    }).join("") +
+    `</div>`
+  );
+}
+async function apiCall(o, action) {
+  const r = await sb("/functions/v1/smm-order", { method: "POST", body: { action, order_id: o.id } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !Array.isArray(j.results)) return false;
+  const before = JSON.stringify(o.smm);
+  o.smm = j.results;
+  o.smm_status = j.smm_status;
+  return before !== JSON.stringify(o.smm);
+}
+/* Paid orders made only of provider items are sent by the customer's own session (the function allows it for self-service providers only),
+   then polled every few seconds while the orders page is open until the code / delivery arrives. */
+async function apiAuto(rows, seq, n = 0) {
+  if (seq !== routeSeq || !/^#\/orders/.test(location.hash) || n > 40 || !user) return;
+  let changed = false,
+    again = false;
+  for (const o of rows) {
+    if (o.payment_status != "paid") continue;
+    const its = orderItemsOf(o),
+      api = its.filter((i) => {
+        const p = prod(i.id);
+        return p && apiMode(p);
+      });
+    if (!api.length) continue;
+    try {
+      if (!o.smm && api.length == its.length) {
+        if (await apiCall(o, "send")) changed = true;
+      } else if (apiLinesOf(o).some(apiPending)) {
+        if (await apiCall(o, "poll")) changed = true;
+      }
+    } catch {}
+    if (apiLinesOf(o).some(apiPending)) again = true;
+  }
+  if (changed && seq === routeSeq) {
+    $("#m").innerHTML = ordersHTML(rows);
+    decorate();
+  }
+  if (again) setTimeout(() => apiAuto(rows, seq, n + 1), 6000);
 }
 async function ordersPage(seq) {
   $("#m").innerHTML = loadingBox();
@@ -3029,6 +3136,7 @@ async function ordersPage(seq) {
     if (seq === routeSeq) {
       $("#m").innerHTML = ordersHTML(rows);
       decorate();
+      apiAuto(rows, seq);
     }
   } catch (err) {
     console.error("[AMARIX] load orders", err);
@@ -3481,8 +3589,8 @@ document.addEventListener("click", async (e) => {
     if (!x) return;
     const pq = prod(id),
       nq = x.q + (+b.dataset.d || 0),
-      lo = pq && needsLink(pq) ? qMin(pq) : 1,
-      hi = pq && needsLink(pq) ? qMax(pq) : QCAP;
+      lo = pq && qLimited(pq) ? qMin(pq) : 1,
+      hi = pq && qLimited(pq) ? qMax(pq) : QCAP;
     if (nq < lo) cart = cart.filter((c) => c.id != id);
     else x.q = Math.min(hi, nq);
     save();
@@ -4322,7 +4430,7 @@ const sbU = (p) => (+p.smm_qty > 0 ? +p.smm_qty : 1); // real quantity of one pa
 const sbN = (p) => qClamp(p, SB.n);
 const sbPrice = (p) => {
   const u = sbU(p);
-  return u > 1 || p.smm_service ? { v: (pr(p) * 1000) / u, l: "/ 1000" } : { v: pr(p), l: sbT("/ وحدة", "/ unit") };
+  return u > 1 || (p.smm_service && !apiMode(p)) ? { v: (pr(p) * 1000) / u, l: "/ 1000" } : { v: pr(p), l: sbT("/ وحدة", "/ unit") };
 };
 const sbAll = () => P.filter(isBoost);
 

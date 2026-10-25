@@ -5,7 +5,7 @@
 html.amx-skip #amx-splash{display:none!important}
 #amx-splash{
   position:fixed;inset:0;z-index:2147483000;direction:ltr;
-  background:radial-gradient(120% 90% at 78% 6%,#1b5d3d 0%,#0f3122 36%,#08170f 100%);
+  background:radial-gradient(120% 90% at 78% 6%,#2b2f45 0%,#1b1c26 40%,#12131a 100%);
   display:flex;align-items:center;justify-content:center;
   will-change:transform;
   animation:amxFailsafe 0s linear 7s forwards; /* never trap the user if JS fails */
@@ -24,13 +24,13 @@ html.amx-skip #amx-splash{display:none!important}
 
 /* soft pulsing glow behind the logo */
 .amx-glow{position:absolute;left:50%;top:46%;width:130vmin;height:130vmin;margin:-65vmin 0 0 -65vmin;border-radius:50%;
-  background:radial-gradient(closest-side,rgba(82,183,136,.34),rgba(82,183,136,.10) 55%,transparent 72%);
+  background:radial-gradient(closest-side,rgba(185,255,102,.34),rgba(185,255,102,.10) 55%,transparent 72%);
   opacity:0;will-change:transform,opacity;animation:amxGlow 3.2s ease-in-out .15s infinite}
 @keyframes amxGlow{0%{opacity:0;transform:scale(.7)}35%{opacity:1}100%{opacity:.55;transform:scale(1.08)}}
 
 /* sonar ripples */
 .amx-ring{position:absolute;left:50%;top:46%;width:34vmin;height:34vmin;margin:-17vmin 0 0 -17vmin;border-radius:50%;
-  border:2px solid rgba(167,232,189,.7);box-shadow:0 0 24px rgba(82,183,136,.45),inset 0 0 24px rgba(82,183,136,.25);
+  border:2px solid rgba(185,255,102,.7);box-shadow:0 0 24px rgba(185,255,102,.45),inset 0 0 24px rgba(185,255,102,.25);
   opacity:0;transform:scale(.25);will-change:transform,opacity;animation:amxRing 2.6s cubic-bezier(.2,.6,.3,1) infinite}
 .amx-ring.amx-r2{animation-delay:.4s}
 .amx-ring.amx-r3{animation-delay:.8s}
@@ -54,7 +54,7 @@ html.amx-skip #amx-splash{display:none!important}
 .amx-mark{position:relative;width:min(62vw,300px);aspect-ratio:773/507;
   opacity:0;transform:scale(.55);will-change:transform,opacity;
   animation:amxMark 1.15s cubic-bezier(.2,1.25,.35,1) .3s forwards}
-.amx-mark img{display:block;width:100%;height:100%;filter:drop-shadow(0 0 22px rgba(82,183,136,.55))}
+.amx-mark img{display:block;width:100%;height:100%;filter:drop-shadow(0 0 22px rgba(185,255,102,.55))}
 .amx-shine{position:absolute;inset:0;overflow:hidden;
   -webkit-mask:url(logo-mark.webp) center/contain no-repeat;mask:url(logo-mark.webp) center/contain no-repeat}
 .amx-shine::before{content:"";position:absolute;top:0;bottom:0;left:0;width:60%;

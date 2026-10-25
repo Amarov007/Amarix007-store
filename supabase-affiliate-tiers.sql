@@ -125,6 +125,9 @@ begin
   return new;
 end $function$;
 
+drop trigger if exists orders_affiliate_trg on public.orders;
+create trigger orders_affiliate_trg before update of payment_status on public.orders for each row execute function public.orders_affiliate();
+
 -- ---------- تقرير الشريك الشهري (آخر 12 شهراً، لحسابه المعتمد فقط) ----------
 create or replace function public.my_affiliate_monthly()
 returns table(month text, sales integer, volume numeric, commission numeric)

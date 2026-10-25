@@ -188,21 +188,7 @@ begin
   return c;
 end $function$;
 
-create or replace function public.handle_new_user() returns trigger
-language plpgsql security definer set search_path = public as $function$
-declare meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb); rc text := upper(trim(coalesce(meta->>'ref', ''))); refd text;
-begin
-  if rc <> '' and exists (select 1 from public.profiles where ref_code = rc) then refd := rc; end if;
-  insert into public.profiles (id, email, full_name, ref_code, referred_by)
-  values (new.id, new.email, coalesce(meta->>'full_name', meta->>'name'), public.gen_ref_code(), refd)
-  on conflict (id) do nothing;
-  insert into public.affiliates (user_id) values (new.id) on conflict (user_id) do nothing;
-  if refd is not null then
-    update public.affiliates set signups = coalesce(signups, 0) + 1
-     where user_id = (select id from public.profiles where ref_code = refd);
-  end if;
-  return new;
-end $function$;
+-- [moved] public.handle_new_user() is defined only in supabase-affiliate-program.sql (one definition per function; see tests/verify-project.py check 5).
 
 create or replace function public.my_proof_count() returns integer
 language sql stable security definer set search_path = public, storage as $$
@@ -211,17 +197,7 @@ language sql stable security definer set search_path = public, storage as $$
      and (storage.foldername(o.name))[1] = (select auth.uid())::text;
 $$;
 
-create or replace function public.track_ref_click(p_code text) returns void
-language plpgsql security definer set search_path = public as $function$
-declare ip text := public.client_ip();
-begin
-  if p_code !~ '^[A-Za-z0-9]{6,12}$' then return; end if;
-  if ip = 'unknown' then return; end if;
-  if not public.rl_hit('refclk:' || ip || ':' || upper(p_code), 1, 86400) then return; end if;
-  if not public.rl_hit('refclk-ip:' || ip, 20, 3600) then return; end if;
-  update public.affiliates set clicks = coalesce(clicks, 0) + 1
-   where user_id = (select id from public.profiles where ref_code = upper(p_code));
-end $function$;
+-- [moved] public.track_ref_click() is defined only in supabase-affiliate-program.sql (one definition per function; see tests/verify-project.py check 5).
 
 create or replace function public.set_payment_proof(p_order_id text, p_path text) returns void
 language plpgsql security definer set search_path = public as $function$
@@ -267,133 +243,11 @@ begin
   return new;
 end $function$;
 
-create or replace function public.orders_enforce_pricing() returns trigger
-language plpgsql security definer set search_path = public as $function$
-declare
-  cfg jsonb; prods jsonb; it jsonb; p jsonb; newitems jsonb := '[]'::jsonb;
-  qty numeric; unit numeric; sub numeric := 0; disc numeric := 0; cp jsonb; code text;
-  base_cur text; trusted boolean;
-begin
-  trusted := auth.uid() is null or public.is_admin();
+-- [moved] public.orders_enforce_pricing() is defined only in supabase-boost-units.sql (one definition per function; see tests/verify-project.py check 5).
 
-  if not trusted and not public.rl_hit('order:' || auth.uid()::text, 10, 3600) then
-    raise exception 'rate_limited';                       -- 10 طلبات / ساعة لكل مستخدم
-  end if;
+-- [moved] public.orders_affiliate() is defined only in supabase-affiliate-tiers.sql (one definition per function; see tests/verify-project.py check 5).
 
-  -- رقم الطلب: دائماً من التسلسل للعملاء؛ المدير/الخلفية يستطيعون تمرير رقم يدوي صالح
-  if not trusted or new.id is null or new.id = '' then
-    new.id := 'AMX-' || nextval('public.orders_seq')::text;
-  end if;
-
-  select data into cfg from public.store_config where id = 1;
-  prods := coalesce(cfg->'products', '[]'::jsonb);
-
-  if jsonb_typeof(new.items) <> 'array' or jsonb_array_length(new.items) = 0 then raise exception 'invalid_items'; end if;
-  if jsonb_array_length(new.items) > 50 then raise exception 'too_many_items'; end if;
-  if new.id !~ '^AMX-[A-Z0-9]{3,30}$' then raise exception 'invalid_order_id'; end if;
-
-  for it in select * from jsonb_array_elements(new.items) loop
-    select x into p from jsonb_array_elements(prods) x where x->>'id' = it->>'id' limit 1;
-    if p is null then raise exception 'unknown_product %', it->>'id'; end if;
-    if not trusted and (p->>'k' = 'link' or coalesce((p->>'p')::numeric, 0) <= 0) then
-      raise exception 'not_orderable %', it->>'id';       -- منتج زيارة فقط أو بلا سعر
-    end if;
-    qty := coalesce(nullif(it->>'q','')::numeric, 0);
-    if qty < 1 or qty <> trunc(qty) or qty > 100000 then raise exception 'invalid_quantity'; end if;
-    -- حدود الكمية التي يحددها المدير لكل منتج (qmin / qmax بالوحدات). تُطبَّق على العملاء فقط.
-    if not trusted then
-      if qty < greatest(1, coalesce(nullif(p->>'qmin', '')::numeric, 1)) then raise exception 'below_min_quantity'; end if;
-      if coalesce(nullif(p->>'qmax', '')::numeric, 0) > 0 and qty > (p->>'qmax')::numeric then raise exception 'above_max_quantity'; end if;
-    end if;
-    unit := round(coalesce((p->>'p')::numeric, 0) * (1 - coalesce((p->>'d')::numeric, 0) / 100), 2);
-    sub := sub + unit * qty;
-    newitems := newitems || jsonb_build_object(
-      'id', p->>'id', 'q', qty, 'price', unit,
-      'ar', coalesce(p->>'ar', ''), 'en', coalesce(p->>'en', ''),
-      'name', case when new.lang = 'en' then coalesce(nullif(p->>'en', ''), p->>'ar', '')
-                   else coalesce(nullif(p->>'ar', ''), p->>'en', '') end,
-      'link', left(coalesce(it->>'link', ''), 500));
-  end loop;
-
-  code := upper(trim(coalesce(new.coupon, '')));
-  if code <> '' then
-    cp := cfg->'coupons'->code;
-    if cp is null or jsonb_typeof(cp) <> 'array' or not public.coupon_usable(cp, code) then
-      if trusted then new.coupon := null; else raise exception 'coupon_invalid'; end if;
-    else
-      new.coupon := code;
-      disc := least(sub, sub * coalesce((cp->>0)::numeric, 0) / 100 + coalesce((cp->>1)::numeric, 0));
-    end if;
-  else
-    new.coupon := null;
-  end if;
-
-  new.items := newitems;
-  new.total := round(greatest(0, sub - disc), 2);
-
-  if not trusted then
-    select e.key into base_cur
-      from jsonb_each(coalesce(cfg->'rates', '{}'::jsonb)) e
-     where jsonb_typeof(e.value) = 'array' and jsonb_typeof(e.value->0) = 'number'
-       and (e.value->>0)::numeric = 1 limit 1;
-    new.currency := coalesce(base_cur, 'SAR');
-    if new.lang is null or new.lang not in ('ar','en') then new.lang := 'ar'; end if;
-    if new.payment_method is not null and new.payment_method !~ '^[a-z0-9_-]{1,40}$' then new.payment_method := null; end if;
-    new.customer_email := coalesce(nullif(auth.jwt() ->> 'email', ''), new.customer_email);
-    new.customer_name  := left(coalesce(new.customer_name, ''), 120);
-    new.created_at := now();
-    new.pay_currency := case when upper(coalesce(new.pay_currency, '')) ~ '^[A-Z]{3,10}$'
-                             then upper(new.pay_currency) else null end;
-    new.status := 'new'; new.payment_status := 'pending';
-    new.affiliate_ref := null; new.affiliate_commission := 0;
-    new.smm := null; new.smm_status := null;
-  end if;
-  return new;
-end $function$;
-
-create or replace function public.orders_affiliate() returns trigger
-language plpgsql security definer set search_path = public as $function$
-declare ref_code_ text; ref_id uuid; rate numeric; amt numeric;
-begin
-  if new.payment_status = 'paid' and old.payment_status is distinct from 'paid' and new.user_id is not null then
-    select p2.id, p2.ref_code into ref_id, ref_code_
-      from public.profiles p join public.profiles p2 on p2.ref_code = p.referred_by
-     where p.id = new.user_id and p2.id <> new.user_id;
-    if ref_id is not null then
-      select coalesce((data->>'affiliate_rate')::numeric, 5) into rate from public.store_config where id = 1;
-      amt := round(coalesce(new.total, 0) * coalesce(rate, 5) / 100, 2);
-      new.affiliate_ref := ref_code_; new.affiliate_commission := amt;
-      update public.affiliates set sales = coalesce(sales, 0) + 1, total_commission = coalesce(total_commission, 0) + amt where user_id = ref_id;
-    end if;
-  elsif old.payment_status = 'paid' and new.payment_status is distinct from 'paid' and coalesce(old.affiliate_commission, 0) > 0 then
-    update public.affiliates set sales = greatest(coalesce(sales, 0) - 1, 0), total_commission = greatest(coalesce(total_commission, 0) - old.affiliate_commission, 0)
-     where user_id = (select id from public.profiles where ref_code = old.affiliate_ref);
-    new.affiliate_commission := 0;
-  end if;
-  return new;
-end $function$;
-
-create or replace function public.profiles_protect_referral() returns trigger
-language plpgsql security definer set search_path = public as $function$
-begin
-  if auth.uid() is null or public.is_admin() then return new; end if;
-  new.ref_code := old.ref_code;
-  if old.referred_by is not null then
-    new.referred_by := old.referred_by;
-  elsif new.referred_by is not null then
-    new.referred_by := upper(trim(new.referred_by));
-    if new.referred_by = old.ref_code
-       or coalesce(old.created_at, now()) < now() - interval '2 days'
-       or exists (select 1 from public.orders where user_id = old.id)
-       or not exists (select 1 from public.profiles where ref_code = new.referred_by) then
-      new.referred_by := null;
-    else
-      update public.affiliates set signups = coalesce(signups, 0) + 1
-       where user_id = (select id from public.profiles where ref_code = new.referred_by);
-    end if;
-  end if;
-  return new;
-end $function$;
+-- [moved] public.profiles_protect_referral() is defined only in supabase-affiliate-program.sql (one definition per function; see tests/verify-project.py check 5).
 
 -- ---------- إشعارات تلغرام ----------
 create or replace function public.notify_telegram(p_text text) returns void
@@ -488,23 +342,19 @@ begin
 end $function$;
 
 -- ---------- التريغرات ----------
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
+-- [moved] trigger on_auth_user_created -> supabase-affiliate-program.sql (next to handle_new_user)
 
-drop trigger if exists orders_enforce_pricing on public.orders;
-create trigger orders_enforce_pricing before insert on public.orders for each row execute function public.orders_enforce_pricing();
+-- [moved] trigger orders_enforce_pricing -> supabase-boost-units.sql (next to the function)
 drop trigger if exists orders_clear_proof_trg on public.orders;
 create trigger orders_clear_proof_trg before insert on public.orders for each row execute function public.orders_clear_proof_on_insert();
-drop trigger if exists orders_affiliate_trg on public.orders;
-create trigger orders_affiliate_trg before update of payment_status on public.orders for each row execute function public.orders_affiliate();
+-- [moved] trigger orders_affiliate_trg -> supabase-affiliate-tiers.sql (next to the function)
 drop trigger if exists orders_notify_ins_trg on public.orders;
 create trigger orders_notify_ins_trg after insert on public.orders for each row execute function public.orders_notify();
 drop trigger if exists orders_notify_upd_trg on public.orders;
 create trigger orders_notify_upd_trg after update of payment_status on public.orders for each row
   when (old.payment_status is distinct from new.payment_status) execute function public.orders_notify();
 
-drop trigger if exists profiles_protect_referral_trg on public.profiles;
-create trigger profiles_protect_referral_trg before update of ref_code, referred_by on public.profiles for each row execute function public.profiles_protect_referral();
+-- [moved] trigger profiles_protect_referral_trg -> supabase-affiliate-program.sql (next to the function)
 drop trigger if exists profiles_notify_trg on public.profiles;
 create trigger profiles_notify_trg after insert on public.profiles for each row execute function public.profiles_notify();
 
@@ -562,15 +412,7 @@ drop policy if exists "affiliates admin delete" on public.affiliates;
 create policy "affiliates admin delete" on public.affiliates for delete to authenticated using (public.is_admin());
 
 -- ---------- صلاحيات تنفيذ الدوال ----------
-revoke execute on all functions in schema public from public, anon, authenticated;
-grant execute on all functions in schema public to service_role;
-grant execute on function public.public_config()            to anon, authenticated;
-grant execute on function public.check_coupon(text)         to anon, authenticated;
-grant execute on function public.track_ref_click(text)      to anon, authenticated;
-grant execute on function public.is_admin()                 to authenticated;
-grant execute on function public.my_proof_count()           to authenticated;
-grant execute on function public.set_payment_proof(text, text) to authenticated;
-grant execute on function public.claim_payment(text)        to authenticated;
+-- [moved] function execute grants (revoke all + every grant execute) -> supabase-final-grants.sql, which must be run LAST.
 
 -- ---------- التخزين (Storage) ----------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
