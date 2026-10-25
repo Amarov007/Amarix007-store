@@ -15,7 +15,7 @@ const REMOTE_CFG = (() => {
   }
 })(); // optional cached copy
 const ORDER_STATUSES = ["new", "processing", "done", "cancelled"];
-const PAY_STATUSES = ["pending", "review", "paid", "rejected"];
+const PAY_STATUSES = ["pending", "review", "paid"];
 
 /* ---------- 2. Icons & brand logos ---------- */
 const I = {
@@ -260,19 +260,6 @@ const T = {
     paidbtn: "تم الدفع",
     claimed: "تم إبلاغ الفريق بالدفع، سيتم التحقق قريباً",
     claimfail: "تعذّر إرسال الإبلاغ، حاول مجدداً",
-    pay_rejected: "الدفع مرفوض",
-    rejwhy: "سبب الرفض",
-    rejretry: "يمكنك تصحيح الإثبات وإعادة الإرسال",
-    refph: "رقم العملية / TxID (إلزامي)",
-    refneed: "أدخل رقم العملية أو معرّف التحويل (4 أحرف على الأقل)",
-    dupref: "رقم العملية هذا مستخدم في طلب آخر",
-    dupproof: "صورة الإثبات هذه مستخدمة في طلب آخر، ارفع إثباتك الخاص",
-    toomany: "استنفدت محاولات الإرسال، تواصل مع الدعم",
-    paytl: "تتبّع الدفع",
-    tgbtn: "المتابعة عبر تيليغرام",
-    tgerr: "تعذّر تسجيل الدخول عبر تيليغرام، حاول مجدداً",
-    tgexp: "انتهت صلاحية الطلب، اضغط زر تيليغرام مرة أخرى",
-    tgbanned: "هذا الحساب موقوف",
     payhow: "طريقة الدفع",
     payto: "حوّل المبلغ إلى",
     copy: "نسخ",
@@ -562,19 +549,6 @@ const T = {
     paidbtn: "I have paid",
     claimed: "The team was notified and will verify your payment soon",
     claimfail: "Could not send the notice, try again",
-    pay_rejected: "Payment rejected",
-    rejwhy: "Reason",
-    rejretry: "Fix the proof and submit again",
-    refph: "Transaction ID / reference (required)",
-    refneed: "Enter the transaction ID / transfer reference (min 4 characters)",
-    dupref: "This transaction ID was already used on another order",
-    dupproof: "This proof image was already used on another order, upload your own",
-    toomany: "No more attempts left, contact support",
-    paytl: "Payment tracking",
-    tgbtn: "Continue with Telegram",
-    tgerr: "Telegram sign-in failed, try again",
-    tgexp: "The request expired, tap the Telegram button again",
-    tgbanned: "This account is suspended",
     payhow: "Payment method",
     payto: "Transfer the amount to",
     copy: "Copy",
@@ -796,8 +770,6 @@ let returnTo = ""; // where to go after login
 let lastOrder = null; // info for the success page
 let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
-/* Telegram login: رقم البوت (الجزء الذي قبل «:» في توكن البوت). اتركه فارغاً لإخفاء الزر. لا تضع التوكن هنا أبداً. */
-const TG_BOT_ID = "";
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
 const PUBLIC_ROUTES = ["login", "policies", "faq"]; // reachable without an account
 const GUEST_ROUTES = ["", "c", "p", "boost", "cart", "fav"]; // browsing + cart: open to visitors; checkout, orders, account, support and partner still need an account
@@ -2243,15 +2215,12 @@ function walletErr(err) {
     [/wallet_not_eligible/, A ? "المحفظة تعمل مع خدمات الرشق فقط" : "The wallet only works for boost services"],
     [/below_min/, A ? "المبلغ أقل من الحد الأدنى للشحن" : "Amount is below the minimum top-up"],
     [/above_max/, A ? "المبلغ أكبر من الحد الأعلى للشحن" : "Amount is above the maximum top-up"],
+    [/above_daily/, A ? "تجاوزت الحد اليومي للشحن، حاول غداً" : "You reached the daily top-up limit, try again tomorrow"],
     [/invalid_method/, A ? "وسيلة الدفع غير متاحة" : "Payment method is not available"],
     [/too_many_pending/, A ? "لديك طلبات شحن معلّقة كثيرة، أكملها أولاً" : "You have too many open top-ups, finish them first"],
     [/rate_limited/, A ? "محاولات كثيرة، انتظر قليلاً" : "Too many attempts, wait a bit"],
     [/wallet_disabled/, A ? "المحفظة متوقفة حالياً" : "The wallet is currently disabled"],
     [/proof_required/, t("proofneed")],
-    [/ref_required/, t("refneed")],
-    [/duplicate_ref/, t("dupref")],
-    [/duplicate_proof/, t("dupproof")],
-    [/too_many_attempts/, t("toomany")],
     [/invalid_path|proof_missing/, t("proofdeny")],
     [/not_allowed/, A ? "العملية غير مسموحة (ربما تمّت مسبقاً)" : "Not allowed (maybe already done)"],
   ].find(([re]) => re.test(m));
@@ -2268,7 +2237,7 @@ function walletSession(r) {
 const walletProofPick = (id) =>
   `<label class="proofcard"><input type="file" accept="image/jpeg,image/png,image/webp" hidden data-a="wproof" data-id="${ex(id)}"><span class="pc-ic">${ic("upload", 26)}</span><span class="pc-t">${t("proofbtn")}</span><span class="pc-s">${t("proofpick")}</span></label>`;
 const walletClaimBtn = (id, hasProof) =>
-  `${refInput("w" + id)}<button class="b${hasProof ? "" : " locked"}" data-a="wl-claim" data-id="${ex(id)}"${hasProof ? "" : ' disabled aria-disabled="true"'}>${ic("check", 16)} ${t("paidbtn")}</button>`;
+  `<button class="b${hasProof ? "" : " locked"}" data-a="wl-claim" data-id="${ex(id)}"${hasProof ? "" : ' disabled aria-disabled="true"'}>${ic("check", 16)} ${t("paidbtn")}</button>`;
 const walletConv = () => {
   const m = pmOf(wl.method),
     k = m && m.currency;
@@ -2391,7 +2360,7 @@ async function uploadWalletProof(inp) {
       r = await putProof(tk, path, blob);
     if (r.status == 401) throw Object.assign(new Error("session"), { session: true });
     if (!r.ok) throw new Error("up " + r.status);
-    const r2 = await sb("/rest/v1/rpc/wallet_topup_set_proof", { method: "POST", body: { p_id: id, p_path: path, p_hash: await fileHash(f) } });
+    const r2 = await sb("/rest/v1/rpc/wallet_topup_set_proof", { method: "POST", body: { p_id: id, p_path: path } });
     if (r2.status == 401) throw Object.assign(new Error("session"), { session: true });
     if (!r2.ok) throw new Error(await r2.text());
     toast(t("proofok"));
@@ -2414,15 +2383,9 @@ async function uploadWalletProof(inp) {
 }
 async function walletClaim(btn, id) {
   if (btn && btn.disabled) return toast(t("proofneed"), "wn");
-  const refEl = document.querySelector('[data-ref="w' + (+id || 0) + '"]'),
-    ref = ((refEl && refEl.value) || "").trim();
-  if (ref.length < 4) {
-    if (refEl) refEl.focus();
-    return toast(t("refneed"), "wn");
-  }
   setBusy(btn, true);
   try {
-    const r = await sb("/rest/v1/rpc/wallet_topup_claim", { method: "POST", body: { p_id: +id, p_ref: ref } });
+    const r = await sb("/rest/v1/rpc/wallet_topup_claim", { method: "POST", body: { p_id: +id } });
     if (walletSession(r)) return;
     if (!r.ok) throw new Error(await r.text());
     toast(lang == "ar" ? "وصلنا طلبك، سنراجع الدفع ونضيف الرصيد" : "Got it — we'll verify the payment and add the balance");
@@ -2858,10 +2821,8 @@ async function placeOrder(btn, viaWhatsApp = false) {
 const proofPick = (id) =>
   `<label class="proofcard"><input type="file" accept="image/jpeg,image/png,image/webp" hidden data-a="proof" data-id="${ex(id)}"><span class="pc-ic">${ic("upload", 26)}</span><span class="pc-t">${t("proofbtn")}</span><span class="pc-s">${t("proofpick")}</span></label>`;
 /* "I have paid" stays locked (disabled) until a proof image is attached */
-const refInput = (id) =>
-  `<input class="inp" data-ref="${ex(id)}" dir="ltr" maxlength="120" autocomplete="off" placeholder="${t("refph")}" style="margin-bottom:8px">`;
 const claimBtn = (id, hasProof) =>
-  `${refInput(id)}<button class="b${hasProof ? "" : " locked"}" data-a="claim" data-id="${ex(id)}"${hasProof ? "" : " disabled aria-disabled=\"true\""}>${ic("check", 16)} ${t("paidbtn")}</button>`;
+  `<button class="b${hasProof ? "" : " locked"}" data-a="claim" data-id="${ex(id)}"${hasProof ? "" : " disabled aria-disabled=\"true\""}>${ic("check", 16)} ${t("paidbtn")}</button>`;
 const proofOkCard = () =>
   `<div class="proofcard ok"><span class="pc-ic">${ic("check", 26)}</span><span class="pc-t">${t("proofok")}</span></div>`;
 function proofBox(id, claimedFlag, has) {
@@ -2910,15 +2871,6 @@ async function putObject(bucket, tk, path, blob, name = "file.jpg") {
   } catch {}
   return r;
 }
-/* بصمة SHA-256 لملف الإثبات الأصلي: تمنع استعمال الصورة نفسها في طلبين */
-async function fileHash(f) {
-  try {
-    const d = await crypto.subtle.digest("SHA-256", await f.arrayBuffer());
-    return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("");
-  } catch {
-    return null;
-  }
-}
 const putProof = (tk, path, blob) => putObject("payment-proofs", tk, path, blob, "proof.jpg");
 async function uploadProof(inp) {
   const f = inp.files && inp.files[0],
@@ -2939,7 +2891,7 @@ async function uploadProof(inp) {
     if (!r.ok) throw new Error("up " + r.status + " " + (await r.text()).slice(0, 120));
     const r2 = await sb("/rest/v1/rpc/set_payment_proof", {
       method: "POST",
-      body: { p_order_id: id, p_path: path, p_hash: await fileHash(f) },
+      body: { p_order_id: id, p_path: path },
     });
     if (r2.status == 401) throw Object.assign(new Error("session"), { session: true });
     if (!r2.ok) throw new Error("rpc " + (await r2.text()).slice(0, 160));
@@ -2963,8 +2915,6 @@ async function uploadProof(inp) {
           ? t("proofbig")
           : /Bucket not found|PGRST202|42883|up 404|set_payment_proof/i.test(m) && !/not_allowed|invalid_path|proof_missing/.test(m)
           ? t("proofsetup")
-          : /duplicate_proof/.test(m)
-          ? t("dupproof")
           : /not_allowed|invalid_path|proof_missing/.test(m)
           ? t("proofdeny")
           : navigator.onLine
@@ -2981,17 +2931,11 @@ async function uploadProof(inp) {
 /* "I have paid": moves the user's own order from pending to review (server function claim_payment) */
 async function claimPayment(btn, id) {
   if (btn && btn.disabled) return toast(t("proofneed"), "wn");
-  const refEl = document.querySelector('[data-ref="' + String(id).replace(/"/g, "") + '"]'),
-    ref = ((refEl && refEl.value) || "").trim();
-  if (ref.length < 4) {
-    if (refEl) refEl.focus();
-    return toast(t("refneed"), "wn");
-  }
   setBusy(btn, true);
   try {
-    const r = await sb("/rest/v1/rpc/order_payment_claim", {
+    const r = await sb("/rest/v1/rpc/claim_payment", {
       method: "POST",
-      body: { p_order_id: id, p_ref: ref },
+      body: { p_order_id: id },
     });
     if (r.status == 401) {
       clearSession();
@@ -3010,14 +2954,6 @@ async function claimPayment(btn, id) {
       A = lang == "ar";
     const why = /proof_required/i.test(m)
       ? t("proofneed")
-      : /ref_required/i.test(m)
-      ? t("refneed")
-      : /duplicate_ref/i.test(m)
-      ? t("dupref")
-      : /duplicate_proof/i.test(m)
-      ? t("dupproof")
-      : /too_many_attempts/i.test(m)
-      ? t("toomany")
       : /PGRST202|Could not find the function|42883/i.test(m)
       ? A
         ? "الدالة غير مثبّتة في قاعدة البيانات (شغّل supabase-schema.sql)"
@@ -3070,44 +3006,11 @@ function ordersHTML(rows) {
         const cur0 = o.currency && R[o.currency] ? o.currency : BASE;
         const total = `<bdi dir="ltr">${( (o.total * R[cur][0]) / R[cur0][0] ).toFixed(2)} ${ex(R[cur][1])}</bdi>`;
         const m = o.payment_method ? pmOf(o.payment_method) : null;
-        const canClaim = (pay == "pending" || pay == "rejected") && st != "cancelled";
-        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp && pay != "rejected" ? proofOkCard() : proofPick(o.id) + (hp ? "" : `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`)}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" }${ pay == "rejected" && st != "cancelled" ? `<p class="ord-note er">${ic("warn", 14)} <b>${t("pay_rejected")}</b>${o.pay_reject_reason ? ` — ${t("rejwhy")}: ${ex(o.pay_reject_reason)}` : ""}<br><small>${t("rejretry")}</small></p>` : "" }${ st != "cancelled" && o.payment_method != "wallet" && pay != "pending" ? `<details class="ord-tl"><summary data-a="pay-tl" data-id="${ex(o.id)}" data-kind="order">${t("paytl")}</summary><div class="tl-body" id="tl-${ex(o.id)}"></div></details>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } <details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
+        const canClaim = pay == "pending" && st != "cancelled";
+        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } <details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
       })
       .join("")
   );
-}
-async function tgTimeline(id, kind) {
-  const box = document.getElementById("tl-" + id);
-  if (!box || box.dataset.ld) return;
-  box.dataset.ld = "1";
-  box.textContent = "…";
-  try {
-    const r = await sb("/rest/v1/rpc/my_payment_timeline", {
-      method: "POST",
-      body: kind == "topup" ? { p_topup: +id } : { p_order: id },
-    });
-    if (!r.ok) throw new Error(await r.text());
-    const rows = await r.json(),
-      A = lang == "ar",
-      nm = {
-        order_created: A ? "تم إنشاء الطلب" : "Order created",
-        order_payment_review: A ? "أُرسل للتحقق من الدفع" : "Sent for payment review",
-        order_payment_paid: A ? "تم اعتماد الدفع" : "Payment approved",
-        order_payment_rejected: A ? "رُفض الدفع" : "Payment rejected",
-        order_status_processing: A ? "الطلب قيد التنفيذ" : "Order in progress",
-        order_status_done: A ? "اكتمل الطلب" : "Order completed",
-        order_status_cancelled: A ? "أُلغي الطلب" : "Order cancelled",
-      };
-    box.innerHTML = rows.length
-      ? rows
-          .filter((x) => nm[x.event])
-          .map((x) => `<div class="row"><span>${ex(nm[x.event])}${x.public_note ? `<small> — ${ex(x.public_note)}</small>` : ""}</span><small dir="ltr">${ex(fmtDate(x.created_at))}</small></div>`)
-          .join("")
-      : "—";
-  } catch {
-    box.dataset.ld = "";
-    box.textContent = t("loaderr");
-  }
 }
 async function ordersPage(seq) {
   $("#m").innerHTML = loadingBox();
@@ -3703,10 +3606,6 @@ document.addEventListener("click", async (e) => {
     supClose();
     aiToggle(true);
   } else if (a == "ai-wa") openWhatsApp(t("hi"));
-  else if (a == "tg-login") {
-    e.preventDefault();
-    tgStart(b);
-  } else if (a == "pay-tl") tgTimeline(b.dataset.id, b.dataset.kind);
   else if (a == "google") {
     e.preventDefault();
     b.disabled = true;
@@ -3961,18 +3860,12 @@ function authPage() {
   if (m == "reset")
     return `<form class="box au" id="af" novalidate>${head2(t("newpw"))} <label class="fld"><span>${t( "newpw" )}</span><div class="pw"><input class="inp" name="p" type="password" id="pw-input" autocomplete="new-password" required>${eye}</div> <div class="strength-bar"><div id="pw-fill"></div></div><small id="pw-text" style="font-size:11px"></small></label> <label class="fld"><span>${t( "confpw" )}</span><input class="inp" name="p2" type="password" autocomplete="new-password" required></label> <p class="err" id="er" role="alert"></p><button class="b block" type="submit">${t( "resetbtn" )}</button></form>`;
   const up = m == "signup";
-  return `<form class="box au" id="af" novalidate>${head2( up ? t("reg") : t("login") )} ${ up ? `<label class="fld"><span>${t( "nl" )}</span><input class="inp" name="n" autocomplete="name" required></label>` : "" } <label class="fld"><span>${t( "em" )}</span><input class="inp" name="e" type="email" dir="ltr" autocomplete="email" required></label> <label class="fld"><span>${t( "pw" )}</span><div class="pw"><input class="inp" name="p" type="password" id="pw-input" autocomplete="${ up ? "new-password" : "current-password" }" required>${eye}</div> ${ up ? `<div class="strength-bar"><div id="pw-fill"></div></div><small id="pw-text" style="font-size:11px"></small>` : `<a href="#" class="forgot" data-a="auth-forgot">${t("forgot")}</a>` }</label> ${humanBox()}<p class="err" id="er" role="alert"></p> <button class="b block" type="submit">${ up ? t("reg") : t("login") }</button>${googleBtn()}${tgBtn()}${link( "toggle-mode", up ? t("has") : t("no") )}</form>`;
+  return `<form class="box au" id="af" novalidate>${head2( up ? t("reg") : t("login") )} ${ up ? `<label class="fld"><span>${t( "nl" )}</span><input class="inp" name="n" autocomplete="name" required></label>` : "" } <label class="fld"><span>${t( "em" )}</span><input class="inp" name="e" type="email" dir="ltr" autocomplete="email" required></label> <label class="fld"><span>${t( "pw" )}</span><div class="pw"><input class="inp" name="p" type="password" id="pw-input" autocomplete="${ up ? "new-password" : "current-password" }" required>${eye}</div> ${ up ? `<div class="strength-bar"><div id="pw-fill"></div></div><small id="pw-text" style="font-size:11px"></small>` : `<a href="#" class="forgot" data-a="auth-forgot">${t("forgot")}</a>` }</label> ${humanBox()}<p class="err" id="er" role="alert"></p> <button class="b block" type="submit">${ up ? t("reg") : t("login") }</button>${googleBtn()}${link( "toggle-mode", up ? t("has") : t("no") )}</form>`;
 }
 
 /* Official multicolour Google "G" (Google branding guidelines) */
 const GICON =
   '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
-const TGICON =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#229ed9"/><path fill="#fff" d="M5.4 11.9l11.1-4.3c.5-.2 1 .1.8.9l-1.9 8.9c-.1.6-.5.8-1 .5l-2.9-2.1-1.4 1.4c-.2.2-.3.3-.6.3l.2-3 5.4-4.9c.2-.2 0-.3-.4-.1L8.1 13.5l-2.9-.9c-.6-.2-.6-.6.2-.7z"/></svg>';
-const tgBtn = () =>
-  TG_BOT_ID
-    ? `${googleOn ? "" : `<div class="or"><span>${t("gor")}</span></div>`}<button type="button" class="gbtn" data-a="tg-login">${TGICON}<span>${t("tgbtn")}</span></button>`
-    : "";
 const googleBtn = () =>
   googleOn
     ? `<div class="or"><span>${t( "gor" )}</span></div><button type="button" class="gbtn" data-a="google">${GICON}<span>${t( "gbtn" )}</span></button>`
@@ -4281,65 +4174,8 @@ addEventListener("pageshow", (e) => {
 }); // back from Google: re-enable the button
 
 /* Links in e-mails come back as #access_token=…&type=recovery|signup (or #error=…). Handle them, then clean the URL. */
-/* ---- Telegram login: oauth.telegram.org → يعود إلى /#tgAuthResult=<base64url JSON> → الدالة الطرفية telegram-auth تتحقق من التوقيع وتُرجع جلسة ---- */
-function tgStart(btn) {
-  if (!TG_BOT_ID) return;
-  try {
-    localStorage.setItem("amx_tg_pending", String(Date.now())); // حماية من فرض جلسة غريبة (login CSRF): لا نقبل النتيجة إلا بعد ضغطك أنت على الزر
-  } catch {}
-  if (btn) btn.disabled = true;
-  location.href =
-    "https://oauth.telegram.org/auth?bot_id=" + encodeURIComponent(TG_BOT_ID) +
-    "&origin=" + encodeURIComponent(location.origin) +
-    "&embed=0&return_to=" + encodeURIComponent(location.origin + "/");
-}
-async function tgFinish(raw) {
-  history.replaceState(null, "", location.pathname + location.search + "#/");
-  let msg = "tgerr";
-  try {
-    const ts = +(localStorage.getItem("amx_tg_pending") || 0);
-    localStorage.removeItem("amx_tg_pending");
-    if (!ts || Date.now() - ts > 6 * 60 * 1000) throw new Error("tgexp");
-    let b64 = raw.replace(/-/g, "+").replace(/_/g, "/");
-    while (b64.length % 4) b64 += "=";
-    const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))));
-    let ref = "";
-    try {
-      ref = localStorage.getItem("ax_ref") || "";
-    } catch {}
-    const r = await fetch(SB_URL + "/functions/v1/telegram-auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: SB_KEY },
-      body: JSON.stringify({ action: "login", data, ref }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !j.session || !j.session.access_token) {
-      if (j && j.error == "expired") throw new Error("tgexp");
-      if (j && j.error == "banned") throw new Error("tgbanned");
-      throw new Error("tgerr");
-    }
-    storeSession(j.session);
-    syncProfile();
-    pushSync();
-    const to = returnTo && !/login/.test(returnTo) ? returnTo : "#/";
-    returnTo = "";
-    if (to != "#/") history.replaceState(null, "", location.pathname + location.search + to);
-    setTimeout(() => {
-      toast(t("loggedin"));
-      beep("ok");
-    }, 400);
-    return;
-  } catch (err) {
-    if (err && /^tg(exp|banned)$/.test(err.message)) msg = err.message;
-  }
-  authMode = "login";
-  history.replaceState(null, "", location.pathname + location.search + "#/login");
-  setTimeout(() => toast(t(msg), "er"), 400);
-}
-
 async function handleAuthRedirect() {
   const h = location.hash || "";
-  if (h.startsWith("#tgAuthResult=")) return tgFinish(h.slice(14));
   if (h.startsWith("#/") || !/(access_token|error)=/.test(h)) return;
   const p = new URLSearchParams(h.slice(1));
   history.replaceState(null, "", location.pathname + location.search + "#/");

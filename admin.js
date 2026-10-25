@@ -209,7 +209,6 @@ const PAY_STATUSES = [
   ["pending", "بانتظار الدفع"],
   ["review", "قيد التحقق"],
   ["paid", "تم الدفع"],
-  ["rejected", "مرفوض"],
 ];
 const PAY_ICONS = [
   ["", "بدون (حروف أو شعار مرفوع)"],
@@ -573,7 +572,6 @@ VIEW.wallets = () => {
   setTimeout(loadWallets, 50);
   return `<div class="card"><h2>إعدادات المحفظة</h2><p class="hint">لكل مستخدم رصيد منفصل لكل قسم. القسم الحالي: <b>smm</b> (خدمات الرشق فقط). الرصيد بالعملة الأساسية للمتجر (USD). بعد التعديل اضغط «نشر» من الرئيسية.</p><div class="g2">${F("تفعيل المحفظة", "wallet.on", { t: "chk" })}${F("أقل مبلغ شحن", "wallet.min", { t: "num", n: 1, d: 1 })}${F("أعلى مبلغ شحن (0 = بلا حد)", "wallet.max", { t: "num", n: 1, d: 1 })}</div></div>
 <div class="card"><h2>طلبات الشحن <small class="od-m" id="wl-c"></small></h2><p class="hint">يضغط العميل «تم الدفع» بعد رفع الإثبات فيظهر هنا بحالة «بانتظار المراجعة». راجع الإثبات ثم وافق (يُضاف الرصيد فوراً) أو ارفض. يمكنك تعديل المبلغ قبل الموافقة إن حوّل العميل مبلغاً مختلفاً.</p><div class="acts"><button class="b b2 sm" data-a="wl-reload">تحديث</button></div><div id="wl-tops">${loadingHTML}</div></div>
-<div class="card"><h2>فحص التطابق والتدقيق</h2><p class="hint">يقارن أرصدة المحافظ بدفتر الحركات ويكشف الطلبات المدفوعة بلا خصم أو بمبلغ أقل من إجماليها.</p><div class="acts"><button class="b b2 sm" data-a="pay-audit">تشغيل الفحص</button></div><div id="pay-audit-out"></div></div>
 <div class="card"><h2>تعديل رصيد يدوي</h2><p class="hint">أدخل بريد المستخدم ومبلغاً موجباً للإضافة أو سالباً للخصم (بالدولار).</p><div class="g2"><div class="fld"><span>بريد المستخدم</span><input class="inp" id="wl-ae" dir="ltr" placeholder="user@example.com"></div><div class="fld"><span>المبلغ (+/−)</span><input class="inp" id="wl-aa" type="number" step="any" dir="ltr"></div><div class="fld w2"><span>ملاحظة</span><input class="inp" id="wl-an" maxlength="200"></div></div><div class="acts"><button class="b" data-a="wl-adjust-email">تنفيذ</button></div></div>
 <div class="card"><h2>أرصدة المستخدمين</h2><div id="wl-bals">${loadingHTML}</div></div>
 <div class="card"><h2>آخر الحركات</h2><div id="wl-tx">${loadingHTML}</div></div>`;
@@ -601,7 +599,7 @@ async function loadWallets() {
 function wlTopRow(x) {
   const s = WL_ST[x.status] || [x.status, ""],
     open = x.status == "pending" || x.status == "review";
-  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.payment_ref ? `<div class="od-m">رقم العملية: <b dir="ltr">${esc(x.payment_ref)}</b></div>` : ""}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
+  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
 }
 function renderWallets() {
   const t = $("#wl-tops");
@@ -632,7 +630,7 @@ async function wlAct(btn, fn) {
   try {
     await fn();
   } catch (e) {
-    toast("فشل — " + payErr(e), "e");
+    toast("فشل — " + (e.message || ""), "e");
   } finally {
     busy(btn, false);
   }
@@ -651,8 +649,7 @@ const wlReject = (btn) =>
   wlAct(btn, async () => {
     const note = prompt("سبب الرفض (يظهر للعميل):", "");
     if (note === null) return;
-    if (note.trim().length < 3) return toast(PAY_ERR.reason_required, "e");
-    await wlRpc("wallet_topup_reject", { p_id: +btn.dataset.id, p_note: note.trim() });
+    await wlRpc("wallet_topup_reject", { p_id: +btn.dataset.id, p_note: note });
     toast("تم الرفض");
     loadWallets();
   });
@@ -1192,10 +1189,6 @@ document.addEventListener("click", (e) => {
   if (a == "exp") return exportBackup();
   if (a == "reload-orders") return loadOrders();
   if (a == "reload-tickets") return loadTickets();
-  if (a == "pay-ok") return payApprove(b);
-  if (a == "pay-no") return payReject(b);
-  if (a == "pay-log") return payLog(b);
-  if (a == "pay-audit") return payAudit(b);
   if (a == "wl-reload") return loadWallets();
   if (a == "wl-approve") return wlApprove(b);
   if (a == "wl-reject") return wlReject(b);
@@ -1926,7 +1919,7 @@ function orderRow(o) {
         timeStyle: "short",
       })
     : "";
-  return `<div class="od"><div class="od-h"><div><span class="od-id">${esc( o.id )}</span><div class="od-m">${esc( o.customer_name || "—" )} · <span dir="ltr">${esc( o.customer_email || "" )}</span></div><div class="od-m">${esc(date)} · <b>${(+o.total).toFixed( 2 )} ${esc(curName(o.currency || baseCur()))}</b>${ o.coupon ? ' · كوبون: <span dir="ltr">' + esc(o.coupon) + "</span>" : "" }${o.affiliate_ref ? " · Ref: " + esc(o.affiliate_ref) : ""}</div></div> <div class="od-s"><select class="inp s-${st0}" data-ost="${esc( o.id )}" data-prev="${esc(st0)}">${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${st0 == k ? "selected" : ""}>${n}</option>` ).join("")}</select>${payActions(o)}</div></div> ${ o.payment_method ? `<div class="od-m">وسيلة الدفع: <b>${esc( o.payment_method == "wallet" ? "المحفظة" : (D.payments.find((m) => m.id == o.payment_method) || {}).ar || o.payment_method )}</b></div>` : "" } ${proofBlock(o)}${payInfo(o)}${smmBlock(o, items)} <details><summary>المنتجات (${ items.length })</summary><div class="od-items">${items .map( (i) => `<div><span>${esc(i.ar || i.name || i.id)} × ${esc(i.q)}${ i.link ? '<br><small dir="ltr">' + esc(i.link) + "</small>" : "" }</span><b>${esc(i.price)}</b></div>` ) .join("")}</div></details></div>`;
+  return `<div class="od"><div class="od-h"><div><span class="od-id">${esc( o.id )}</span><div class="od-m">${esc( o.customer_name || "—" )} · <span dir="ltr">${esc( o.customer_email || "" )}</span></div><div class="od-m">${esc(date)} · <b>${(+o.total).toFixed( 2 )} ${esc(curName(o.currency || baseCur()))}</b>${ o.coupon ? ' · كوبون: <span dir="ltr">' + esc(o.coupon) + "</span>" : "" }${o.affiliate_ref ? " · Ref: " + esc(o.affiliate_ref) : ""}</div></div> <div class="od-s"><select class="inp s-${st0}" data-ost="${esc( o.id )}" data-prev="${esc(st0)}">${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${st0 == k ? "selected" : ""}>${n}</option>` ).join("")}</select>${(() => { const ps = PAY_STATUSES.some((x) => x[0] == o.payment_status) ? o.payment_status : "pending"; return `<select class="inp" style="margin-top:6px" data-pst="${esc( o.id )}" data-prev="${esc(ps)}" title="حالة الدفع">${PAY_STATUSES.map( ([k, n]) => `<option value="${k}" ${ps == k ? "selected" : ""}>💳 ${n}</option>` ).join("")}</select>`; })()}</div></div> ${ o.payment_method ? `<div class="od-m">وسيلة الدفع: <b>${esc( o.payment_method == "wallet" ? "المحفظة" : (D.payments.find((m) => m.id == o.payment_method) || {}).ar || o.payment_method )}</b></div>` : "" } ${proofBlock(o)}${smmBlock(o, items)} <details><summary>المنتجات (${ items.length })</summary><div class="od-items">${items .map( (i) => `<div><span>${esc(i.ar || i.name || i.id)} × ${esc(i.q)}${ i.link ? '<br><small dir="ltr">' + esc(i.link) + "</small>" : "" }</span><b>${esc(i.price)}</b></div>` ) .join("")}</div></details></div>`;
 }
 function renderOrderList() {
   const b = $("#ob");
@@ -2525,137 +2518,6 @@ async function smmAction(btn, kind) {
   } catch (e) {
     smmOut("✗ " + esc(e.message));
     toast("فشل: " + e.message.slice(0, 80), "e");
-  } finally {
-    busy(btn, false);
-  }
-}
-/* ---- اعتماد/رفض الدفع: يمرّ عبر دوال الخادم فقط (order_payment_approve / order_payment_reject) ---- */
-const PAY_ERR = {
-  self_approval: "لا يمكنك اعتماد أو رفض طلبك الشخصي",
-  underpaid: "المبلغ المستلم أقل من إجمالي الطلب",
-  admin_required: "هذا المبلغ فوق حدّ الموظف — يعتمده الأدمن",
-  not_in_review: "الطلب ليس في حالة «قيد التحقق»",
-  note_required: "الملاحظة إلزامية (5 أحرف على الأقل)",
-  reason_required: "اكتب سبب الرفض (3 أحرف على الأقل)",
-  invalid_amount: "مبلغ غير صحيح",
-  above_requested: "لا يمكن اعتماد مبلغ أكبر من المطلوب — استعمل «تعديل رصيد يدوي» مع ملاحظة",
-  proof_required: "لا يوجد إثبات أو رقم عملية",
-  order_locked: "الطلب مقفل بعد إرسال الدفع",
-  order_refunded: "الطلب مُسترجَع ولا يُعاد فتحه، أنشئ طلباً جديداً",
-  use_payment_rpc: "تغيير حالة الدفع يتم بأزرار الاعتماد/الرفض فقط",
-  not_found: "الطلب غير موجود",
-  not_allowed: "غير مسموح",
-};
-function payErr(e) {
-  const m = String((e && e.message) || e || ""),
-    k = Object.keys(PAY_ERR).find((x) => m.includes(x));
-  return k ? PAY_ERR[k] : m.replace(/[{}"]/g, "").slice(0, 120);
-}
-async function payRpc(name, body) {
-  const r = await api("/rest/v1/rpc/" + name, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json().catch(() => null);
-}
-function payInfo(o) {
-  const bits = [];
-  if (o.payment_ref) bits.push(`رقم العملية: <b dir="ltr">${esc(o.payment_ref)}</b>`);
-  if (+o.pay_attempts > 1) bits.push(`محاولات الإرسال: ${esc(o.pay_attempts)}`);
-  if (o.paid_amount != null) bits.push(`المستلم: <b>${(+o.paid_amount).toFixed(2)}</b>${o.paid_at ? " · " + esc(new Date(o.paid_at).toLocaleString("ar")) : ""}`);
-  if (o.pay_reject_reason) bits.push(`سبب الرفض: ${esc(o.pay_reject_reason)}`);
-  return bits.length ? `<div class="od-m">${bits.join(" · ")}</div>` : "";
-}
-function payActions(o) {
-  const ps = PAY_STATUSES.some((x) => x[0] == o.payment_status) ? o.payment_status : "pending",
-    lab = (PAY_STATUSES.find((x) => x[0] == ps) || [ps, ps])[1],
-    cls = ps == "paid" || ps == "review" ? "k" : ps == "rejected" ? "d" : "",
-    id = esc(o.id);
-  let h = `<div class="od-m" style="margin-top:6px"><span class="bdg ${cls}">💳 ${esc(lab)}</span></div>`;
-  const wallet = o.payment_method == "wallet", cancelled = o.status == "cancelled";
-  if (!wallet && !cancelled && ps != "paid") {
-    const manual = ps != "review";
-    h += `<div class="acts" style="margin-top:6px"><input class="inp" id="pr-${id}" type="number" step="any" dir="ltr" value="${esc(o.total)}" style="max-width:100px" title="المبلغ المستلم فعلياً (بالعملة الأساسية)"><button class="b sm" data-a="pay-ok" data-id="${id}"${manual ? ' data-manual="1"' : ""}>${manual ? "اعتماد يدوي" : "اعتماد الدفع"}</button>${ps == "review" ? `<button class="b b2 sm" data-a="pay-no" data-id="${id}">رفض</button>` : ""}</div>`;
-  }
-  h += `<details class="od-tl"><summary class="od-m" data-a="pay-log" data-id="${id}" style="cursor:pointer">سجل الدفع</summary><div id="pl-${id}" class="od-m"></div></details>`;
-  return h;
-}
-async function payApprove(btn) {
-  const id = btn.dataset.id,
-    o = (ORDERS || []).find((x) => x.id == id);
-  if (!o) return;
-  const recv = +(($("#pr-" + id) || {}).value),
-    manual = btn.dataset.manual == "1";
-  if (!(recv > 0)) return toast("أدخل المبلغ المستلم", "e");
-  let note = null;
-  if (manual) {
-    note = prompt("اعتماد بدون مراجعة إثبات (دفع نقدي/يدوي). اكتب سبب أو مرجع الاعتماد (إلزامي):", "");
-    if (note === null) return;
-  }
-  if (!confirm(`اعتماد دفع الطلب ${id}؟\nالمستلم: ${recv} من أصل ${o.total}`)) return;
-  busy(btn, true);
-  try {
-    await payRpc("order_payment_approve", { p_order_id: id, p_received: recv, p_note: note });
-    toast("تم اعتماد الدفع ✓");
-    await loadOrders();
-    const o2 = (ORDERS || []).find((x) => x.id == id);
-    if (o2 && o2.payment_status == "paid") autoSend(o2);
-  } catch (e) {
-    toast("فشل — " + payErr(e), "e");
-  } finally {
-    busy(btn, false);
-  }
-}
-async function payReject(btn) {
-  const id = btn.dataset.id,
-    reason = prompt("سبب الرفض (يظهر للعميل):", "");
-  if (reason === null) return;
-  if (reason.trim().length < 3) return toast(PAY_ERR.reason_required, "e");
-  busy(btn, true);
-  try {
-    await payRpc("order_payment_reject", { p_order_id: id, p_reason: reason.trim() });
-    toast("تم رفض الدفع");
-    await loadOrders();
-  } catch (e) {
-    toast("فشل — " + payErr(e), "e");
-  } finally {
-    busy(btn, false);
-  }
-}
-async function payLog(btn) {
-  const id = btn.dataset.id,
-    box = document.getElementById("pl-" + id);
-  if (!box || box.dataset.ld) return;
-  box.dataset.ld = "1";
-  box.textContent = "…";
-  try {
-    const r = await api("/rest/v1/payment_events?select=*&order_id=eq." + encodeURIComponent(id) + "&order=id.asc&limit=100");
-    if (!r.ok) throw new Error(await r.text());
-    const rows = await r.json();
-    box.innerHTML = rows.length
-      ? rows.map((x) => `<div>${esc(new Date(x.created_at).toLocaleString("ar"))} · <b>${esc(x.event)}</b> · ${esc(x.actor_role || "")}${x.from_status || x.to_status ? ` · ${esc(x.from_status || "—")} → ${esc(x.to_status || "—")}` : ""}${x.amount != null ? ` · ${(+x.amount).toFixed(2)}` : ""}${x.note ? ` · ${esc(x.note)}` : ""}</div>`).join("")
-      : "لا سجل بعد (السجل يبدأ من تاريخ تشغيل supabase-payments-hardening.sql)";
-  } catch (e) {
-    box.dataset.ld = "";
-    box.textContent = "تعذّر التحميل — " + payErr(e);
-  }
-}
-async function payAudit(btn) {
-  busy(btn, true);
-  const out = $("#pay-audit-out");
-  try {
-    const a = await payRpc("payments_audit", {});
-    const rows = [
-      ["فروقات بين الرصيد ودفتر الحركات", a.balance_mismatch],
-      ["طلبات مدفوعة بالمحفظة بلا حركة خصم", (a.wallet_paid_without_spend || []).length],
-      ["حركات خصم بلا طلب مدفوع", (a.spend_without_paid_order || []).length],
-      ["طلبات مدفوعة بلا مبلغ مستلم (آخر 30 يوم)", (a.paid_without_amount || []).length],
-      ["طلبات مدفوعة بأقل من إجماليها", (a.paid_below_total || []).length],
-      ["استرجاع بلا إلغاء", (a.refund_without_cancel || []).length],
-    ];
-    const bad = rows.some((x) => +x[1] > 0);
-    if (out)
-      out.innerHTML = `<p class="hint">${bad ? "⚠️ توجد ملاحظات تحتاج مراجعة" : "✅ كل شيء متطابق"}</p>` + rows.map((x) => `<div class="od-m">${esc(x[0])}: <b>${+x[1]}</b></div>`).join("") + (bad ? `<details><summary class="od-m">التفاصيل</summary><pre dir="ltr" style="white-space:pre-wrap;font-size:11px">${esc(JSON.stringify(a, null, 1))}</pre></details>` : "");
-  } catch (e) {
-    if (out) out.textContent = "تعذّر الفحص — " + payErr(e);
   } finally {
     busy(btn, false);
   }
