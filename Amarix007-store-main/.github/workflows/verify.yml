@@ -1,0 +1,13 @@
+name: verify
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: for f in app.js admin.js sw.js boot.js music.js splash.js svc-parse.js store-data.js; do node --check $f; done
+      - run: python3 tests/verify-project.py
+      - name: SEO pages are up to date
+        run: node tools/gen-seo-pages.mjs && git diff --exit-code -- faq policies sitemap.xml
