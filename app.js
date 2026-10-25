@@ -120,7 +120,7 @@ const PAYG = {
 };
 /* The store's own mark (same drawing as the header logo) */
 const LOGO_SVG =
-  '<svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 25.5L14 7L16.5 12" stroke="#A7E8BD" stroke-width="2.75"/><path d="M10 18.5H19" stroke="#52B788" stroke-width="2.25"/><path d="M16.5 12L20.5 18L26 8" stroke="#A7E8BD" stroke-width="2.75"/><circle cx="26" cy="8" r="1.75" fill="#A7E8BD"/></svg>';
+  '<svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 25.5L14 7L16.5 12" stroke="#B9FF66" stroke-width="2.75"/><path d="M10 18.5H19" stroke="#B9FF66" stroke-width="2.25"/><path d="M16.5 12L20.5 18L26 8" stroke="#B9FF66" stroke-width="2.75"/><circle cx="26" cy="8" r="1.75" fill="#B9FF66"/></svg>';
 
 /* ---------- 3. Translations ---------- */
 const T = {
@@ -239,7 +239,6 @@ const T = {
     gbtn: "المتابعة عبر Google",
     gor: "أو",
     gerr: "تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.",
-    tgerr: "تعذّر تسجيل الدخول عبر تيليغرام. حاول مرة أخرى.",
     mailfail: "تعذّر إرسال البريد. حاول لاحقاً.",
     fill: "أدخل البريد الإلكتروني وكلمة المرور",
     fillm: "أدخل بريدك الإلكتروني",
@@ -531,7 +530,6 @@ const T = {
     gbtn: "Continue with Google",
     gor: "or",
     gerr: "Google sign-in failed. Please try again.",
-    tgerr: "Telegram sign-in failed. Please try again.",
     mailfail: "Could not send the email. Try again later.",
     fill: "Enter your email and password",
     fillm: "Enter your email",
@@ -772,7 +770,6 @@ let returnTo = ""; // where to go after login
 let lastOrder = null; // info for the success page
 let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
-let tgBot = ls.get("amx_tg") || ""; // Telegram login bot username (from the telegram-auth function, cached)
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
 const PUBLIC_ROUTES = ["login", "policies", "faq"]; // reachable without an account
 const GUEST_ROUTES = ["", "c", "p", "boost", "cart", "fav"]; // browsing + cart: open to visitors; checkout, orders, account, support and partner still need an account
@@ -882,10 +879,12 @@ const visitBtn = (p, big) => {
     ? `<a class="b vis${big ? " big" : ""}" data-a="visit" data-id="${ex(p.id)}" href="${ex(u)}" target="_blank" rel="noopener noreferrer nofollow" aria-label="${visitLabel(p)} — ${t("visitext")}"><span class="vis-t">${visitLabel(p)}</span><span class="vis-i">${ic("ext", big ? 18 : 16)}</span></a>`
     : `<span class="b vis off${big ? " big" : ""}" aria-disabled="true">${t("visitbad")}</span>`;
 };
+const FRAME_OK = ["www.youtube.com", "www.youtube-nocookie.com", "player.vimeo.com", "www.google.com", "maps.google.com", "t.me", "challenges.cloudflare.com"];
 const frameSrc = (u) => {
   try {
     const x = new URL(safeUrl(u), location.href);
-    return x.protocol === "https:" && x.origin !== location.origin ? x.href : ""; // never frame our own origin (the sandbox would not isolate it)
+    // never frame our own origin (the sandbox would not isolate it); only hosts also allowed by the page's CSP frame-src
+    return x.protocol === "https:" && x.origin !== location.origin && FRAME_OK.indexOf(x.hostname) >= 0 ? x.href : "";
   } catch {
     return "";
   }
@@ -1230,7 +1229,7 @@ function payLogo(m, size = 44) {
     .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
     .trim();
   if (!nm)
-    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#08694a" };color:#fff">${ic("card", size * 0.5)}</span>`;
+    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff">${ic("card", size * 0.5)}</span>`;
   const ini = ex(
     [
       ...plain(m.en || m.ar || pmReadable(m) || "?")
@@ -1244,7 +1243,7 @@ function payLogo(m, size = 44) {
       .join("")
       .toUpperCase() || "?"
   );
-  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#08694a" };color:#fff"><b>${ini}</b></span>`;
+  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff"><b>${ini}</b></span>`;
 }
 
 /* ---------- 6. Supabase client (anon key + user JWT) ---------- */
@@ -1729,11 +1728,13 @@ function head() {
   root.dir = lang == "ar" ? "rtl" : "ltr";
   root.dataset.theme = th;
   // Brand colours edited in the admin panel
+  // (v37) the old green defaults, and an untouched colour picker (#000000), are ignored so the palette in style.css wins
+  const LEGACY_COL = ["#08694a", "#a7e8bd", "#52b788", "#000000"];
   ["g", "m", "ac"].forEach((k) => {
-    if (safeColor(col[k])) root.style.setProperty("--" + k, col[k]);
+    if (safeColor(col[k]) && LEGACY_COL.indexOf(String(col[k]).toLowerCase()) < 0) root.style.setProperty("--" + k, col[k]);
   });
   const meta = document.querySelector("meta[name=theme-color]");
-  if (meta) meta.content = th == "dark" ? "#121212" : "#F8FAF9";
+  if (meta) meta.content = th == "dark" ? "#191A23" : "#FFFFFF";
   const logo = CFG.site.logo;
   if (logo) $(".logo .tile").innerHTML = `<img src="${ex(logo)}" alt="">`;
   $("#bn").innerHTML = `${ex(CFG.site.n1)}<b>${ex(CFG.site.n2)}</b>`;
@@ -2223,6 +2224,9 @@ function walletErr(err) {
     [/rate_limited/, A ? "محاولات كثيرة، انتظر قليلاً" : "Too many attempts, wait a bit"],
     [/wallet_disabled/, A ? "المحفظة متوقفة حالياً" : "The wallet is currently disabled"],
     [/proof_required/, t("proofneed")],
+    [/duplicate_proof/, A ? "هذا الإثبات مستخدم في طلب آخر، أرفق إثباتاً جديداً" : "This proof was already used on another top-up, attach a new one"],
+    [/duplicate_reference/, A ? "رقم العملية هذا مستخدم من قبل" : "This transaction reference was already used"],
+    [/invalid_reference/, A ? "رقم العملية غير صالح (6–100 حرف أو رقم)" : "Invalid transaction reference (6–100 letters/digits)"],
     [/invalid_path|proof_missing/, t("proofdeny")],
     [/not_allowed/, A ? "العملية غير مسموحة (ربما تمّت مسبقاً)" : "Not allowed (maybe already done)"],
   ].find(([re]) => re.test(m));
@@ -2238,6 +2242,8 @@ function walletSession(r) {
 }
 const walletProofPick = (id) =>
   `<label class="proofcard"><input type="file" accept="image/jpeg,image/png,image/webp" hidden data-a="wproof" data-id="${ex(id)}"><span class="pc-ic">${ic("upload", 26)}</span><span class="pc-t">${t("proofbtn")}</span><span class="pc-s">${t("proofpick")}</span></label>`;
+const walletRefInput = (id) =>
+  `<label class="fld"><span class="hint">${lang == "ar" ? "رقم العملية / المرجع (اختياري، يسرّع المراجعة)" : "Transaction ID / reference (optional, speeds up review)"}</span><input class="inp" id="wlref-${ex(id)}" type="text" dir="ltr" maxlength="100" autocomplete="off" placeholder="TXID / 123456789"></label>`;
 const walletClaimBtn = (id, hasProof) =>
   `<button class="b${hasProof ? "" : " locked"}" data-a="wl-claim" data-id="${ex(id)}"${hasProof ? "" : ' disabled aria-disabled="true"'}>${ic("check", 16)} ${t("paidbtn")}</button>`;
 const walletConv = () => {
@@ -2274,7 +2280,7 @@ function walletTopupCard(x) {
     m = pmOf(x.payment_method),
     k = x.pay_currency && R[x.pay_currency] ? x.pay_currency : m && m.currency,
     hp = !!x.payment_proof;
-  return `${payInstructions(m)}<div class="box wl-top"><div class="ord-h"><div><b dir="ltr">#${ex(x.id)}</b><div class="ord-meta">${fmtDate(x.created_at)} · ${ex(walletSecName(x.section))}</div></div><div style="text-align:end"><span class="wst">${A ? "بانتظار الدفع" : "Awaiting payment"}</span><div class="ord-t n">${money(x.amount)}</div></div></div>${k && R[k] ? `<p class="pd">${A ? "حوّل بالضبط" : "Transfer exactly"}: <b dir="ltr">${fmt(x.amount, k)}</b></p>` : ""}<div class="ord-act">${hp ? proofOkCard() : walletProofPick(x.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${walletClaimBtn(x.id, hp)}</div></div>`;
+  return `${payInstructions(m)}<div class="box wl-top"><div class="ord-h"><div><b dir="ltr">#${ex(x.id)}</b><div class="ord-meta">${fmtDate(x.created_at)} · ${ex(walletSecName(x.section))}</div></div><div style="text-align:end"><span class="wst">${A ? "بانتظار الدفع" : "Awaiting payment"}</span><div class="ord-t n">${money(x.amount)}</div></div></div>${k && R[k] ? `<p class="pd">${A ? "حوّل بالضبط" : "Transfer exactly"}: <b dir="ltr">${fmt(x.amount, k)}</b></p>` : ""}<div class="ord-act">${hp ? proofOkCard() : walletProofPick(x.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${walletRefInput(x.id)}${walletClaimBtn(x.id, hp)}</div></div>`;
 }
 function walletPage() {
   const A = lang == "ar",
@@ -2345,6 +2351,14 @@ async function walletTopup(btn) {
     setBusy(btn, false);
   }
 }
+async function sha256Hex(blob) {
+  try {
+    const d = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+    return Array.from(new Uint8Array(d)).map((x) => x.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
 async function uploadWalletProof(inp) {
   const f = inp.files && inp.files[0],
     id = +inp.dataset.id,
@@ -2362,7 +2376,7 @@ async function uploadWalletProof(inp) {
       r = await putProof(tk, path, blob);
     if (r.status == 401) throw Object.assign(new Error("session"), { session: true });
     if (!r.ok) throw new Error("up " + r.status);
-    const r2 = await sb("/rest/v1/rpc/wallet_topup_set_proof", { method: "POST", body: { p_id: id, p_path: path } });
+    const r2 = await sb("/rest/v1/rpc/wallet_topup_set_proof", { method: "POST", body: { p_id: id, p_path: path, p_hash: await sha256Hex(blob) } });
     if (r2.status == 401) throw Object.assign(new Error("session"), { session: true });
     if (!r2.ok) throw new Error(await r2.text());
     toast(t("proofok"));
@@ -2387,7 +2401,7 @@ async function walletClaim(btn, id) {
   if (btn && btn.disabled) return toast(t("proofneed"), "wn");
   setBusy(btn, true);
   try {
-    const r = await sb("/rest/v1/rpc/wallet_topup_claim", { method: "POST", body: { p_id: +id } });
+    const r = await sb("/rest/v1/rpc/wallet_topup_claim", { method: "POST", body: { p_id: +id, p_tx_ref: ((document.getElementById("wlref-" + id) || {}).value || "").trim() || null } });
     if (walletSession(r)) return;
     if (!r.ok) throw new Error(await r.text());
     toast(lang == "ar" ? "وصلنا طلبك، سنراجع الدفع ونضيف الرصيد" : "Got it — we'll verify the payment and add the balance");
@@ -3608,7 +3622,14 @@ document.addEventListener("click", async (e) => {
     supClose();
     aiToggle(true);
   } else if (a == "ai-wa") openWhatsApp(t("hi"));
-  else if (a == "google") {
+  else if (a == "tg-login") {
+    e.preventDefault();
+    if (!tgOn()) return;
+    b.disabled = true;
+    location.href =
+      "https://oauth.telegram.org/auth?bot_id=" + TG_BOT_ID + "&origin=" + encodeURIComponent(location.origin) +
+      "&request_access=write&return_to=" + encodeURIComponent(location.origin + "/");
+  } else if (a == "google") {
     e.preventDefault();
     b.disabled = true;
     location.href =
@@ -3868,13 +3889,16 @@ function authPage() {
 /* Official multicolour Google "G" (Google branding guidelines) */
 const GICON =
   '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+/* Telegram login: numeric id of the bot (BotFather > /setdomain must be set to the store's domain) and the telegram-auth Edge Function. Empty = the button is hidden. */
+const TG_BOT_ID = "";
+const TGICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#229ED9"/><path fill="#fff" d="M5.4 11.9l11.1-4.3c.5-.2 1 .1.8.9l-1.9 8.9c-.1.6-.5.8-1 .5l-2.9-2.1-1.4 1.3c-.2.2-.3.3-.6.3l.2-3 5.4-4.9c.2-.2 0-.3-.4-.1l-6.7 4.2-2.9-.9c-.6-.2-.6-.6.1-.8z"/></svg>';
+const tgOn = () => /^\d{5,15}$/.test(String(TG_BOT_ID));
 const googleBtn = () =>
-  googleOn || tgBot
-    ? `<div class="or"><span>${t( "gor" )}</span></div>${
-        googleOn
-          ? `<button type="button" class="gbtn" data-a="google">${GICON}<span>${t( "gbtn" )}</span></button>`
-          : ""
-      }${tgBot ? `<div class="tgw" id="tg-w"></div>` : ""}`
+  googleOn || tgOn()
+    ? `<div class="or"><span>${t("gor")}</span></div>` +
+      (googleOn ? `<button type="button" class="gbtn" data-a="google">${GICON}<span>${t("gbtn")}</span></button>` : "") +
+      (tgOn() ? `<button type="button" class="gbtn" data-a="tg-login" style="margin-top:8px">${TGICON}<span>${lang == "ar" ? "الدخول عبر تيليغرام" : "Continue with Telegram"}</span></button>` : "")
     : "";
 
 const authMsg = (m) => {
@@ -4179,74 +4203,51 @@ addEventListener("pageshow", (e) => {
   if (e.persisted) render();
 }); // back from Google: re-enable the button
 
-/* ---------- Telegram login (official Telegram Login Widget, redirect mode) ----------
-   The widget sends the person back to this page as ?id=…&auth_date=…&hash=…; handleTelegramReturn() posts those to the
-   telegram-auth Edge Function, which verifies Telegram's signature and answers with a normal Supabase session. */
-async function checkTelegram() {
+/* Links in e-mails come back as #access_token=…&type=recovery|signup (or #error=…). Handle them, then clean the URL. */
+async function handleTelegramResult(h) {
+  history.replaceState(null, "", location.pathname + location.search + "#/");
   try {
-    const r = await fetch(SB_URL + "/functions/v1/telegram-auth?cfg=1", {
-      headers: { apikey: SB_KEY },
-    });
-    const bot = r.ok ? String((await r.json()).bot || "") : "";
-    ls.set("amx_tg", bot);
-    if (bot == tgBot) return;
-    tgBot = bot;
-    const f = $("#af");
-    if (f && ![...f.querySelectorAll("input")].some((i) => i.type != "hidden" && i.value)) render();
-  } catch {}
-}
-function tgMount() {
-  const w = document.getElementById("tg-w");
-  if (!w || !tgBot || w.dataset.m) return;
-  w.dataset.m = "1";
-  const s = document.createElement("script");
-  s.async = true;
-  s.src = "https://telegram.org/js/telegram-widget.js?22";
-  s.setAttribute("data-telegram-login", tgBot);
-  s.setAttribute("data-size", "large");
-  s.setAttribute("data-radius", "12");
-  s.setAttribute("data-lang", lang == "ar" ? "ar" : "en");
-  s.setAttribute("data-auth-url", location.origin + location.pathname);
-  w.appendChild(s);
-}
-async function handleTelegramReturn() {
-  const q = new URLSearchParams(location.search);
-  if (!q.get("hash") || !q.get("auth_date") || !q.get("id")) return;
-  const data = {};
-  ["id", "first_name", "last_name", "username", "photo_url", "auth_date", "hash"].forEach((k) => {
-    if (q.has(k)) data[k] = q.get(k);
-  });
-  history.replaceState(null, "", location.pathname + "#/login"); // never leave the signed payload in the address bar
-  try {
-    const r = await fetch(SB_URL + "/functions/v1/telegram-auth", {
+    let raw = decodeURIComponent(h.slice("#tgAuthResult=".length)).replace(/-/g, "+").replace(/_/g, "/");
+    while (raw.length % 4) raw += "=";
+    const bin = atob(raw);
+    let txt;
+    try {
+      txt = decodeURIComponent(escape(bin));
+    } catch {
+      txt = bin;
+    }
+    const d = JSON.parse(txt);
+    const r1 = await fetch(SB_URL + "/functions/v1/telegram-auth", {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: SB_KEY },
-      body: JSON.stringify({ data, ref: (() => {
-          try {
-            return localStorage.getItem("ax_ref") || "";
-          } catch {
-            return "";
-          }
-        })(),
-      }),
+      body: JSON.stringify(d),
     });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.access_token) throw new Error(j.error || "telegram");
-    storeSession(j);
-    history.replaceState(null, "", location.pathname + "#/");
+    if (!r1.ok) throw new Error("tg " + r1.status);
+    const k = await r1.json();
+    const r2 = await fetch(SB_URL + "/auth/v1/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY },
+      body: JSON.stringify({ type: k.type || "magiclink", token_hash: k.token_hash }),
+    });
+    if (!r2.ok) throw new Error("verify " + r2.status);
+    const s = await r2.json();
+    if (!s.access_token) throw new Error("session");
+    storeSession(s);
+    attachRef(s.access_token, s.user);
+    syncProfile();
+    pushSync();
     setTimeout(() => {
       toast(t("loggedin"));
       beep("ok");
-    }, 500);
-  } catch {
-    authMode = "login";
-    setTimeout(() => toast(t("tgerr"), "er"), 500);
+    }, 400);
+  } catch (err) {
+    console.error("[AMARIX] telegram login", err);
+    setTimeout(() => toast(lang == "ar" ? "تعذّر الدخول عبر تيليغرام، حاول مجدداً" : "Telegram sign-in failed, try again", "er"), 400);
   }
 }
-
-/* Links in e-mails come back as #access_token=…&type=recovery|signup (or #error=…). Handle them, then clean the URL. */
 async function handleAuthRedirect() {
   const h = location.hash || "";
+  if (h.startsWith("#tgAuthResult=")) return handleTelegramResult(h);
   if (h.startsWith("#/") || !/(access_token|error)=/.test(h)) return;
   const p = new URLSearchParams(h.slice(1));
   history.replaceState(null, "", location.pathname + location.search + "#/");
@@ -4890,7 +4891,6 @@ const AUTH_ROUTES = ["orders", "account", "support"];
 function render() {
   render0();
   qbRefresh();
-  tgMount();
 }
 function render0() {
   if (waitCfg) {
@@ -5231,9 +5231,7 @@ async function boot() {
   user = ls.json("amx_user", null);
   if (user && !ls.get("amx_token")) user = null;
   checkGoogle();
-  checkTelegram();
   await handleAuthRedirect();
-  await handleTelegramReturn();
   /* Stale-while-revalidate: the last published config is cached in localStorage ('amx_remote') and used for the first paint, so returning visitors never see the embedded placeholder store. With no cache yet (first visit) we show a skeleton instead of the placeholders, and fall back to the embedded copy only if the request fails or is too slow. */
   const cached =
     REMOTE_CFG && Array.isArray(REMOTE_CFG.products) ? REMOTE_CFG : null;

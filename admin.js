@@ -23,7 +23,7 @@ const EMPTY = {
     sa: "",
     se: "",
     desc: "",
-    col: { g: "#08694a", m: "#A7E8BD", ac: "#52B788" },
+    col: { g: "", m: "", ac: "" },
     rt: { ar: "", en: "" },
     risk: { ar: "", en: "" },
     ai_on: true,
@@ -599,7 +599,7 @@ async function loadWallets() {
 function wlTopRow(x) {
   const s = WL_ST[x.status] || [x.status, ""],
     open = x.status == "pending" || x.status == "review";
-  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
+  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${x.tx_ref ? `<div class="od-m">رقم العملية: <b dir="ltr">${esc(x.tx_ref)}</b></div>` : ""}${x.first_approved_by && (x.status == "review" || x.status == "pending") ? '<div class="od-m">✅ وافق أدمن أول — بانتظار أدمن ثانٍ</div>' : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
 }
 function renderWallets() {
   const t = $("#wl-tops");
@@ -630,7 +630,10 @@ async function wlAct(btn, fn) {
   try {
     await fn();
   } catch (e) {
-    toast("فشل — " + (e.message || ""), "e");
+    {
+      const m = String(e.message || "");
+      toast("فشل — " + (/second_approver_required/.test(m) ? "لا يمكنك الموافقة مرتين على نفس الطلب، يلزم أدمن آخر" : /proof_required/.test(m) ? "لا يمكن الموافقة بدون إثبات دفع" : m), "e");
+    }
   } finally {
     busy(btn, false);
   }
@@ -641,7 +644,11 @@ const wlApprove = (btn) =>
       amt = +($("#wla-" + id) || {}).value;
     if (!(amt > 0)) return toast("أدخل مبلغاً صحيحاً", "e");
     if (!confirm(`إضافة ${amt} USD إلى رصيد المستخدم؟`)) return;
-    await wlRpc("wallet_topup_approve", { p_id: id, p_amount: amt });
+    const res = await wlRpc("wallet_topup_approve", { p_id: id, p_amount: amt });
+    if (res === -1) {
+      toast("سُجّلت موافقتك الأولى — المبلغ كبير ويحتاج موافقة أدمن ثانٍ", "w");
+      return loadWallets();
+    }
     toast("تمت إضافة الرصيد ✓");
     loadWallets();
   });
@@ -1255,7 +1262,7 @@ const NEW = {
     en: "New method",
     icon: "",
     logo: "",
-    color: "#08694a",
+    color: "#191A23",
     acc: "",
     da: "",
     de: "",
