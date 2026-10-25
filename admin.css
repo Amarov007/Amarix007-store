@@ -221,3 +221,24 @@ h2{font-size:18px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
 .stat small{font-size:12px;font-weight:600;color:var(--mu)}
 .stat.hot{border-color:#f87171}.stat.hot b{color:#fca5a5}
 .hint.warn{color:#fbbf24}
+
+/* ===== مزوّدو الرشق (SMM providers) ===== */
+.pv-sub{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:4px;background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow-x:auto}
+.pv-sub button{flex:1;min-width:max-content;background:transparent;border:0;color:var(--mu);padding:9px 14px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.pv-sub button.on{background:var(--g);color:#fff;font-weight:600}
+.pv-card.dis{opacity:.72}
+.pv-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.pv-h b{font-size:15px}
+.pv-dot{width:10px;height:10px;border-radius:50%;background:var(--mu);flex:none}
+.pv-dot.ok{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+.pv-dot.bad{background:var(--er);box-shadow:0 0 0 3px color-mix(in srgb,var(--er) 25%,transparent)}
+.pv-dot.off{background:var(--mu);opacity:.5}
+.pv-tag{display:inline-block;font-size:11px;padding:1px 9px;border-radius:99px;border:1px solid var(--ac);color:var(--lk)}
+.pv-tag.gr{border-color:var(--bd);color:var(--mu)}
+.pv-tag.er{border-color:var(--er);color:var(--er)}
+.pv-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:6px}
+.pv-g>div{background:var(--bg);border-radius:12px;padding:8px 10px;min-width:0}
+.pv-g span{display:block;font-size:11px;color:var(--mu)}
+.pv-g b{font-size:13px;overflow-wrap:anywhere}
+.pv-g b.lowb{color:var(--er)}
+.stat.hot b{color:var(--er)}

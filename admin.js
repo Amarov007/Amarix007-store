@@ -23,7 +23,7 @@ const EMPTY = {
     sa: "",
     se: "",
     desc: "",
-    col: { g: "", m: "", ac: "" },
+    col: { g: "#08694a", m: "#A7E8BD", ac: "#52B788" },
     rt: { ar: "", en: "" },
     risk: { ar: "", en: "" },
     ai_on: true,
@@ -151,6 +151,7 @@ const TABS = [
   ["staff", "الموظفون"],
   ["activity", "سجل النشاط"],
   ["apis", "إعدادات APIs"],
+  ["providers", "مزوّدو الرشق"],
   ["affiliates", "الشركاء (Affiliate)"],
   ["orders", "الطلبات"],
   ["stats", "الإحصاءات"],
@@ -173,6 +174,7 @@ const TI = {
   staff:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
   wallets:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1.2"/>',
   users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>',
+  providers:'<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>',
   apis:'<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/>',
   affiliates:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   orders:'<path d="M6 2l-2 4v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4z"/><path d="M4 6h16M9 11a3 3 0 0 0 6 0"/>',
@@ -184,6 +186,7 @@ const TG = [
   ["المبيعات", ["orders","payments","wallets","coupons","affiliates","users"]],
   ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
   ["التواصل والدعم", ["tickets","push","social"]],
+  ["الرشق (SMM)", ["providers"]],
   ["النظام", ["apis","stats","staff","activity"]]
 ];
 const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
@@ -474,7 +477,7 @@ const VIEW = {
       const k = "products." + ed + ".",
         p = D.products[ed],
         opts = D.categories.map((x) => [x.id, x.ar]);
-      return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F( "رقم خدمة الرشق في الموقع (SMM service id)", k + "smm_service", { d: 1 } )}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql). منتجات الرشق المستوردة تلقائياً تكون «كمية الرشق لكل وحدة = 1» والسعر هو سعر وحدة واحدة (سعر الألف ÷ 1000)، وأقل/أعلى كمية تأتي مباشرة من المزوّد (شغّل supabase-boost-units.sql مرة واحدة).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
+      return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F("مزوّد الرشق", k + "smm_provider", { t: "sel", o: pvOpts() })}${F("رقم الخدمة عند المزوّد (SMM service id)", k + "smm_service", { d: 1 })}${F("مزوّد احتياطي (اختياري)", k + "smm_provider2", { t: "sel", o: pvOpts2() })}${F("رقم الخدمة عند المزوّد الاحتياطي", k + "smm_service2", { d: 1 })}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql). منتجات الرشق المستوردة تلقائياً تكون «كمية الرشق لكل وحدة = 1» والسعر هو سعر وحدة واحدة (سعر الألف ÷ 1000)، وأقل/أعلى كمية تأتي مباشرة من المزوّد (شغّل supabase-boost-units.sql مرة واحدة).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
     }
     const q = pq.trim().toLowerCase(),
       L = D.products
@@ -524,7 +527,7 @@ const VIEW = {
     return `<div class="card"><h2>المستخدمين المسجلين</h2><div id="users-list">${loadingHTML}</div></div>`;
   },
   apis() {
-    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("SMM API URL", "api.smm_url", { d: 1 })}${F( "SMM API Key", "api.smm_key", { d: 1 } )}${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> <div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase (المتصفح لا يستطيع الاتصال بموقع الرشق مباشرة، والمفتاح يبقى في الخادم). احفظ الإعدادات أولاً.</p> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="acts" style="margin-top:8px"><button class="b bd2" data-a="smm-wipe" type="button">🗑 حذف كل منتجات الرشق</button><button class="b" data-a="smm-redo" type="button">♻ حذف وإعادة جلب من المزوّد</button><button class="b b2" data-a="smm-undo" type="button">↩ استرجاع المحذوف</button></div><p class="hint">«حذف وإعادة جلب» يجلب الخدمات من المزوّد أولاً، وإن فشل الجلب لا يُحذف شيء. يُحفظ نسخة احتياطية قبل الحذف ويمكن الاسترجاع منها. بعدها اضغط «نشر».</p> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
+    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> <div class="card"><h2>مواقع الرشق (SMM)</h2><p class="hint">أُدير الربط مع مواقع الرشق الآن من تبويب «مزوّدو الرشق»: يمكنك إضافة أكثر من موقع، فحص الرصيد، استعراض الخدمات واستيرادها، ومزامنة الأسعار.</p><div class="acts"><button class="b" data-a="pv-open" data-s="list">فتح مزوّدي الرشق</button></div></div>`;
   },
   affiliates() {
     setTimeout(() => { loadAffiliates(); loadAffReport(); loadAffTiers(); }, 50);
@@ -599,7 +602,7 @@ async function loadWallets() {
 function wlTopRow(x) {
   const s = WL_ST[x.status] || [x.status, ""],
     open = x.status == "pending" || x.status == "review";
-  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${x.tx_ref ? `<div class="od-m">رقم العملية: <b dir="ltr">${esc(x.tx_ref)}</b></div>` : ""}${x.first_approved_by && (x.status == "review" || x.status == "pending") ? '<div class="od-m">✅ وافق أدمن أول — بانتظار أدمن ثانٍ</div>' : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
+  return `<div class="od"><div class="od-h"><div><span class="od-id">#${esc(x.id)} · ${esc(x.section)}</span><div class="od-m">${wlWho(x)}</div><div class="od-m">${esc(wlDate(x.created_at))} · وسيلة الدفع: <b>${esc(((D.payments || []).find((m) => m.id == x.payment_method) || {}).ar || x.payment_method || "—")}</b></div></div><div class="od-s"><span class="bdg ${s[1]}">${s[0]}</span><div class="od-m"><b>${(+x.amount).toFixed(2)} USD</b></div></div></div>${x.payment_proof ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(x.payment_proof)}">عرض الإثبات</button></div>` : '<div class="od-m">لا يوجد إثبات مرفق</div>'}${x.admin_note ? `<div class="od-m">ملاحظة: ${esc(x.admin_note)}</div>` : ""}${open ? `<div class="acts" style="margin-top:8px"><input class="inp" id="wla-${esc(x.id)}" type="number" step="any" dir="ltr" value="${esc(x.amount)}" style="max-width:120px" title="المبلغ الذي سيُضاف"><button class="b sm" data-a="wl-approve" data-id="${esc(x.id)}">موافقة وإضافة الرصيد</button><button class="b b2 sm" data-a="wl-reject" data-id="${esc(x.id)}">رفض</button></div>` : ""}</div>`;
 }
 function renderWallets() {
   const t = $("#wl-tops");
@@ -630,10 +633,7 @@ async function wlAct(btn, fn) {
   try {
     await fn();
   } catch (e) {
-    {
-      const m = String(e.message || "");
-      toast("فشل — " + (/second_approver_required/.test(m) ? "لا يمكنك الموافقة مرتين على نفس الطلب، يلزم أدمن آخر" : /proof_required/.test(m) ? "لا يمكن الموافقة بدون إثبات دفع" : m), "e");
-    }
+    toast("فشل — " + (e.message || ""), "e");
   } finally {
     busy(btn, false);
   }
@@ -644,11 +644,7 @@ const wlApprove = (btn) =>
       amt = +($("#wla-" + id) || {}).value;
     if (!(amt > 0)) return toast("أدخل مبلغاً صحيحاً", "e");
     if (!confirm(`إضافة ${amt} USD إلى رصيد المستخدم؟`)) return;
-    const res = await wlRpc("wallet_topup_approve", { p_id: id, p_amount: amt });
-    if (res === -1) {
-      toast("سُجّلت موافقتك الأولى — المبلغ كبير ويحتاج موافقة أدمن ثانٍ", "w");
-      return loadWallets();
-    }
+    await wlRpc("wallet_topup_approve", { p_id: id, p_amount: amt });
     toast("تمت إضافة الرصيد ✓");
     loadWallets();
   });
@@ -893,7 +889,9 @@ document.addEventListener("input", (e) => {
     const n = $("#pq");
     n.focus();
     n.setSelectionRange(p, p);
-  } else if (t.id == "smm-q") smmList();
+  } else if ((t.id && /^sv-/.test(t.id)) || t.dataset.sv !== undefined) svInput(t);
+  else if (t.dataset.pf !== undefined) { if (PV_EDIT) PV_EDIT[t.dataset.pf] = t.type == "checkbox" ? t.checked : t.value; }
+  else if (t.id == "lg-prov" || t.id == "lg-st") { LG.prov = ($("#lg-prov") || {}).value || ""; LG.st = ($("#lg-st") || {}).value || ""; renderSmmLog(); }
   else if (t.id == "tkq") {
     tkQ = t.value;
     renderTicketList();
@@ -913,7 +911,6 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("change", async (e) => {
   const t = e.target,
     d = t.dataset;
-  if (t.id == "smm-lim") return smmList(); // refresh the "import N results" button
   if (d.up) return upl(t);
   if (d.imp) return imp(t);
   if (d.pst) return setPayment(t);
@@ -966,6 +963,7 @@ document.addEventListener("click", (e) => {
     ed = null;
     render();
     if (tab == "apis") loadApis();
+    if (tab == "providers") { PV_EDIT = null; if (PV_ERR) { PV_ERR = ""; PV_LOADED = false; render(); } }
     return;
   }
   const a = d.a;
@@ -1183,13 +1181,8 @@ document.addEventListener("click", (e) => {
   if (a == "f-add-opt") return addFilterOpt(b);
   if (a == "proof-link") return proofLink(b);
   if (a == "save-api") return saveApis(b);
-  if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
-  if (a == "smm-imp") return smmImport(b);
-  if (a == "smm-wipe") return smmWipe(b, false);
-  if (a == "smm-redo") return smmWipe(b, true);
-  if (a == "smm-undo") return smmUndo();
-  if (a == "smm-reprice") return smmReprice();
-  if (a == "smm-recheck") { busy(b, true); return smmFetchRates(true).then(() => homeStats()).catch((e) => toast("فشل: " + String(e.message).slice(0, 70), "e")).finally(() => busy(b, false)); }
+  if (/^(pv|sv|sm|lg)-/.test(a)) return pvClick(a, b);
+  if (a == "smm-recheck") return smmRecheckAll(b);
   if (a == "autosend-t") { localStorage.setItem("amx_autosend", autoOn() ? "0" : "1"); toast(autoOn() ? "الإرسال التلقائي مفعّل" : "الإرسال التلقائي متوقف"); return homeStats(); }
   if (a == "smm-send" || a == "smm-status") return smmOrder(b);
   if (a == "pub") return publish(b);
@@ -1262,7 +1255,7 @@ const NEW = {
     en: "New method",
     icon: "",
     logo: "",
-    color: "#191A23",
+    color: "#08694a",
     acc: "",
     da: "",
     de: "",
@@ -1902,7 +1895,7 @@ function smmBlock(o, items) {
     ? o.smm
         .map(
           (r) =>
-            `<div class="od-m" dir="ltr">#${esc(r.order || "—")} · ${esc( r.status || r.error || "" )}${r.remains != null ? " · remains " + esc(r.remains) : ""}</div>`
+            `<div class="od-m" dir="ltr">#${esc(r.order || "—")} · ${esc( r.status || r.error || "" )}${r.provider_name ? " · " + esc(r.provider_name) : ""}${r.remains != null ? " · remains " + esc(r.remains) : ""}</div>`
         )
         .join("")
     : "";
@@ -2208,7 +2201,7 @@ async function setTicketStatus(sel) {
   }
 }
 
-/* ---------- SMM & payment helpers (Edge Function `smm`) ---------- */
+/* ---------- SMM: مزوّدون متعددون (Edge Function `smm-hub`) ---------- */
 async function fn(name, body) {
   const r = await api("/functions/v1/" + name, {
     method: "POST",
@@ -2216,60 +2209,243 @@ async function fn(name, body) {
     body: JSON.stringify(body || {}),
   });
   if (r.status == 404)
-    throw new Error(
-      "الدالة " + name + " غير منشورة في Supabase (Edge Functions)"
-    );
+    throw new Error("الدالة " + name + " غير منشورة في Supabase (Edge Functions) — نفّذ: supabase functions deploy " + name);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "خطأ " + r.status);
   return j;
 }
-let SMM_SVC = [];
-function smmOut(html) {
-  const o = $("#smm-out");
-  if (o) o.innerHTML = html;
+let PROVIDERS = [], PV_LOADED = false, PV_ERR = "", PV_SUB = "list", PV_EDIT = null;
+let SVC = {}, SLOG = [];
+let SV = { pid: "", q: "", cat: "", sort: "name", page: 0, sel: new Set(), hideImp: true, refill: false, rmin: "", rmax: "", tcat: "", mk: "", lim: 300 };
+const PV_PAGE = 40;
+const fmtT = (t) => (t ? new Date(t).toLocaleString("ar-EG-u-nu-latn", { dateStyle: "short", timeStyle: "short" }) : "—");
+const pvById = (id) => PROVIDERS.find((p) => p.id == id);
+const pvDefault = () => PROVIDERS.find((p) => p.is_default) || null;
+const provOf = (p) => p.smm_provider || (pvDefault() || {}).id || "";
+const pvName = (id) => (pvById(id) || {}).name || id || "—";
+const pvHost = (u) => { try { return new URL(u).hostname; } catch (e) { return ""; } };
+const pvLinked = (id) => D.products.filter((p) => p.smm_service && provOf(p) == id);
+const pvOpts = () => [["", pvDefault() ? "الافتراضي (" + pvDefault().name + ")" : "الافتراضي"], ...PROVIDERS.map((p) => [p.id, p.name + (p.enabled ? "" : " (معطّل)")])];
+const pvOpts2 = () => [["", "بدون مزوّد احتياطي"], ...PROVIDERS.map((p) => [p.id, p.name + (p.enabled ? "" : " (معطّل)")])];
+
+async function loadProviders() {
+  try {
+    const r = await api("/rest/v1/smm_providers?select=*&order=priority.asc,id.asc");
+    if (!r.ok) { PV_ERR = r.status == 404 ? "setup" : "err"; PV_LOADED = false; }
+    else { PROVIDERS = await r.json(); PV_LOADED = true; PV_ERR = ""; }
+  } catch (e) { PV_ERR = "err"; PV_LOADED = false; }
+  if (tab == "providers" && !PV_EDIT) render();
 }
-let SMM_MK = "30", SMM_CAT = "";
-const smmFiltered = () => {
-  const q = (($("#smm-q") || {}).value || "").trim().toLowerCase();
-  return SMM_SVC.filter(
-    (x) => !q || (x.id + " " + x.name + " " + (x.category || "")).toLowerCase().includes(q)
-  );
+
+/* ---------- عرض: تبويب المزوّدين ---------- */
+VIEW.providers = () => {
+  if (!PV_LOADED && !PV_ERR) setTimeout(loadProviders, 0);
+  if (PV_ERR == "setup")
+    return `<div class="card"><h2>مزوّدو الرشق</h2><p class="hint warn">⚠ جدول smm_providers غير موجود بعد.</p><ol class="hint"><li>نفّذ الملف <b dir="ltr">supabase-smm-providers.sql</b> في Supabase › SQL Editor.</li><li>انشر الدالة: <b dir="ltr">supabase functions deploy smm-hub</b></li><li>أعد تحميل هذه الصفحة.</li></ol><button class="b" data-a="pv-reload">إعادة المحاولة</button></div>`;
+  if (PV_ERR) return `<div class="card"><p class="hint warn">⚠ تعذّر تحميل المزوّدين (تأكد أنك مسجّل كأدمن).</p><button class="b" data-a="pv-reload">إعادة المحاولة</button></div>`;
+  if (!PV_LOADED) return `<div class="card">${loadingHTML}</div>`;
+  const subs = [["list", "المزوّدون"], ["services", "استعراض واستيراد الخدمات"], ["sync", "الأسعار والمزامنة"], ["log", "سجل الإرسال"]];
+  const nav = `<div class="pv-sub">${subs.map(([k, n]) => `<button class="${PV_SUB == k ? "on" : ""}" data-a="pv-sub" data-s="${k}">${n}</button>`).join("")}</div>`;
+  return nav + (PV_SUB == "services" ? pvServicesView() : PV_SUB == "sync" ? pvSyncView() : PV_SUB == "log" ? pvLogView() : pvListView());
 };
-/* How many services one import / re-import may add. 0 = all of them. Kept in the browser; default 300 (every product is part of the public store config that each visitor downloads). */
-function smmLim() {
-  const el = $("#smm-lim");
-  let v = el ? el.value : (() => { try { return localStorage.getItem("amx_smm_lim"); } catch (e) { return null; } })();
-  v = v === null || v === "" || v === undefined ? 300 : Math.max(0, parseInt(v, 10) || 0);
-  try { localStorage.setItem("amx_smm_lim", String(v)); } catch (e) {}
-  return v || Infinity;
+
+function pvListView() {
+  if (PV_EDIT) return pvEditView();
+  const act = PROVIDERS.filter((p) => p.enabled), linked = D.products.filter((p) => p.smm_service).length;
+  const low = act.filter((p) => p.last_balance != null && +p.last_balance < +p.low_balance);
+  const orphan = D.products.filter((p) => p.smm_service && !pvById(provOf(p)));
+  const dflt = pvDefault();
+  const st = `<div class="stats"><div class="stat"><b>${PROVIDERS.length}</b><span>مزوّد</span></div><div class="stat"><b>${act.length}</b><span>مفعّل</span></div><div class="stat"><b>${linked}</b><span>منتج رشق مرتبط</span></div><div class="stat${low.length ? " hot" : ""}"><b>${low.length}</b><span>رصيد منخفض</span></div></div>`;
+  const warns =
+    (!PROVIDERS.length ? `<div class="card"><p class="hint">لا يوجد مزوّدون بعد. أضف موقع الرشق الأول (رابط الـ API ومفتاحه).</p></div>` : "") +
+    (PROVIDERS.length && !dflt ? `<div class="card" style="border-color:var(--wn)"><b>⚠ لا يوجد مزوّد افتراضي.</b> المنتجات التي لم يُحدَّد لها مزوّد لن تُرسل. افتح مزوّداً وفعّل «افتراضي».</div>` : "") +
+    (orphan.length ? `<div class="card" style="border-color:var(--er)"><b>⚠ ${orphan.length} منتج مرتبط بمزوّد غير موجود.</b> لن تُرسل طلباته.</div>` : "");
+  const cards = PROVIDERS.map((p) => {
+    const n = pvLinked(p.id).length, ok = p.last_ok, bal = p.last_balance;
+    const dot = !p.enabled ? "off" : ok === true ? "ok" : ok === false ? "bad" : "na";
+    const isLow = bal != null && +bal < +p.low_balance;
+    return `<div class="card pv-card${p.enabled ? "" : " dis"}"><div class="pv-h"><span class="pv-dot ${dot}"></span><b>${esc(p.name)}</b>${p.is_default ? '<span class="pv-tag">افتراضي</span>' : ""}${p.enabled ? "" : '<span class="pv-tag gr">معطّل</span>'}<small class="od-m" dir="ltr">${esc(pvHost(p.api_url))}</small></div>
+<div class="pv-g"><div><span>الرصيد</span><b dir="ltr" class="${isLow ? "lowb" : ""}">${bal != null ? (+bal).toFixed(2) + " " + esc(p.last_currency || "") : "—"}</b></div><div><span>الاستجابة</span><b dir="ltr">${p.last_ms != null ? p.last_ms + " ms" : "—"}</b></div><div><span>منتجات مرتبطة</span><b>${n}</b></div><div><span>الهامش الافتراضي</span><b>${+p.default_markup}%</b></div><div><span>آخر فحص</span><b>${fmtT(p.last_checked_at)}</b></div><div><span>الأولوية</span><b>${+p.priority}</b></div></div>
+${ok === false && p.last_error ? `<p class="hint warn">✗ ${esc(p.last_error)}</p>` : ""}${isLow ? `<p class="hint warn">⚠ الرصيد أقل من حد التنبيه (${+p.low_balance}).</p>` : ""}${p.note ? `<p class="hint">${esc(p.note)}</p>` : ""}
+<div class="acts"><button class="b sm" data-a="pv-test" data-id="${esc(p.id)}">فحص الاتصال والرصيد</button><button class="b b2 sm" data-a="pv-open" data-s="services" data-id="${esc(p.id)}">الخدمات</button><button class="b b2 sm" data-a="pv-edit" data-id="${esc(p.id)}">تعديل</button><button class="b b2 sm" data-a="pv-toggle" data-id="${esc(p.id)}">${p.enabled ? "تعطيل" : "تفعيل"}</button><button class="b bd2 sm" data-a="pv-del" data-id="${esc(p.id)}">حذف</button></div></div>`;
+  }).join("");
+  return st + warns + `<div class="acts" style="margin:0 0 10px"><button class="b" data-a="pv-new">+ إضافة مزوّد</button><button class="b b2" data-a="pv-balances">⟳ تحديث كل الأرصدة</button></div>` + cards +
+    `<div class="card"><h2>كيف يعمل التوجيه؟</h2><p class="hint">كل منتج رشق يحمل «مزوّد» و«رقم الخدمة» عنده (يُضبط تلقائياً عند الاستيراد، ويمكن تعديله في المنتج). عند تأكيد الدفع يُرسل كل عنصر إلى مزوّده. يمكنك تحديد <b>مزوّد احتياطي</b> لمنتج: إن رفض الأول الطلب صراحةً (رصيد/خدمة متوقفة) يُجرَّب الاحتياطي. أي انقطاع أو مهلة أثناء الشراء يُعلَّم «غير مؤكد» ولا يُعاد تلقائياً لمنع الخصم المزدوج.</p></div>`;
 }
-function smmList() {
-  const mk = $("#smm-mk"), ct = $("#smm-cat");
-  if (mk) SMM_MK = mk.value;
-  if (ct) SMM_CAT = ct.value;
-  if (!SMM_CAT) SMM_CAT = ((D.categories.find((c) => c.ty == "boost") || D.categories[0] || {}).id) || "";
-  const all = smmFiltered(), L = all.slice(0, 80);
-  const bar =
-    '<div class="g2" style="margin:8px 0;align-items:end">' +
-    '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641</span><select class="inp" id="smm-cat">' +
-    D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("") +
-    '</select></label>' +
-    `<label class="fld"><span>\u0647\u0627\u0645\u0634 \u0627\u0644\u0631\u0628\u062d %</span><input class="inp" id="smm-mk" type="number" min="0" step="1" value="${esc(SMM_MK)}" dir="ltr"></label>` +
-    `<label class="fld"><span>الحد الأقصى للاستيراد (0 = كل النتائج)</span><input class="inp" id="smm-lim" type="number" min="0" step="100" value="${esc(String(smmLim() === Infinity ? 0 : smmLim()))}" dir="ltr"></label></div>` +
-    `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button>`;
-  smmOut(
-    L.length
-      ? bar +
-          '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
-          L.map(
-            (x) =>
-              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}${x.category ? '<br><small class="od-m">' + esc(x.category) + '</small>' : ''}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button></td></tr>`
-          ).join("") +
-          "</table>"
-      : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c"
-  );
+const pvf = (l, k, o = {}) => {
+  const v = PV_EDIT[k];
+  if (o.t == "chk") return `<label class="chk"><input type="checkbox" data-pf="${k}" ${v ? "checked" : ""}> ${l}</label>`;
+  if (o.t == "area") return `<div class="fld w2"><span>${l}</span><textarea class="inp" rows="2" data-pf="${k}">${esc(v)}</textarea></div>`;
+  return `<div class="fld ${o.w ? "w2" : ""}"><span>${l}</span><input class="inp" id="${o.id || ""}" type="${o.t || "text"}" ${o.t == "number" ? 'step="any" min="0"' : ""} ${o.d ? 'dir="ltr"' : ""} value="${esc(v)}" data-pf="${k}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ""} autocomplete="off"></div>`;
+};
+function pvEditView() {
+  const e = PV_EDIT;
+  return `<div class="card"><button class="b b2" data-a="pv-cancel">← رجوع</button><h2>${e._new ? "إضافة مزوّد" : "تعديل: " + esc(e.name)}</h2>
+<div class="g2">${pvf("اسم المزوّد (للعرض الداخلي)", "name", { w: 1, ph: "مثال: SMMKings" })}${pvf("رابط الـ API (https://…/api/v2)", "api_url", { d: 1, w: 1, ph: "https://example.com/api/v2" })}
+<div class="fld w2"><span>مفتاح الـ API</span><div class="imgf"><input class="inp" id="pv-key" type="password" dir="ltr" value="${esc(e.api_key)}" data-pf="api_key" autocomplete="off"><button type="button" class="b b2 sm" data-a="pv-eye">إظهار</button></div></div>
+${pvf("هامش الربح الافتراضي %", "default_markup", { t: "number", d: 1 })}${pvf("تنبيه عند انخفاض الرصيد عن", "low_balance", { t: "number", d: 1 })}${pvf("الأولوية (الأصغر أولاً)", "priority", { t: "number", d: 1 })}</div>
+${pvf("ملاحظات داخلية", "note", { t: "area" })}
+<div class="g2">${pvf("مفعّل", "enabled", { t: "chk" })}${pvf("مزوّد افتراضي (للمنتجات التي بلا مزوّد محدد)", "is_default", { t: "chk" })}</div>
+<p class="hint">المفتاح يُحفظ في جدول smm_providers (أدمن فقط) ولا يُنشر مع المتجر ولا يخرج من الخادم عند الإرسال. الرابط يجب أن يكون https وبدون عنوان IP.</p>
+<div class="acts"><button class="b" data-a="pv-save">حفظ المزوّد</button><button class="b b2" data-a="pv-test-draft">اختبار قبل الحفظ</button></div><div id="pv-test-out" class="hint" style="margin-top:8px"></div></div>`;
 }
-/* ---- service -> Arabic title / platform / type (so the store filters work) ---- */
+const pvNewId = () => "p" + Math.random().toString(36).slice(2, 7);
+async function pvSave(btn) {
+  const e = PV_EDIT;
+  if (!e) return;
+  const name = String(e.name || "").trim(), url = String(e.api_url || "").trim(), key = String(e.api_key || "").trim();
+  if (!name) return toast("اكتب اسم المزوّد", "e");
+  if (!/^https:\/\/[^\s/?#]+\.[^\s/?#]+/i.test(url)) return toast("رابط API يجب أن يبدأ بـ https://", "e");
+  if (!key) return toast("أدخل مفتاح الـ API", "e");
+  const row = { name, api_url: url, api_key: key, enabled: !!e.enabled, is_default: !!e.is_default, priority: Math.round(+e.priority || 100), default_markup: Math.max(0, +e.default_markup || 0), low_balance: Math.max(0, +e.low_balance || 0), note: String(e.note || "").trim() || null };
+  const H = { "Content-Type": "application/json", Prefer: "return=representation" };
+  const prevDef = pvDefault();
+  let cleared = false;
+  busy(btn, true);
+  try {
+    if (row.is_default && prevDef && prevDef.id != e.id) {
+      const c = await api("/rest/v1/smm_providers?id=eq." + encodeURIComponent(prevDef.id), { method: "PATCH", headers: H, body: JSON.stringify({ is_default: false }) });
+      if (!c.ok) throw new Error((await c.text()).slice(0, 140));
+      cleared = true;
+    }
+    const r = e._new
+      ? await api("/rest/v1/smm_providers", { method: "POST", headers: H, body: JSON.stringify({ id: e.id, ...row }) })
+      : await api("/rest/v1/smm_providers?id=eq." + encodeURIComponent(e.id), { method: "PATCH", headers: H, body: JSON.stringify(row) });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    if (!(await r.json()).length) throw new Error("لم يُحفظ شيء — غالباً حسابك ليس أدمن (RLS)");
+    PV_EDIT = null;
+    await loadProviders();
+    toast("تم حفظ المزوّد ✓");
+    render();
+  } catch (er) {
+    if (cleared) { try { await api("/rest/v1/smm_providers?id=eq." + encodeURIComponent(prevDef.id), { method: "PATCH", headers: H, body: JSON.stringify({ is_default: true }) }); } catch (x) {} }
+    toast("فشل الحفظ — " + String(er.message || "").slice(0, 90), "e");
+  } finally { busy(btn, false); }
+}
+async function pvPatch(id, body) {
+  const r = await api("/rest/v1/smm_providers?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error((await r.text()).slice(0, 140));
+  if (!(await r.json()).length) throw new Error("RLS: لا صلاحية");
+}
+async function pvDelete(id) {
+  const p = pvById(id), n = pvLinked(id).length;
+  if (!p) return;
+  if (n) return toast(`المزوّد مرتبط بـ ${n} منتج. احذف منتجاته من «الأسعار والمزامنة» أو عطّله بدل الحذف`, "e");
+  if (!confirm(`حذف المزوّد «${p.name}» نهائياً؟ (يُحذف مفتاحه أيضاً)`)) return;
+  try {
+    const r = await api("/rest/v1/smm_providers?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: { Prefer: "return=representation" } });
+    if (!r.ok || !(await r.json()).length) throw new Error("لم يُحذف");
+    toast("تم حذف المزوّد");
+    await loadProviders();
+  } catch (e) { toast("فشل الحذف: " + String(e.message).slice(0, 80), "e"); }
+}
+async function pvTest(btn) {
+  busy(btn, true);
+  try {
+    const j = await fn("smm-hub", { action: "test", provider_id: btn.dataset.id });
+    toast(j.ok ? "الاتصال ناجح ✓ الرصيد: " + j.balance + " " + (j.currency || "") : "فشل: " + String(j.error || "").slice(0, 80), j.ok ? "" : "e");
+    await loadProviders();
+  } catch (e) { toast("فشل: " + String(e.message).slice(0, 80), "e"); }
+  finally { busy(btn, false); }
+}
+async function pvTestDraft(btn) {
+  const e = PV_EDIT, out = $("#pv-test-out");
+  busy(btn, true);
+  try {
+    const j = await fn("smm-hub", { action: "test", draft: { api_url: String(e.api_url || "").trim(), api_key: String(e.api_key || "").trim() } });
+    out.innerHTML = j.ok ? `✓ الاتصال ناجح — الرصيد <b dir="ltr">${esc(j.balance)} ${esc(j.currency || "")}</b> · ${j.ms} ms` : `<span class="hint warn">✗ ${esc(j.error || "فشل")}</span>`;
+  } catch (er) { out.innerHTML = `<span class="hint warn">✗ ${esc(er.message)}</span>`; }
+  finally { busy(btn, false); }
+}
+async function pvBalances(btn) {
+  busy(btn, true);
+  try { await fn("smm-hub", { action: "balances" }); await loadProviders(); toast("تم تحديث الأرصدة"); }
+  catch (e) { toast("فشل: " + String(e.message).slice(0, 80), "e"); }
+  finally { busy(btn, false); }
+}
+
+/* ---------- جلب الخدمات واستعراضها واستيرادها ---------- */
+async function svcFetch(pid, force) {
+  if (SVC[pid] && !force) return SVC[pid];
+  const j = await fn("smm-hub", { action: "services", provider_id: pid });
+  if (!Array.isArray(j.services) || !j.services.length) throw new Error(j.error || "لم يُرجع المزوّد أي خدمة");
+  SVC[pid] = j.services;
+  return SVC[pid];
+}
+function pvServicesView() {
+  const en = PROVIDERS.filter((p) => p.enabled);
+  if (!en.length) return `<div class="card"><p class="hint">فعّل مزوّداً واحداً على الأقل من تبويب «المزوّدون».</p></div>`;
+  if (!SV.pid || !en.some((p) => p.id == SV.pid)) { SV.pid = (en.find((p) => p.is_default) || en[0]).id; SV.cat = ""; SV.sel.clear(); SV.mk = ""; SV.page = 0; }
+  if (SV.mk === "") SV.mk = String(+pvById(SV.pid).default_markup);
+  if (!SV.tcat || !D.categories.some((c) => c.id == SV.tcat)) SV.tcat = (D.categories.find((c) => c.ty == "boost") || D.categories[0] || {}).id || "";
+  setTimeout(svResults, 0);
+  const have = SVC[SV.pid];
+  return `<div class="card"><h2>استعراض الخدمات</h2><div class="g2"><label class="fld"><span>المزوّد</span><select class="inp" id="sv-pid">${en.map((p) => `<option value="${esc(p.id)}"${p.id == SV.pid ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label><div class="fld"><span>${have ? have.length + " خدمة محمّلة" : "لم تُحمَّل الخدمات بعد"}</span><button class="b" data-a="sv-load">⟳ ${have ? "إعادة الجلب" : "جلب الخدمات"} من المزوّد</button></div></div>${have ? svCtl() : '<p class="hint">اضغط «جلب الخدمات» لعرض قائمة هذا المزوّد. قد يستغرق بضع ثوانٍ للقوائم الكبيرة.</p>'}</div><div id="sv-res"></div>`;
+}
+function svCtl() {
+  const L = SVC[SV.pid] || [], cats = [...new Set(L.map((x) => x.category).filter(Boolean))].sort().slice(0, 600);
+  const sorts = [["name", "الاسم"], ["rate_a", "السعر: الأقل أولاً"], ["rate_d", "السعر: الأعلى أولاً"], ["id", "رقم الخدمة"]];
+  return `<div class="g3" style="margin-top:6px"><label class="fld"><span>بحث (اسم / رقم / فئة)</span><input class="inp" id="sv-q" value="${esc(SV.q)}" placeholder="مثال: instagram followers"></label><label class="fld"><span>فئة المزوّد</span><select class="inp" id="sv-cat"><option value="">كل الفئات (${cats.length})</option>${cats.map((c) => `<option value="${esc(c)}"${c == SV.cat ? " selected" : ""}>${esc(c.slice(0, 70))}</option>`).join("")}</select></label><label class="fld"><span>الترتيب</span><select class="inp" id="sv-sort">${sorts.map(([k, n]) => `<option value="${k}"${k == SV.sort ? " selected" : ""}>${n}</option>`).join("")}</select></label><label class="fld"><span>أقل سعر /1000</span><input class="inp" id="sv-rmin" type="number" step="any" min="0" dir="ltr" value="${esc(SV.rmin)}"></label><label class="fld"><span>أعلى سعر /1000</span><input class="inp" id="sv-rmax" type="number" step="any" min="0" dir="ltr" value="${esc(SV.rmax)}"></label><div class="fld"><span>فلاتر</span><label class="chk"><input type="checkbox" id="sv-hide" ${SV.hideImp ? "checked" : ""}> إخفاء المستورد</label><label class="chk"><input type="checkbox" id="sv-refill" ${SV.refill ? "checked" : ""}> يدعم التعويض فقط</label></div></div>
+<div class="card" style="background:var(--bg);margin:8px 0 0"><h3>الاستيراد إلى المتجر</h3><div class="g3"><label class="fld"><span>القسم المستهدف</span><select class="inp" id="sv-tcat">${D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == SV.tcat ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("")}</select></label><label class="fld"><span>هامش الربح %</span><input class="inp" id="sv-mk" type="number" min="0" step="1" dir="ltr" value="${esc(SV.mk)}"></label><label class="fld"><span>أقصى عدد للاستيراد الجماعي (0 = الكل)</span><input class="inp" id="sv-lim" type="number" min="0" step="50" dir="ltr" value="${esc(SV.lim)}"></label></div><div class="acts"><button class="b" data-a="sv-imp" data-m="sel">استيراد المحدد (<span id="sv-selc">${SV.sel.size}</span>)</button><button class="b b2" data-a="sv-imp" data-m="all">استيراد كل النتائج (<span id="sv-alln">0</span>)</button></div><p class="hint">السعر المعروض في المتجر = سعر المزوّد ÷ 1000 × (1 + الهامش)، للوحدة الواحدة. يُحفظ المزوّد ورقم الخدمة في المنتج. بعد الاستيراد اضغط «نشر».</p></div>`;
+}
+const svLim = () => { const n = parseInt(SV.lim, 10); return n > 0 ? n : Infinity; };
+function svImported() {
+  return new Set(D.products.filter((p) => p.smm_service && provOf(p) == SV.pid && p.c == SV.tcat).map((p) => String(p.smm_service)));
+}
+function svFiltered() {
+  const L = SVC[SV.pid] || [], q = SV.q.trim().toLowerCase(), imp = svImported(), lo = parseFloat(SV.rmin), hi = parseFloat(SV.rmax);
+  const r = L.filter((x) => (!q || (x.id + " " + x.name + " " + x.category).toLowerCase().includes(q)) && (!SV.cat || x.category == SV.cat) && (!(lo >= 0) || x.rate >= lo) && (!(hi > 0) || x.rate <= hi) && (!SV.refill || x.refill) && (!SV.hideImp || !imp.has(x.id)));
+  const s = SV.sort;
+  r.sort((a, b) => (s == "rate_a" ? a.rate - b.rate : s == "rate_d" ? b.rate - a.rate : s == "id" ? (+a.id || 0) - (+b.id || 0) : String(a.name).localeCompare(String(b.name))));
+  return r;
+}
+function svResults() {
+  const o = $("#sv-res");
+  if (!o) return;
+  if (!SVC[SV.pid]) { o.innerHTML = ""; return; }
+  const all = svFiltered(), pages = Math.max(1, Math.ceil(all.length / PV_PAGE));
+  if (SV.page >= pages) SV.page = pages - 1;
+  const rows = all.slice(SV.page * PV_PAGE, (SV.page + 1) * PV_PAGE), imp = svImported(), mk = Math.max(0, parseFloat(SV.mk) || 0);
+  const an = $("#sv-alln"), sc = $("#sv-selc");
+  if (an) an.textContent = Math.min(all.length, svLim());
+  if (sc) sc.textContent = SV.sel.size;
+  const pg = `<div class="acts"><button class="b b2 sm" data-a="sv-pg" data-d="-1" ${SV.page ? "" : "disabled"}>→ السابق</button><small class="od-m">صفحة ${SV.page + 1} / ${pages} · ${all.length} نتيجة</small><button class="b b2 sm" data-a="sv-pg" data-d="1" ${SV.page < pages - 1 ? "" : "disabled"}>التالي ←</button></div>`;
+  o.innerHTML = `<div class="card">${pg}<div class="tw"><table class="tb"><tr><th><input type="checkbox" id="sv-all" title="تحديد الصفحة"></th><th>#</th><th>الخدمة</th><th>سعر /1000</th><th>بيعك /1000</th><th>الحدود</th><th></th></tr>${rows.length ? rows.map((x) => `<tr><td><input type="checkbox" data-sv="${esc(x.id)}" ${SV.sel.has(x.id) ? "checked" : ""} ${imp.has(x.id) ? "disabled" : ""}></td><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}<br><small class="od-m">${esc(x.category)}${x.refill ? " · ♻ تعويض" : ""}${x.cancel ? " · إلغاء" : ""}${x.dripfeed ? " · dripfeed" : ""}</small></td><td dir="ltr">${(+x.rate).toFixed(4)}</td><td dir="ltr"><b>${(x.rate * (1 + mk / 100)).toFixed(4)}</b></td><td dir="ltr">${esc(x.min)}–${esc(x.max)}</td><td>${imp.has(x.id) ? '<span class="pv-tag">مستورد</span>' : `<button class="b sm" data-a="sv-one" data-id="${esc(x.id)}">+</button>`}</td></tr>`).join("") : '<tr><td colspan="7" class="hint">لا نتائج.</td></tr>'}</table></div>${all.length > PV_PAGE ? pg : ""}</div>`;
+}
+function svInput(t) {
+  const id = t.id;
+  if (t.dataset.sv !== undefined) { t.checked ? SV.sel.add(t.dataset.sv) : SV.sel.delete(t.dataset.sv); const c = $("#sv-selc"); if (c) c.textContent = SV.sel.size; return; }
+  if (id == "sv-all") { $("#sv-res").querySelectorAll("input[data-sv]:not(:disabled)").forEach((c) => { c.checked = t.checked; t.checked ? SV.sel.add(c.dataset.sv) : SV.sel.delete(c.dataset.sv); }); const c = $("#sv-selc"); if (c) c.textContent = SV.sel.size; return; }
+  if (id == "sv-pid") { SV.pid = t.value; SV.cat = ""; SV.sel.clear(); SV.page = 0; SV.mk = ""; return render(); }
+  if (id == "sv-lim") { SV.lim = t.value; return svResults(); }
+  const map = { "sv-q": "q", "sv-cat": "cat", "sv-sort": "sort", "sv-rmin": "rmin", "sv-rmax": "rmax", "sv-tcat": "tcat", "sv-mk": "mk" };
+  if (map[id]) SV[map[id]] = t.value;
+  else if (id == "sv-hide") SV.hideImp = t.checked;
+  else if (id == "sv-refill") SV.refill = t.checked;
+  SV.page = 0;
+  svResults();
+}
+async function svLoad(btn) {
+  busy(btn, true);
+  try { await svcFetch(SV.pid, true); SV.page = 0; toast("تم جلب " + SVC[SV.pid].length + " خدمة"); render(); }
+  catch (e) { toast("فشل: " + String(e.message).slice(0, 90), "e"); }
+  finally { busy(btn, false); }
+}
+function svImport(btn, one) {
+  const pid = SV.pid, cat = SV.tcat, mk = Math.max(0, parseFloat(SV.mk) || 0), L = SVC[pid] || [];
+  if (!cat) return toast("اختر قسماً مستهدفاً", "e");
+  const mode = one ? "one" : btn.dataset.m;
+  const src = mode == "one" ? L.filter((x) => x.id == btn.dataset.id) : mode == "sel" ? L.filter((x) => SV.sel.has(x.id)) : svFiltered().slice(0, svLim());
+  if (!src.length) return toast("لا توجد خدمات للاستيراد", "e");
+  if (mode == "all" && !confirm(`استيراد ${src.length} خدمة من «${pvName(pid)}» إلى قسم «${catName(cat)}» بهامش ${mk}%؟`)) return;
+  const r = smmImportList(src, cat, mk, pid);
+  SV.sel.clear();
+  save();
+  toast(`تمت إضافة ${r.add} · تخطّي ${r.skip}. اضغط نشر للحفظ`, r.add ? "" : "e");
+  svResults();
+}
+
+/* ---------- أسماء/تصنيف الخدمات (كما كانت) ---------- */
 const SMM_PLAT = [
   [/instagram|\binsta\b|\big\b|انستغرام|انستجرام|إنستغرام|إنستجرام/i, "Instagram", "إنستغرام"], [/tik ?tok|تيك ?توك/i, "TikTok", "تيك توك"], [/youtube|\byt\b|يوتيوب/i, "YouTube", "يوتيوب"],
   [/telegram|\btg\b|تيليجرام|تيليغرام/i, "Telegram", "تيليجرام"], [/twitter|\bx\b|tweet|تويتر|إكس|اكس/i, "X", "إكس (تويتر)"], [/facebook|\bfb\b|فيسبوك|فيس بوك/i, "Facebook", "فيسبوك"],
@@ -2299,7 +2475,7 @@ function smmEnsureFilter(cat, plEn, ty) {
   const add = (g, v) => { if (g && Array.isArray(g.o) && v && !g.o.some((o) => String(o).toLowerCase() == String(v).toLowerCase())) g.o.push(v); };
   if (c.ty == "boost") { add(c.f[0], plEn == "Other" ? "" : plEn); add(c.f[1], ty); }
 }
-/* Turn panel services into store products. New imports are sold per SINGLE unit (smm_qty = 1): the buyer types any quantity between the provider's min and max,
+/* New imports are sold per SINGLE unit (smm_qty = 1): the buyer types any quantity between the provider's min and max,
    price per unit = rate / 1000 x (1 + markup), qmin / qmax = the provider's own min / max. Older products (smm_qty = 1000) keep working as packages of 1000. */
 const smmUnitPrice = (rate, u, mk) => {
   const v = (rate * u / 1000) * (1 + mk / 100);
@@ -2309,27 +2485,20 @@ const smmLimits = (min, max, u) => {
   const lo = Math.max(1, Math.ceil((parseFloat(min) || 1) / u)), hi = Math.floor((parseFloat(max) || 0) / u);
   return { qmin: lo, qmax: hi > 0 ? Math.max(lo, hi) : 0 };
 };
-function smmImport(btn) {
-  const mk = Math.max(0, parseFloat(($("#smm-mk") || {}).value) || 0);
-  const cat = ($("#smm-cat") || {}).value || SMM_CAT;
-  if (!cat) return toast("اختر قسماً", "e");
-  try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {}
-  const src = btn.dataset.id == "*" ? smmFiltered().slice(0, smmLim()) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
-  const r = smmImportList(src, cat, mk);
-  save();
-  toast(`تمت إضافة ${r.add} · تخطّي ${r.skip}. اضغط نشر للحفظ`, r.add ? "" : "e");
-}
-function smmImportList(src, cat, mk) {
+function smmImportList(src, cat, mk, pid) {
   let add = 0, skip = 0;
+  const have = new Set(D.products.filter((p) => p.smm_service).map((p) => provOf(p) + "|" + p.smm_service + "|" + p.c));
   src.forEach((x) => {
     const sid = String(x.id), rate = parseFloat(x.rate);
-    if (!(rate > 0) || D.products.some((p) => String(p.smm_service) == sid && p.c == cat)) { skip++; return; }
+    if (!(rate > 0) || have.has(pid + "|" + sid + "|" + cat)) { skip++; return; }
     const it = NEW.products(), mt = smmMeta(x), name = String(x.name || ("Service " + sid)).trim();
+    let id = "smm_" + pid + "_" + sid, n = 2;
+    while (D.products.some((p) => p.id == id)) id = "smm_" + pid + "_" + sid + "_" + n++;
     Object.assign(it, {
-      id: "smm" + sid, c: cat, k: "buy", ar: mt.ar, en: name,
+      id, c: cat, k: "buy", ar: mt.ar, en: name,
       p: smmUnitPrice(rate, 1, mk),
       o: 0, d: 0, r: 5, n: 0, bs: 0, tg: mt.tg, sp: mt.plAr + " · " + mt.ty,
-      smm_service: sid, smm_qty: 1, smm_mk: mk,
+      smm_provider: pid, smm_service: sid, smm_qty: 1, smm_mk: mk,
       ...smmLimits(x.min, x.max, 1),
     });
     D.products.push(it);
@@ -2339,49 +2508,90 @@ function smmImportList(src, cat, mk) {
   return { add, skip };
 }
 
-/* ---- حذف كل منتجات الرشق (المستوردة + القديمة داخل أقسام الرشق) وإعادة جلبها ---- */
-const isBoostProduct = (p) => !!p.smm_service || (D.categories.find((c) => c.id == p.c) || {}).ty == "boost";
-async function smmLoadServices() {
-  const j = await fn("smm-order", { action: "services" });
-  if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق — تحقق من الرابط والمفتاح في إعدادات APIs");
-  SMM_SVC = Array.isArray(j)
-    ? j.map((x) => ({ id: x.service, name: x.name, category: x.category, rate: x.rate, min: x.min, max: x.max }))
-    : j.services || [];
+/* ---------- الأسعار والمزامنة (لكل مزوّد) ---------- */
+const smmCacheAll = () => { try { return JSON.parse(localStorage.getItem("amx_smm_rates2") || "{}") || {}; } catch (e) { return {}; } };
+async function smmFetchRates(pid, force) {
+  const all = smmCacheAll(), c = all[pid];
+  if (!force && c && Date.now() - c.ts < 864e5) return c;
+  const L = await svcFetch(pid, true);
+  const want = new Set(pvLinked(pid).map((p) => String(p.smm_service)));
+  const map = {}, ids = [];
+  L.forEach((x) => { ids.push(x.id); if (want.has(x.id)) map[x.id] = [x.rate, x.min, x.max]; });
+  all[pid] = { ts: Date.now(), map, ids };
+  try { localStorage.setItem("amx_smm_rates2", JSON.stringify(all)); } catch (e) {}
+  return all[pid];
 }
-async function smmWipe(btn, redo) {
-  const old = D.products.filter(isBoostProduct);
-  if (!old.length && !redo) return toast("لا توجد منتجات رشق لحذفها", "e");
-  const mkEl = $("#smm-mk"), catEl = $("#smm-cat");
-  const mk = Math.max(0, parseFloat(mkEl ? mkEl.value : localStorage.getItem("amx_smm_mk")) || 30);
-  const cat = (catEl && catEl.value) || SMM_CAT || (D.categories.find((c) => c.ty == "boost") || {}).id || "";
-  if (redo && !cat) return toast("لا يوجد قسم رشق لاستيراد المنتجات إليه", "e");
+const smmMk = (p) => { const v = parseFloat(p.smm_mk); if (v >= 0) return v; const pv = pvById(provOf(p)); return pv ? +pv.default_markup : 30; };
+const smmUnit = (p) => (+p.smm_qty > 0 ? +p.smm_qty : 1000);
+function smmDrift(pid) {
+  const c = smmCacheAll()[pid], up = [], gone = [];
+  if (!c) return { up, gone, c: null };
+  const have = new Set(c.ids || []);
+  pvLinked(pid).forEach((p) => {
+    const sid = String(p.smm_service), r = c.map[sid];
+    if (!r) { if (have.size && !have.has(sid)) gone.push(p); return; }
+    const u = smmUnit(p), np = smmUnitPrice(r[0], u, smmMk(p));
+    if (Math.abs(np - p.p) > (u >= 1000 ? 0.009 : 1e-7) && Math.abs(np - p.p) / Math.max(p.p, 1e-6) > 0.005) up.push({ p, np, rate: r[0] });
+  });
+  return { up, gone, c };
+}
+function pvSyncView() {
+  const groups = PROVIDERS.map((pv) => ({ pv, n: pvLinked(pv.id).length })).filter((x) => x.n);
+  const orphan = D.products.filter((p) => p.smm_service && !pvById(provOf(p)));
+  if (!groups.length && !orphan.length) return `<div class="card"><p class="hint">لا توجد منتجات رشق مرتبطة بمزوّدين بعد. استورد خدمات من تبويب «استعراض واستيراد الخدمات».</p></div>`;
+  const bk = (() => { try { return JSON.parse(localStorage.getItem("amx_smm_backup") || "null"); } catch (e) { return null; } })();
+  return (orphan.length ? `<div class="card" style="border-color:var(--er)"><b>⚠ ${orphan.length} منتج مرتبط بمزوّد غير موجود</b><p class="hint">${orphan.slice(0, 6).map((p) => esc((p.ar || p.id).slice(0, 28))).join("، ")}${orphan.length > 6 ? "…" : ""} — أنشئ المزوّد الافتراضي أو عدّل المنتجات.</p></div>` : "") +
+    groups.map(({ pv, n }) => {
+      const d = smmDrift(pv.id);
+      return `<div class="card"><div class="pv-h"><span class="pv-dot ${pv.enabled ? "ok" : "off"}"></span><b>${esc(pv.name)}</b><small class="od-m">${n} منتج · ${d.c ? "آخر فحص أسعار: " + fmtT(d.c.ts) : "لم تُفحص الأسعار بعد"}</small></div>
+${d.c ? (d.up.length ? `<p class="hint">${d.up.length} منتجاً سعره لا يطابق سعر المزوّد الحالي مع هامشك:</p><div class="tw"><table class="tb"><tr><th>المنتج</th><th>سعرك</th><th>الجديد</th></tr>${d.up.slice(0, 8).map(({ p, np }) => `<tr><td>${esc((p.ar || "").slice(0, 50))}</td><td dir="ltr">${p.p}</td><td dir="ltr"><b>${np}</b> ${np > p.p ? "▲" : "▼"}</td></tr>`).join("")}</table></div>${d.up.length > 8 ? `<small class="od-m">…و${d.up.length - 8} أخرى</small>` : ""}` : `<p class="hint">✓ الأسعار مطابقة للمزوّد.</p>`) + (d.gone.length ? `<p class="hint warn">⚠ ${d.gone.length} خدمة لم تعد موجودة عند المزوّد: ${d.gone.slice(0, 4).map((p) => esc((p.ar || "").slice(0, 26))).join("، ")}</p>` : "") : ""}
+<div class="g3"><label class="fld"><span>هامش جديد % لكل منتجات هذا المزوّد</span><input class="inp" id="sm-mk-${esc(pv.id)}" type="number" min="0" step="1" dir="ltr" placeholder="${+pv.default_markup}"></label></div>
+<div class="acts"><button class="b sm" data-a="sm-check" data-id="${esc(pv.id)}">فحص الأسعار الآن</button>${d.up.length ? `<button class="b sm" data-a="sm-reprice" data-id="${esc(pv.id)}">تطبيق الأسعار الجديدة (${d.up.length})</button>` : ""}<button class="b b2 sm" data-a="sm-markup" data-id="${esc(pv.id)}">تطبيق الهامش الجديد</button>${d.gone.length ? `<button class="b bd2 sm" data-a="sm-wipe-gone" data-id="${esc(pv.id)}">حذف المفقودة (${d.gone.length})</button>` : ""}<button class="b bd2 sm" data-a="sm-wipe" data-id="${esc(pv.id)}">🗑 حذف كل منتجاته (${n})</button></div></div>`;
+    }).join("") +
+    `<div class="card"><div class="acts" style="margin:0"><button class="b b2" data-a="sm-undo" ${bk && bk.items && bk.items.length ? "" : "disabled"}>↩ استرجاع آخر حذف${bk && bk.items ? " (" + bk.items.length + ")" : ""}</button></div><p class="hint">كل حذف يحفظ نسخة في هذا المتصفح للاسترجاع. التغييرات تحتاج «نشر» لتظهر في المتجر.</p></div>`;
+}
+async function smmCheck(btn) {
+  busy(btn, true);
+  try { await smmFetchRates(btn.dataset.id, true); toast("تم فحص الأسعار"); render(); }
+  catch (e) { toast("فشل: " + String(e.message).slice(0, 80), "e"); }
+  finally { busy(btn, false); }
+}
+function smmApplyReprice(pid) {
+  const d = smmDrift(pid);
+  d.up.forEach(({ p, np }) => { p.p = np; if (p.smm_mk == null) p.smm_mk = smmMk(p); });
+  if (d.c) pvLinked(pid).filter((p) => d.c.map[String(p.smm_service)]).forEach((p) => { const r = d.c.map[String(p.smm_service)], l = smmLimits(r[1], r[2], smmUnit(p)); p.qmin = l.qmin; p.qmax = l.qmax; });
+  save();
+  return d.up.length;
+}
+function smmReprice(btn) { const n = smmApplyReprice(btn.dataset.id); toast(`تم تحديث ${n} سعراً. اضغط نشر للحفظ`); render(); }
+async function smmMarkup(btn) {
+  const pid = btn.dataset.id, mk = parseFloat(($("#sm-mk-" + pid) || {}).value);
+  if (!(mk >= 0)) return toast("أدخل هامشاً صحيحاً", "e");
   busy(btn, true);
   try {
-    if (redo) {
-      await smmLoadServices(); // fetch first: if this fails nothing is deleted
-      if (!SMM_SVC.length) throw new Error("المزوّد لم يُرجع أي خدمة — لم يُحذف شيء");
-    }
-    const n = Math.min(SMM_SVC.length, smmLim());
-    const msg = redo
-      ? `سيتم حذف ${old.length} منتج رشق ثم استيراد ${n} خدمة جديدة من المزوّد بهامش ${mk}% إلى قسم «${catName(cat)}». متابعة؟`
-      : `سيتم حذف ${old.length} منتج رشق (المستوردة والقديمة داخل أقسام الرشق). متابعة؟`;
-    if (!confirm(msg)) return;
-    try { localStorage.setItem("amx_smm_backup", JSON.stringify({ ts: Date.now(), items: old })); } catch (e) {
-      if (!confirm("تعذّر حفظ نسخة احتياطية للاسترجاع. المتابعة دون نسخة؟")) return;
-    }
-    for (let i = D.products.length - 1; i >= 0; i--) if (isBoostProduct(D.products[i])) D.products.splice(i, 1);
-    let r = { add: 0, skip: 0 };
-    if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportList(SMM_SVC.slice(0, smmLim()), cat, mk); }
-    save();
-    toast(redo ? `حُذف ${old.length} وأُضيف ${r.add} منتج جديد. اضغط نشر للحفظ` : `حُذف ${old.length} منتج. اضغط نشر للحفظ`);
-    smmOut(redo ? `✓ حُذف ${old.length} وأُضيف ${r.add} (تخطّي ${r.skip}). اضغط «نشر» لتطبيق التغيير على المتجر.` : `✓ حُذف ${old.length} منتج رشق. اضغط «نشر» لتطبيق التغيير.`);
-  } catch (e) {
-    smmOut("✗ " + esc(e.message));
-    toast("فشل: " + String(e.message).slice(0, 80), "e");
-  } finally {
-    busy(btn, false);
-  }
+    await smmFetchRates(pid, false);
+    if (!confirm(`تطبيق هامش ${mk}% على ${pvLinked(pid).length} منتج من «${pvName(pid)}» وإعادة حساب أسعارها؟`)) return;
+    pvLinked(pid).forEach((p) => (p.smm_mk = mk));
+    const n = smmApplyReprice(pid);
+    toast(`تم تطبيق الهامش وتحديث ${n} سعراً. اضغط نشر للحفظ`);
+    render();
+  } catch (e) { toast("فشل: " + String(e.message).slice(0, 80), "e"); }
+  finally { busy(btn, false); }
 }
+function smmRemove(list, label) {
+  if (!list.length) return toast("لا يوجد ما يُحذف", "e");
+  if (!confirm(`سيتم حذف ${list.length} منتج (${label}). متابعة؟`)) return;
+  try { localStorage.setItem("amx_smm_backup", JSON.stringify({ ts: Date.now(), items: list })); } catch (e) {
+    if (!confirm("تعذّر حفظ نسخة احتياطية للاسترجاع. المتابعة دون نسخة؟")) return;
+  }
+  const ids = new Set(list.map((p) => p.id));
+  for (let i = D.products.length - 1; i >= 0; i--) if (ids.has(D.products[i].id)) D.products.splice(i, 1);
+  save();
+  toast(`حُذف ${list.length} منتج. اضغط نشر للحفظ`);
+  render();
+}
+const smmWipe = (pid) => smmRemove(pvLinked(pid).slice(), "كل منتجات «" + pvName(pid) + "»");
+const smmWipeGone = (pid) => smmRemove(smmDrift(pid).gone.slice(), "خدمات مفقودة عند «" + pvName(pid) + "»");
 function smmUndo() {
   let b = null;
   try { b = JSON.parse(localStorage.getItem("amx_smm_backup") || "null"); } catch (e) {}
@@ -2395,45 +2605,71 @@ function smmUndo() {
   render();
 }
 
-/* ---- price sync with the provider (cache is kept 24h; only ids + rates of imported products) ---- */
-const smmCfg = () => D.products.some((p) => p.smm_service);
-const smmCache = () => { try { return JSON.parse(localStorage.getItem("amx_smm_rates") || "null"); } catch (e) { return null; } };
-async function smmFetchRates(force) {
-  const c = smmCache();
-  if (!force && c && Date.now() - c.ts < 864e5) return c;
-  const j = await fn("smm-order", { action: "services" });
-  if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق");
-  const L = Array.isArray(j) ? j : j.services || [];
-  const want = new Set(D.products.filter((p) => p.smm_service).map((p) => String(p.smm_service)));
-  const map = {}, ids = [];
-  L.forEach((x) => { const id = String(x.service != null ? x.service : x.id); ids.push(id); if (want.has(id)) map[id] = [parseFloat(x.rate), parseFloat(x.min), parseFloat(x.max)]; });
-  const out = { ts: Date.now(), map, ids };
-  try { localStorage.setItem("amx_smm_rates", JSON.stringify(out)); } catch (e) {}
-  return out;
+/* ---------- سجل الإرسال ---------- */
+const LOG_ST = { sent: "تم", failed: "فشل", unknown: "غير مؤكد ⚠", sending: "قيد الإرسال" };
+let LG = { prov: "", st: "" };
+function pvLogView() {
+  setTimeout(loadSmmLog, 0);
+  return `<div class="card"><h2>سجل الإرسال إلى المزوّدين</h2><p class="hint"><b>غير مؤكد</b>: حدث انقطاع أو مهلة أثناء الشراء، فقد يكون الطلب وصل للمزوّد. تحقق من لوحة المزوّد أولاً؛ إن لم يوجد، اضغط «السماح بإعادة الإرسال» ثم أعد الإرسال من صفحة الطلبات.</p><div class="fl"><select class="inp" id="lg-prov"><option value="">كل المزوّدين</option>${PROVIDERS.map((p) => `<option value="${esc(p.id)}"${p.id == LG.prov ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select><select class="inp" id="lg-st"><option value="">كل الحالات</option>${Object.entries(LOG_ST).map(([k, n]) => `<option value="${k}"${k == LG.st ? " selected" : ""}>${n}</option>`).join("")}</select><button class="b b2 sm" data-a="lg-reload">تحديث</button></div><div id="lg-list">${loadingHTML}</div></div>`;
 }
-const smmMk = (p) => { const v = parseFloat(p.smm_mk); return v >= 0 ? v : parseFloat(localStorage.getItem("amx_smm_mk")) || 30; };
-function smmDrift(c) {
-  const up = [], gone = [];
-  if (!c) return { up, gone };
-  const have = new Set(c.ids || []);
-  D.products.filter((p) => p.smm_service).forEach((p) => {
-    const sid = String(p.smm_service), r = c.map[sid];
-    if (!r) { if (have.size && !have.has(sid)) gone.push(p); return; }
-    const u = +p.smm_qty > 0 ? +p.smm_qty : 1000, np = smmUnitPrice(r[0], u, smmMk(p));
-    if (Math.abs(np - p.p) > (u >= 1000 ? 0.009 : 1e-7) && Math.abs(np - p.p) / Math.max(p.p, 1e-6) > 0.005) up.push({ p, np, rate: r[0] });
-  });
-  return { up, gone };
+async function loadSmmLog() {
+  const b = $("#lg-list");
+  if (!b) return;
+  try {
+    const r = await api("/rest/v1/smm_order_log?select=*&order=created_at.desc&limit=300");
+    if (!r.ok) throw new Error(r.status);
+    SLOG = await r.json();
+    renderSmmLog();
+  } catch (e) { b.innerHTML = '<p class="hint warn">تعذّر تحميل السجل (هل نفّذت supabase-smm-providers.sql؟)</p>'; }
 }
-function smmReprice() {
-  const c = smmCache(), d = smmDrift(c);
-  d.up.forEach(({ p, np }) => { p.p = np; if (p.smm_mk == null) p.smm_mk = smmMk(p); });
-  if (c) D.products.filter((p) => p.smm_service && c.map[String(p.smm_service)]).forEach((p) => { const r = c.map[String(p.smm_service)], l = smmLimits(r[1], r[2], +p.smm_qty > 0 ? +p.smm_qty : 1000); p.qmin = l.qmin; p.qmax = l.qmax; });
-  save();
-  toast(`تم تحديث ${d.up.length} سعراً. اضغط نشر للحفظ`);
-  render();
+function renderSmmLog() {
+  const b = $("#lg-list");
+  if (!b) return;
+  const rows = SLOG.filter((x) => (!LG.prov || x.provider_id == LG.prov) && (!LG.st || x.status == LG.st));
+  const bad = SLOG.filter((x) => x.status == "unknown" || x.status == "failed").length;
+  b.innerHTML = (bad ? `<p class="hint warn">⚠ ${bad} عنصر فاشل أو غير مؤكد في آخر ${SLOG.length} سجل.</p>` : "") +
+    (rows.length ? `<div class="tw"><table class="tb"><tr><th>الوقت</th><th>الطلب</th><th>المزوّد</th><th>خدمة × كمية</th><th>رقم عند المزوّد</th><th>الحالة</th><th></th></tr>${rows.map((x) => `<tr><td style="white-space:nowrap">${fmtT(x.created_at)}</td><td dir="ltr">${esc(x.order_id)}</td><td>${esc(pvName(x.provider_id))}</td><td dir="ltr">#${esc(x.service_id)} × ${esc(x.quantity)}</td><td dir="ltr">${esc(x.provider_order || "—")}</td><td><span class="pv-tag ${x.status == "sent" ? "" : x.status == "sending" ? "gr" : "er"}">${LOG_ST[x.status] || esc(x.status)}</span>${x.provider_status ? `<br><small class="od-m" dir="ltr">${esc(x.provider_status)}${x.remains != null ? " · remains " + esc(x.remains) : ""}</small>` : ""}${x.error ? `<br><small class="od-m">${esc(x.error)}</small>` : ""}</td><td>${x.status == "failed" || x.status == "unknown" ? `<button class="b b2 sm" data-a="lg-reset" data-o="${esc(x.order_id)}" data-i="${esc(x.item_idx)}">السماح بإعادة الإرسال</button>` : ""}</td></tr>`).join("")}</table></div>` : '<p class="hint">لا توجد سجلات.</p>');
+}
+async function lgReset(btn) {
+  if (!confirm("سيُحذف سجل هذا العنصر ليمكن إرساله من جديد. تأكد أنه لم يصل للمزوّد فعلاً (وإلا سيُخصم مرتين). متابعة؟")) return;
+  busy(btn, true);
+  try { await fn("smm-hub", { action: "reset_item", order_id: btn.dataset.o, idx: +btn.dataset.i }); toast("تم — يمكنك إعادة الإرسال من صفحة الطلبات"); ORDERS = null; loadSmmLog(); }
+  catch (e) { toast("فشل: " + String(e.message).slice(0, 80), "e"); busy(btn, false); }
 }
 
-/* ---- automatic send to the provider + status refresh (runs while the panel is open) ---- */
+/* ---------- موزّع أحداث التبويب ---------- */
+function pvClick(a, b) {
+  const d = b.dataset;
+  switch (a) {
+    case "pv-sub": PV_SUB = d.s; PV_EDIT = null; return render();
+    case "pv-open": tab = "providers"; ed = null; PV_EDIT = null; PV_SUB = d.s; if (d.id) { SV.pid = d.id; SV.cat = ""; SV.sel.clear(); SV.page = 0; SV.mk = ""; } return render();
+    case "pv-reload": PV_ERR = ""; PV_LOADED = false; return render();
+    case "pv-new": PV_EDIT = { _new: true, id: pvNewId(), name: "", api_url: "", api_key: "", enabled: true, is_default: !PROVIDERS.length, priority: 100 + PROVIDERS.length * 10, default_markup: 30, low_balance: 5, note: "" }; return render();
+    case "pv-edit": PV_EDIT = { ...pvById(d.id) }; return render();
+    case "pv-cancel": PV_EDIT = null; return render();
+    case "pv-save": return pvSave(b);
+    case "pv-del": return pvDelete(d.id);
+    case "pv-toggle": return pvPatch(d.id, { enabled: !(pvById(d.id) || {}).enabled }).then(loadProviders).catch((e) => toast("فشل: " + String(e.message).slice(0, 80), "e"));
+    case "pv-test": return pvTest(b);
+    case "pv-test-draft": return pvTestDraft(b);
+    case "pv-eye": { const k = $("#pv-key"); k.type = k.type == "password" ? "text" : "password"; b.textContent = k.type == "password" ? "إظهار" : "إخفاء"; return; }
+    case "pv-balances": return pvBalances(b);
+    case "sv-load": return svLoad(b);
+    case "sv-imp": return svImport(b, false);
+    case "sv-one": return svImport(b, true);
+    case "sv-pg": SV.page = Math.max(0, SV.page + +d.d); return svResults();
+    case "sm-check": return smmCheck(b);
+    case "sm-reprice": return smmReprice(b);
+    case "sm-markup": return smmMarkup(b);
+    case "sm-wipe": return smmWipe(d.id);
+    case "sm-wipe-gone": return smmWipeGone(d.id);
+    case "sm-undo": return smmUndo();
+    case "lg-reload": return loadSmmLog();
+    case "lg-reset": return lgReset(b);
+  }
+}
+
+/* ---- الإرسال التلقائي للمزوّد + تحديث الحالة (يعمل أثناء فتح اللوحة) ---- */
 const autoOn = () => localStorage.getItem("amx_autosend") !== "0";
 const orderItems = (o) => { let it = o.items; if (typeof it == "string") { try { it = JSON.parse(it); } catch (e) { it = []; } } return Array.isArray(it) ? it : []; };
 const hasSmmItems = (o) => orderItems(o).some((i) => { const p = D.products.find((x) => x.id == i.id); return p && p.smm_service; });
@@ -2441,9 +2677,9 @@ const smmDone = (o) => /complete|cancel|refund|fail|partial/i.test(String(o.smm_
 async function autoSend(o, quiet) {
   if (!autoOn() || !o || o.smm || o.payment_status != "paid" || !hasSmmItems(o)) return;
   try {
-    const j = await fn("smm-order", { action: "send", order_id: o.id });
+    const j = await fn("smm-hub", { action: "send", order_id: o.id });
     o.smm = j.results; o.smm_status = j.smm_status;
-    if (!quiet) toast("أُرسل الطلب تلقائياً إلى المزوّد");
+    if (!quiet) toast(/fail|attention/i.test(j.smm_status || "") ? "الإرسال التلقائي: تحقق من نتيجة الطلب" : "أُرسل الطلب تلقائياً إلى المزوّد", /fail|attention/i.test(j.smm_status || "") ? "e" : "");
     if ($("#ob")) renderOrderList();
   } catch (e) { toast("فشل الإرسال التلقائي: " + String(e.message).slice(0, 70), "e"); }
 }
@@ -2451,7 +2687,7 @@ async function autoSweep() {
   if (!autoOn() || !ORDERS) return;
   for (const o of ORDERS.filter((x) => x.payment_status == "paid" && !x.smm && hasSmmItems(x)).slice(0, 5)) await autoSend(o, true);
   for (const o of ORDERS.filter((x) => x.smm && !smmDone(x)).slice(0, 8)) {
-    try { const j = await fn("smm-order", { action: "refresh", order_id: o.id }); o.smm = j.results; o.smm_status = j.smm_status; } catch (e) {}
+    try { const j = await fn("smm-hub", { action: "refresh", order_id: o.id }); o.smm = j.results; o.smm_status = j.smm_status; } catch (e) {}
   }
   if ($("#ob")) renderOrderList();
 }
@@ -2462,14 +2698,15 @@ async function homeStats() {
   const box = $("#hs");
   if (!box) return;
   box.innerHTML = '<div class="card"><div class="ld"><span class="spin"></span> جارٍ تحميل الأرقام…</div></div>';
-  let rows = [], bal = null, cache = smmCache(), err = "";
+  let rows = [], bals = [], err = "";
   try {
     const r = await api("/rest/v1/orders?select=total,currency,payment_status,status,created_at,items&order=created_at.desc&limit=500");
     if (r.ok) rows = await r.json();
   } catch (e) {}
-  if (smmCfg()) {
-    try { const j = await fn("smm-order", { action: "balance" }); bal = { v: parseFloat(j.balance), c: j.currency || "USD" }; } catch (e) { err = String(e.message || "").slice(0, 80); }
-    try { cache = await smmFetchRates(false); } catch (e) {}
+  const linked = D.products.some((p) => p.smm_service);
+  if (linked && IS_ADMIN && PV_LOADED) {
+    try { bals = (await fn("smm-hub", { action: "balances" })).balances || []; } catch (e) { err = String(e.message || "").slice(0, 80); }
+    for (const pv of PROVIDERS.filter((p) => p.enabled && pvLinked(p.id).length)) { try { await smmFetchRates(pv.id, false); } catch (e) {} }
   }
   const now = new Date(), d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(), w0 = d0 - 6 * 864e5;
   const paid = rows.filter((o) => o.payment_status == "paid");
@@ -2480,55 +2717,28 @@ async function homeStats() {
   const cnt = {};
   paid.forEach((o) => orderItems(o).forEach((i) => { const k = i.id; cnt[k] = cnt[k] || { n: 0, t: i.ar || i.name || i.id }; cnt[k].n += +i.q || 1; }));
   const top = Object.values(cnt).sort((a, b) => b.n - a.n).slice(0, 5);
-  const dr = smmDrift(cache), low = bal && bal.v < (parseFloat(localStorage.getItem("amx_smm_low")) || 5);
+  const lowOf = (b) => { const pv = pvById(b.id); return b.ok && pv && b.balance < +pv.low_balance; };
+  const lows = bals.filter(lowOf), fails = bals.filter((b) => !b.ok);
+  const drifts = PROVIDERS.map((pv) => ({ pv, d: smmDrift(pv.id) })).filter((x) => x.d.up.length || x.d.gone.length);
   const kp = (n, l, cl) => `<div class="stat${cl ? " " + cl : ""}"><b>${n}</b><span>${l}</span></div>`;
   box.innerHTML =
-    `<div class="stats">${kp(rev(sum(tdy)), "مبيعات اليوم")}${kp(rev(sum(wk)), "مبيعات 7 أيام")}${kp(pend, "بانتظار مراجعة الدفع", pend ? "hot" : "")}${kp(open, "طلبات مفتوحة")}${bal ? kp(bal.v.toFixed(2) + " <small>" + esc(bal.c) + "</small>", "رصيدك لدى المزوّد", low ? "hot" : "") : ""}</div>` +
-    (low ? `<div class="card" style="border-color:#f87171"><b>⚠ رصيد المزوّد منخفض.</b> الطلبات ستفشل عند نفاد الرصيد، اشحنه قبل استقبال طلبات جديدة.</div>` : "") +
-    (err && smmCfg() ? `<div class="card hint warn">تعذّر قراءة رصيد المزوّد: ${esc(err)}</div>` : "") +
-    (dr.up.length || dr.gone.length
-      ? `<div class="card" style="border-color:var(--wn)"><h2>تغيّر أسعار المزوّد</h2>` +
-        (dr.up.length ? `<p class="hint">${dr.up.length} منتجاً سعره في متجرك لا يطابق سعر المزوّد الحالي مع هامشك:</p><div class="tw"><table class="tb"><tr><th>المنتج</th><th>سعرك</th><th>الجديد</th></tr>${dr.up.slice(0, 8).map(({ p, np }) => `<tr><td>${esc(p.ar)}</td><td dir="ltr">${p.p}</td><td dir="ltr"><b>${np}</b> ${np > p.p ? "▲" : "▼"}</td></tr>`).join("")}</table></div><div class="acts"><button class="b" data-a="smm-reprice">تطبيق كل الأسعار الجديدة (${dr.up.length})</button></div>` : "") +
-        (dr.gone.length ? `<p class="hint warn" style="margin-top:10px">⚠ ${dr.gone.length} خدمة لم تعد موجودة عند المزوّد: ${dr.gone.slice(0, 4).map((p) => esc(p.ar.slice(0, 30))).join("، ")}. أخفِها أو احذفها.</p>` : "") + `</div>`
-      : smmCfg() ? `<div class="card"><small>✓ أسعار المنتجات المستوردة مطابقة للمزوّد${cache ? " (آخر فحص: " + new Date(cache.ts).toLocaleString("ar") + ")" : ""}.</small> <button class="b b2 sm" data-a="smm-recheck">فحص الآن</button></div>` : "") +
+    `<div class="stats">${kp(rev(sum(tdy)), "مبيعات اليوم")}${kp(rev(sum(wk)), "مبيعات 7 أيام")}${kp(pend, "بانتظار مراجعة الدفع", pend ? "hot" : "")}${kp(open, "طلبات مفتوحة")}${bals.filter((b) => b.ok).map((b) => kp(b.balance.toFixed(2) + " <small>" + esc(b.currency || "") + "</small>", "رصيد " + esc(b.name), lowOf(b) ? "hot" : "")).join("")}</div>` +
+    (lows.length ? `<div class="card" style="border-color:#f87171"><b>⚠ رصيد منخفض لدى: ${lows.map((b) => esc(b.name)).join("، ")}.</b> الطلبات ستفشل عند نفاد الرصيد، اشحنه قبل استقبال طلبات جديدة.</div>` : "") +
+    (fails.length ? `<div class="card hint warn">تعذّر قراءة رصيد: ${fails.map((b) => esc(b.name) + " (" + esc(String(b.error || "").slice(0, 50)) + ")").join("، ")}</div>` : "") +
+    (err && linked ? `<div class="card hint warn">تعذّر قراءة أرصدة المزوّدين: ${esc(err)}</div>` : "") +
+    (drifts.length
+      ? `<div class="card" style="border-color:var(--wn)"><h2>تغيّر أسعار المزوّدين</h2>${drifts.map(({ pv, d }) => `<p class="hint"><b>${esc(pv.name)}</b>: ${d.up.length ? d.up.length + " سعر مختلف" : ""}${d.up.length && d.gone.length ? " · " : ""}${d.gone.length ? d.gone.length + " خدمة مفقودة" : ""}</p>`).join("")}<div class="acts"><button class="b" data-a="pv-open" data-s="sync">فتح الأسعار والمزامنة</button><button class="b b2" data-a="smm-recheck">فحص الآن</button></div></div>`
+      : linked && PV_LOADED ? `<div class="card"><small>✓ أسعار المنتجات المستوردة مطابقة للمزوّدين.</small> <button class="b b2 sm" data-a="smm-recheck">فحص الآن</button></div>` : "") +
     `<div class="card"><h2>الأكثر مبيعاً</h2>${top.length ? top.map((t0, i) => `<div class="it"><span class="thm">${i + 1}</span><div class="im"><b>${esc(t0.t)}</b></div><b>${t0.n}</b></div>`).join("") : '<p class="hint">لا توجد طلبات مدفوعة بعد.</p>'}</div>` +
-    `<div class="card"><h2>الأتمتة</h2><p class="hint">عند تأكيد الدفع يُرسَل الطلب للمزوّد تلقائياً وتتحدّث حالته كل مرة تفتح فيها اللوحة. (يعمل أثناء فتح لوحة الإدارة.)</p><div class="acts"><button class="b ${autoOn() ? "" : "b2"}" data-a="autosend-t">الإرسال التلقائي: ${autoOn() ? "مفعّل" : "متوقف"}</button></div></div>`;
+    `<div class="card"><h2>الأتمتة</h2><p class="hint">عند تأكيد الدفع يُرسَل الطلب للمزوّد المناسب لكل عنصر تلقائياً وتتحدّث حالته كل مرة تفتح فيها اللوحة. (يعمل أثناء فتح لوحة الإدارة.)</p><div class="acts"><button class="b ${autoOn() ? "" : "b2"}" data-a="autosend-t">الإرسال التلقائي: ${autoOn() ? "مفعّل" : "متوقف"}</button></div></div>`;
 }
-async function smmAction(btn, kind) {
+async function smmRecheckAll(btn) {
   busy(btn, true);
-  try {
-    if (kind == "smm-test") {
-      const j = await fn("smm-order", { action: "balance" });
-      smmOut(
-        '✓ الاتصال ناجح — الرصيد: <b dir="ltr">' +
-          esc(j.balance) +
-          " " +
-          esc(j.currency || "") +
-          "</b>"
-      );
-      toast("الاتصال بموقع الرشق ناجح");
-    } else {
-      const j = await fn("smm-order", { action: "services" });
-      if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق — تحقق من الرابط والمفتاح في إعدادات APIs");
-      SMM_SVC = Array.isArray(j)
-        ? j.map((x) => ({
-            id: x.service,
-            name: x.name,
-            category: x.category,
-            rate: x.rate,
-            min: x.min,
-            max: x.max,
-          }))
-        : j.services || [];
-      smmList();
-    }
-  } catch (e) {
-    smmOut("✗ " + esc(e.message));
-    toast("فشل: " + e.message.slice(0, 80), "e");
-  } finally {
-    busy(btn, false);
-  }
+  try { for (const pv of PROVIDERS.filter((p) => p.enabled && pvLinked(p.id).length)) await smmFetchRates(pv.id, true); await homeStats(); }
+  catch (e) { toast("فشل: " + String(e.message).slice(0, 70), "e"); }
+  finally { busy(btn, false); }
 }
+
 async function setPayment(sel) {
   const id = sel.dataset.pst,
     prev = sel.dataset.prev,
@@ -2568,7 +2778,7 @@ async function smmOrder(btn) {
     return;
   busy(btn, true);
   try {
-    const j = await fn("smm-order", { action: act, order_id: id });
+    const j = await fn("smm-hub", { action: act, order_id: id });
     const o = (ORDERS || []).find((x) => x.id == id);
     if (o) {
       o.smm = j.results;
@@ -2601,6 +2811,7 @@ async function boot() {
   if (!SES) return loginView();
   await Promise.all([loadCfg(), checkRole()]);
   if (isStaffOnly()) await loadCfgStaff();
+  if (IS_ADMIN) await loadProviders();
   render();
 }
 boot();
