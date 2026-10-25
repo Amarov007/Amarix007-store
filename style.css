@@ -3718,3 +3718,7 @@ body.qb-open{overflow:hidden}
 .wst.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .wst.wt { background: color-mix(in srgb, var(--ac) 18%, transparent); color: var(--ac); }
 .wst.er { background: color-mix(in srgb, var(--er) 18%, transparent); color: var(--er); }
+
+/* Telegram login widget slot (under the Google button) */
+.tgw { display: flex; justify-content: center; align-items: center; min-height: 46px; margin-top: 10px; direction: ltr; }
+.tgw iframe { max-width: 100%; border-radius: 12px; }

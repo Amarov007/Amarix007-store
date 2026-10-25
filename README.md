@@ -54,10 +54,10 @@
 - `index.html` يضيف `preconnect` إلى Supabase لتسريع تحميل الإعدادات، و`robots` وبيانات Organization/WebSite.
 - لم تُصغَّر ملفات JS/CSS عمداً: التوفير بعد الضغط (gzip) نحو 20KB فقط ولا يستحق تعقيد التحرير. الأيقونات محسّنة أصلاً.
 
-## تحديثات 2026-10-25
-- **قاعدة البيانات:** جداول المحفظة للقراءة فقط من العميل، وسُحبت TRUNCATE/TRIGGER/REFERENCES من `affiliate_tiers` و`smm_providers` و`staff_members`، وصارت الجداول الجديدة لا ترث صلاحيات `anon`/`authenticated` تلقائياً (أعطِ كل جدول جديد صلاحياته صراحةً). السجل في `supabase/migrations/`.
-- **سقف شحن يومي اختياري:** ضع `daily_max` داخل `store_config.data.wallet` (0 أو غيابه = بلا سقف).
-- **مطابقة المحفظة:** `select * from public.wallet_reconcile();` كمدير؛ أي صف = رصيد لا يطابق دفتر الحركات.
-- **صفحات السيو:** `node tools/gen-seo-pages.mjs` ولّد `faq/` و`policies/` و`sitemap.xml`، وأضيف `404.html`.
-- **الفحص:** `python tests/verify-project.py`، ويعمل تلقائياً في GitHub Actions (`.github/workflows/verify.yml`).
-- **CSP:** `frame-src https:` و`img-src https:` تُركتا واسعتين عمداً لأن صور المنتجات وتضمين الصفحات يضبطهما المشرف؛ `send-push` مضبوطة على `verify_jwt=false` فتأكد أنها تتحقق من سرّ داخلي.
+## تسجيل الدخول عبر تيليغرام
+- **مطبَّق على Supabase** (مشروع `pvuobngrybygohendwaz`): الجدول `telegram_logins` + trigger حماية البريد المحجوز (`supabase-telegram-login.sql`) + الدالة الطرفية `telegram-auth` (`supabase/functions/telegram-auth/index.ts`، `verify_jwt=false` لأنها تتحقق من توقيع تيليغرام بنفسها).
+- الآلية: زر Telegram Login Widget الرسمي (وضع `data-auth-url`) يعيد الزائر إلى الصفحة بـ `?id=…&auth_date=…&hash=…` ← `handleTelegramReturn()` في `app.js` يرسلها إلى الدالة ← تتحقق HMAC-SHA256 بتوكن البوت، تمنع الإعادة (`telegram_logins`) وتقبل طلبات أحدث من 10 دقائق فقط ← تُنشئ/تجد المستخدم `tg<ID>@amarix007.store` وتُرجع جلسة Supabase عادية.
+- البوت: يُقرأ من `notify_settings.telegram_bot_token` (بوت الإشعارات نفسه) أو من السر `TELEGRAM_LOGIN_BOT_TOKEN` إن وُضع. الزر يظهر تلقائياً عندما تُرجع الدالة اسم البوت (`checkTelegram()`).
+- **مطلوب مرة واحدة في @BotFather:** `/setdomain` ← اختر البوت ← اكتب `amarix007.store` (النطاق نفسه الذي يُفتح منه المتجر؛ بدونه يرفض تيليغرام الدخول).
+- CSP: أُضيف `https://telegram.org` إلى `script-src` في `index.html` فقط.
+- حسابات تيليغرام ليس لها بريد حقيقي: لا تصلها رسائل البريد (تأكيد/استعادة كلمة المرور). إشعارات المتجر تصلها عبر Push/الواجهة فقط.

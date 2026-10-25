@@ -293,16 +293,3 @@ grant execute on function public.wallet_topup_approve(bigint, numeric)      to a
 grant execute on function public.wallet_topup_reject(bigint, text)          to authenticated;
 grant execute on function public.wallet_admin_adjust(uuid, text, numeric, text) to authenticated;
 grant execute on all functions in schema public to service_role;
-
-
--- =====================================================================
--- تحديثات لاحقة (مطبّقة على القاعدة الحية)
--- =====================================================================
--- 1) المحفظة للقراءة فقط من العميل؛ الكتابة عبر الدوال security definer فقط
-revoke all on table public.wallets, public.wallet_transactions, public.wallet_topups from anon, authenticated, public;
-grant select on table public.wallets, public.wallet_transactions, public.wallet_topups to authenticated;
-
--- 2) سقف شحن يومي اختياري: store_config.data.wallet.daily_max (غير موجود أو 0 = بلا سقف) — الخطأ: above_daily
---    (التعريف الكامل لـ wallet_topup_create المحدّث في supabase/migrations/20261025_wallet_daily_cap_reconcile.sql)
-
--- 3) مطابقة الأرصدة مع الدفتر (للمدير): select * from public.wallet_reconcile();  -- أي صف = عدم تطابق

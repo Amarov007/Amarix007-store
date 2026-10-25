@@ -239,6 +239,7 @@ const T = {
     gbtn: "المتابعة عبر Google",
     gor: "أو",
     gerr: "تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.",
+    tgerr: "تعذّر تسجيل الدخول عبر تيليغرام. حاول مرة أخرى.",
     mailfail: "تعذّر إرسال البريد. حاول لاحقاً.",
     fill: "أدخل البريد الإلكتروني وكلمة المرور",
     fillm: "أدخل بريدك الإلكتروني",
@@ -530,6 +531,7 @@ const T = {
     gbtn: "Continue with Google",
     gor: "or",
     gerr: "Google sign-in failed. Please try again.",
+    tgerr: "Telegram sign-in failed. Please try again.",
     mailfail: "Could not send the email. Try again later.",
     fill: "Enter your email and password",
     fillm: "Enter your email",
@@ -770,6 +772,7 @@ let returnTo = ""; // where to go after login
 let lastOrder = null; // info for the success page
 let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
+let tgBot = ls.get("amx_tg") || ""; // Telegram login bot username (from the telegram-auth function, cached)
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
 const PUBLIC_ROUTES = ["login", "policies", "faq"]; // reachable without an account
 const GUEST_ROUTES = ["", "c", "p", "boost", "cart", "fav"]; // browsing + cart: open to visitors; checkout, orders, account, support and partner still need an account
@@ -2215,7 +2218,6 @@ function walletErr(err) {
     [/wallet_not_eligible/, A ? "المحفظة تعمل مع خدمات الرشق فقط" : "The wallet only works for boost services"],
     [/below_min/, A ? "المبلغ أقل من الحد الأدنى للشحن" : "Amount is below the minimum top-up"],
     [/above_max/, A ? "المبلغ أكبر من الحد الأعلى للشحن" : "Amount is above the maximum top-up"],
-    [/above_daily/, A ? "تجاوزت الحد اليومي للشحن، حاول غداً" : "You reached the daily top-up limit, try again tomorrow"],
     [/invalid_method/, A ? "وسيلة الدفع غير متاحة" : "Payment method is not available"],
     [/too_many_pending/, A ? "لديك طلبات شحن معلّقة كثيرة، أكملها أولاً" : "You have too many open top-ups, finish them first"],
     [/rate_limited/, A ? "محاولات كثيرة، انتظر قليلاً" : "Too many attempts, wait a bit"],
@@ -3867,8 +3869,12 @@ function authPage() {
 const GICON =
   '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
 const googleBtn = () =>
-  googleOn
-    ? `<div class="or"><span>${t( "gor" )}</span></div><button type="button" class="gbtn" data-a="google">${GICON}<span>${t( "gbtn" )}</span></button>`
+  googleOn || tgBot
+    ? `<div class="or"><span>${t( "gor" )}</span></div>${
+        googleOn
+          ? `<button type="button" class="gbtn" data-a="google">${GICON}<span>${t( "gbtn" )}</span></button>`
+          : ""
+      }${tgBot ? `<div class="tgw" id="tg-w"></div>` : ""}`
     : "";
 
 const authMsg = (m) => {
@@ -4172,6 +4178,71 @@ async function checkGoogle() {
 addEventListener("pageshow", (e) => {
   if (e.persisted) render();
 }); // back from Google: re-enable the button
+
+/* ---------- Telegram login (official Telegram Login Widget, redirect mode) ----------
+   The widget sends the person back to this page as ?id=…&auth_date=…&hash=…; handleTelegramReturn() posts those to the
+   telegram-auth Edge Function, which verifies Telegram's signature and answers with a normal Supabase session. */
+async function checkTelegram() {
+  try {
+    const r = await fetch(SB_URL + "/functions/v1/telegram-auth?cfg=1", {
+      headers: { apikey: SB_KEY },
+    });
+    const bot = r.ok ? String((await r.json()).bot || "") : "";
+    ls.set("amx_tg", bot);
+    if (bot == tgBot) return;
+    tgBot = bot;
+    const f = $("#af");
+    if (f && ![...f.querySelectorAll("input")].some((i) => i.type != "hidden" && i.value)) render();
+  } catch {}
+}
+function tgMount() {
+  const w = document.getElementById("tg-w");
+  if (!w || !tgBot || w.dataset.m) return;
+  w.dataset.m = "1";
+  const s = document.createElement("script");
+  s.async = true;
+  s.src = "https://telegram.org/js/telegram-widget.js?22";
+  s.setAttribute("data-telegram-login", tgBot);
+  s.setAttribute("data-size", "large");
+  s.setAttribute("data-radius", "12");
+  s.setAttribute("data-lang", lang == "ar" ? "ar" : "en");
+  s.setAttribute("data-auth-url", location.origin + location.pathname);
+  w.appendChild(s);
+}
+async function handleTelegramReturn() {
+  const q = new URLSearchParams(location.search);
+  if (!q.get("hash") || !q.get("auth_date") || !q.get("id")) return;
+  const data = {};
+  ["id", "first_name", "last_name", "username", "photo_url", "auth_date", "hash"].forEach((k) => {
+    if (q.has(k)) data[k] = q.get(k);
+  });
+  history.replaceState(null, "", location.pathname + "#/login"); // never leave the signed payload in the address bar
+  try {
+    const r = await fetch(SB_URL + "/functions/v1/telegram-auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SB_KEY },
+      body: JSON.stringify({ data, ref: (() => {
+          try {
+            return localStorage.getItem("ax_ref") || "";
+          } catch {
+            return "";
+          }
+        })(),
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) throw new Error(j.error || "telegram");
+    storeSession(j);
+    history.replaceState(null, "", location.pathname + "#/");
+    setTimeout(() => {
+      toast(t("loggedin"));
+      beep("ok");
+    }, 500);
+  } catch {
+    authMode = "login";
+    setTimeout(() => toast(t("tgerr"), "er"), 500);
+  }
+}
 
 /* Links in e-mails come back as #access_token=…&type=recovery|signup (or #error=…). Handle them, then clean the URL. */
 async function handleAuthRedirect() {
@@ -4819,6 +4890,7 @@ const AUTH_ROUTES = ["orders", "account", "support"];
 function render() {
   render0();
   qbRefresh();
+  tgMount();
 }
 function render0() {
   if (waitCfg) {
@@ -5159,7 +5231,9 @@ async function boot() {
   user = ls.json("amx_user", null);
   if (user && !ls.get("amx_token")) user = null;
   checkGoogle();
+  checkTelegram();
   await handleAuthRedirect();
+  await handleTelegramReturn();
   /* Stale-while-revalidate: the last published config is cached in localStorage ('amx_remote') and used for the first paint, so returning visitors never see the embedded placeholder store. With no cache yet (first visit) we show a skeleton instead of the placeholders, and fall back to the embedded copy only if the request fails or is too slow. */
   const cached =
     REMOTE_CFG && Array.isArray(REMOTE_CFG.products) ? REMOTE_CFG : null;
