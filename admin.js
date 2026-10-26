@@ -1022,8 +1022,9 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("change", async (e) => {
   const t = e.target,
     d = t.dataset;
+  if (t.id == "smm-fcat") { SMM_FCAT = t.value; return; }
   if (t.id == "smm-lim") return smmList(); // refresh the "import N results" button
-  if (t.id == "smm-prov") { SMM_PROV = t.value || "main"; SMM_SVC = []; SMM_SVC_PROV = null; return smmOut("اضغط «عرض الخدمات» لجلب خدمات «" + esc(provName(SMM_PROV)) + "»."); } // never keep another site's list on screen
+  if (t.id == "smm-prov") { SMM_PROV = t.value || "main"; SMM_SVC = []; SMM_SVC_PROV = null; SMM_FCATS = []; SMM_FCATS_PROV = null; SMM_FCAT = ""; return smmOut("اضغط «عرض الخدمات» لجلب خدمات «" + esc(provName(SMM_PROV)) + "»."); } // never keep another site's list on screen
   if (d.up) return upl(t);
   if (d.imp) return imp(t);
   if (d.pst) return setPayment(t);
@@ -1299,6 +1300,7 @@ document.addEventListener("click", (e) => {
   if (a == "num-sync") return numSync(b);
   if (a == "num-diag") return numDiag(b);
   if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
+  if (a == "smm-fcat-go") return smmFcatGo(b);
   if (a == "smm-imp") return smmImport(b);
   if (a == "smm-wipe") return smmWipe(b, false);
   if (a == "smm-redo") return smmWipe(b, true);
@@ -2501,6 +2503,40 @@ async function provDel(btn) {
 }
 
 let SMM_SVC = [];
+/* فئات مزوّد custom ذي كتالوج من مستويين (مثل FazerCards): الفئة = لعبة، وعروضها تُجلب عند اختيارها */
+let SMM_FCATS = [], SMM_FCATS_PROV = null, SMM_FCAT = "";
+async function smmLoadCats(pv) {
+  if ((PROV_KIND[pv] || "smm") != "custom") return null;
+  try {
+    if (!(await siteSupport())) return null;
+    const j = await fn("smm-order", { action: "categories", provider: pv });
+    return Array.isArray(j.categories) && j.categories.length ? j.categories : null;
+  } catch (e) { return null; } // لا كتالوج فئات لهذا المزوّد: يعمل الجلب العادي
+}
+function smmCatPick() {
+  if (!SMM_FCATS.length || SMM_FCATS_PROV != smmProv()) return "";
+  return '<div class="g2" style="margin:8px 0;align-items:end"><label class="fld"><span>الفئة (اللعبة) عند المزوّد — ' + SMM_FCATS.length + '</span><select class="inp" id="smm-fcat"><option value="">— اختر فئة —</option><option value="*"' + (SMM_FCAT == "*" ? " selected" : "") + '>كل الفئات (حتى 60)</option>' +
+    SMM_FCATS.map((c) => `<option value="${esc(c.id)}"${c.id == SMM_FCAT ? " selected" : ""}>${esc(c.name)}</option>`).join("") +
+    '</select></label><button class="b" data-a="smm-fcat-go" type="button">عرض عروض الفئة</button></div>';
+}
+function smmShowPicker() {
+  smmOut(smmCatPick() + '<p class="hint">اختر الفئة ثم اضغط «عرض عروض الفئة». لاستبدال منتجات فئة واحدة فقط اضغط «حذف وإعادة جلب» بعد اختيارها؛ منتجات الفئات الأخرى لن تُمسّ.</p>');
+}
+async function smmFcatGo(btn) {
+  const v = (($("#smm-fcat") || {}).value) || "";
+  if (!v) return toast("اختر فئة أولاً", "e");
+  SMM_FCAT = v;
+  busy(btn, true);
+  try {
+    await smmLoadServices(smmProv(), v == "*" ? "" : v);
+    smmList();
+  } catch (e) {
+    smmOut(smmCatPick() + "✗ " + esc(e.message));
+    toast("فشل: " + String(e.message).slice(0, 80), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
 function smmOut(html) {
   const o = $("#smm-out");
   if (o) o.innerHTML = html;
@@ -2536,7 +2572,7 @@ function smmList() {
     `<label class="fld"><span>الحد الأقصى للاستيراد (0 = كل النتائج)</span><input class="inp" id="smm-lim" type="number" min="0" step="100" value="${esc(String(smmLim() === Infinity ? 0 : smmLim()))}" dir="ltr"></label></div>` +
     `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button>`;
   smmOut(
-    L.length
+    smmCatPick() + (L.length
       ? bar +
           '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
           L.map(
@@ -2544,7 +2580,7 @@ function smmList() {
               `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}${x.category ? '<br><small class="od-m">' + esc(x.category) + '</small>' : ''}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button></td></tr>`
           ).join("") +
           "</table>"
-      : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c"
+      : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c")
   );
 }
 /* ---- service -> Arabic title / platform / type (so the store filters work) ---- */
@@ -2603,10 +2639,11 @@ function smmImportList(src, cat, mk, prov) {
   src.forEach((x) => {
     const sid = String(x.id), rate = parseFloat(x.rate);
     // the same service number can exist on two different sites, so "already imported" is checked per site
-    if (!(rate > 0) || D.products.some((p) => String(p.smm_service) == sid && provOf(p) == pv && p.c == cat)) { skip++; return; }
+    const kd0 = PROV_KIND[pv] || "smm", cty = kd0 == "custom" && x.country ? String(x.country) : "";
+    if (!(rate > 0) || D.products.some((p) => String(p.smm_service) == sid && provOf(p) == pv && p.c == cat && (!cty || String(p.smm_country || "") == cty))) { skip++; return; }
     const it = NEW.products(), mt = smmMeta(x), name = String(x.name || ("Service " + sid)).trim();
     Object.assign(it, {
-      id: pv == "main" ? "smm" + sid : "smm_" + pv + "_" + sid, c: cat, k: "buy", ar: mt.ar, en: name,
+      id: pv == "main" ? "smm" + sid : "smm_" + pv + "_" + sid + (cty ? "_" + cty.replace(/[^A-Za-z0-9_-]/g, "_") : ""), c: cat, k: "buy", ar: mt.ar, en: name,
       p: smmUnitPrice(rate, 1, mk),
       o: 0, d: 0, r: 5, n: 0, bs: 0, tg: mt.tg, sp: mt.plAr + " · " + mt.ty,
       smm_service: sid, smm_qty: 1, smm_mk: mk,
@@ -2619,6 +2656,10 @@ function smmImportList(src, cat, mk, prov) {
       it.smm_input = kd == "smsactivate" ? "none" : "text";
       if (x.country) it.smm_country = String(x.country);
       if (kd == "smsactivate") { it.qmin = 1; it.qmax = 1; }
+      if (cty && x.category) { // عرض شحن داخل فئة (لعبة): الاسم يحمل اسم اللعبة حتى لا تتشابه العروض بين الألعاب
+        it.ar = x.category + " · " + name; it.en = x.category + " — " + name; it.tg = x.category + " " + name; it.sp = x.category;
+        it.qmin = 1; it.qmax = 1;
+      }
     }
     D.products.push(it);
     smmEnsureFilter(cat, mt.plEn, mt.ty);
@@ -2629,11 +2670,11 @@ function smmImportList(src, cat, mk, prov) {
 
 /* ---- حذف كل منتجات الرشق (المستوردة + القديمة داخل أقسام الرشق) وإعادة جلبها ---- */
 const isBoostProduct = (p) => !!p.smm_service || (D.categories.find((c) => c.id == p.c) || {}).ty == "boost";
-async function smmLoadServices(prov) {
+async function smmLoadServices(prov, cat) {
   const pv = prov || smmProv();
   // a non-main site needs the multi-site function: the old one would answer with the MAIN site's services
   if (pv != "main" && !(await siteSupport())) throw new Error(SITES_OLD);
-  const j = await fn("smm-order", { action: "services", provider: pv });
+  const j = await fn("smm-order", { action: "services", provider: pv, ...(cat ? { category: cat } : {}) });
   if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق — تحقق من الرابط والمفتاح في إعدادات APIs");
   SMM_SVC = Array.isArray(j)
     ? j.map((x) => ({ id: x.service, name: x.name, category: x.category, rate: x.rate, min: x.min, max: x.max, country: x.country }))
@@ -2641,8 +2682,17 @@ async function smmLoadServices(prov) {
   SMM_SVC_PROV = pv; // the site this list really came from: imports are tagged with it, not with the dropdown's current value
 }
 async function smmWipe(btn, redo) {
-  const prov = smmProv(), pn = provName(prov);
-  const inProv = (p) => isBoostProduct(p) && provOf(p) == prov; // only the chosen site's products: other sites are never touched
+  const prov = smmProv();
+  // مزوّد بفئات (ألعاب): لا حذف شامل بالخطأ — يجب اختيار الفئة أولاً، ويُستبدل منتجاتها فقط
+  if (PROV_KIND[prov] == "custom" && SMM_FCATS_PROV != prov) {
+    const cats = await smmLoadCats(prov);
+    if (cats) { SMM_FCATS = cats; SMM_FCATS_PROV = prov; SMM_FCAT = ""; smmShowPicker(); return toast("لهذا المزوّد فئات: اختر الفئة (اللعبة) من القائمة ثم أعد الضغط", "e"); }
+  }
+  const byCat = SMM_FCATS_PROV == prov && SMM_FCATS.length > 0;
+  if (byCat && !SMM_FCAT) return toast("اختر الفئة (اللعبة) من القائمة أولاً", "e");
+  const fc = byCat && SMM_FCAT != "*" ? String(SMM_FCAT) : "";
+  const pn = provName(prov) + (fc ? " — " + (((SMM_FCATS.find((c) => c.id == fc)) || {}).name || fc) : "");
+  const inProv = (p) => isBoostProduct(p) && provOf(p) == prov && (!fc || String(p.smm_country || "") == fc); // only the chosen site's (and category's) products: others are never touched
   const old = D.products.filter(inProv);
   if (!old.length && !redo) return toast("لا توجد منتجات رشق لحذفها لهذا الموقع", "e");
   const mkEl = $("#smm-mk"), catEl = $("#smm-cat");
@@ -2652,7 +2702,7 @@ async function smmWipe(btn, redo) {
   busy(btn, true);
   try {
     if (redo) {
-      await smmLoadServices(prov); // fetch first: if this fails nothing is deleted
+      await smmLoadServices(prov, fc); // fetch first: if this fails nothing is deleted
       if (!SMM_SVC.length) throw new Error("المزوّد لم يُرجع أي خدمة — لم يُحذف شيء");
     }
     const n = Math.min(SMM_SVC.length, smmLim());
@@ -2668,7 +2718,7 @@ async function smmWipe(btn, redo) {
     if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportList(SMM_SVC.slice(0, smmLim()), cat, mk, prov); }
     save();
     toast(redo ? `حُذف ${old.length} وأُضيف ${r.add} منتج جديد. اضغط نشر للحفظ` : `حُذف ${old.length} منتج. اضغط نشر للحفظ`);
-    smmOut(redo ? `✓ «${esc(pn)}»: حُذف ${old.length} وأُضيف ${r.add} (تخطّي ${r.skip}). اضغط «نشر» لتطبيق التغيير على المتجر.` : `✓ «${esc(pn)}»: حُذف ${old.length} منتج رشق. اضغط «نشر» لتطبيق التغيير.`);
+    smmOut(smmCatPick() + (redo ? `✓ «${esc(pn)}»: حُذف ${old.length} وأُضيف ${r.add} (تخطّي ${r.skip}). اضغط «نشر» لتطبيق التغيير على المتجر.` : `✓ «${esc(pn)}»: حُذف ${old.length} منتج رشق. اضغط «نشر» لتطبيق التغيير.`));
   } catch (e) {
     smmOut("✗ " + esc(e.message));
     toast("فشل: " + String(e.message).slice(0, 80), "e");
@@ -2702,7 +2752,8 @@ async function smmFetchRates(force) {
   await Promise.all(smmProvsUsed().map(async (pv) => {
     try {
       if (pv != "main" && !(await siteSupport())) throw new Error(SITES_OLD);
-      const j = await fn("smm-order", { action: "services", provider: pv });
+      const cs = PROV_KIND[pv] == "custom" ? [...new Set(D.products.filter((p) => p.smm_service && provOf(p) == pv && p.smm_country).map((p) => String(p.smm_country)))] : [];
+      const j = await fn("smm-order", { action: "services", provider: pv, ...(cs.length ? { categories: cs } : {}) });
       if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق");
       const L = Array.isArray(j) ? j : j.services || [];
       const want = new Set(D.products.filter((p) => p.smm_service && provOf(p) == pv).map((p) => String(p.smm_service)));
@@ -2827,8 +2878,15 @@ async function smmAction(btn, kind) {
       );
       toast("الاتصال بموقع الرشق ناجح");
     } else {
-      await smmLoadServices(pv);
-      smmList();
+      const cats = await smmLoadCats(pv);
+      if (cats) {
+        SMM_FCATS = cats; SMM_FCATS_PROV = pv; SMM_FCAT = ""; SMM_SVC = []; SMM_SVC_PROV = null;
+        smmShowPicker();
+      } else {
+        SMM_FCATS = []; SMM_FCATS_PROV = null;
+        await smmLoadServices(pv);
+        smmList();
+      }
     }
   } catch (e) {
     smmOut("✗ " + esc(e.message));
