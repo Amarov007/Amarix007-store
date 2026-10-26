@@ -772,7 +772,7 @@ let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
 const PUBLIC_ROUTES = ["login", "policies", "faq"]; // reachable without an account
-const GUEST_ROUTES = ["", "c", "p", "boost", "cart", "fav"]; // browsing + cart: open to visitors; checkout, orders, account, support and partner still need an account
+const GUEST_ROUTES = ["", "c", "p", "x", "boost", "cart", "fav"]; // browsing + cart: open to visitors; checkout, orders, account, support and partner still need an account
 let authMode = "login"; // login | signup | forgot | reset | check
 let checkKind = "signup"; // what the "check your email" page is about: signup | recover
 let pendingEmail = "";
@@ -786,6 +786,7 @@ if (!T[lang]) lang = "ar";
 
 /* Config: embedded store-data.js, overridden by a newer remote copy */
 function setCfg(cfg) {
+  if (window.AMXExt) cfg = AMXExt.merge(cfg); // ext-store.js: PUBG / live apps / AI sections
   CFG = cfg;
   SOC = cfg.social || {};
   C = (CFG.categories || []).map((c) => ({
@@ -1106,7 +1107,7 @@ function clearFilters(id) {
   render();
 }
 function searchPage() {
-  const a = P.filter((p) => hit(p, q)),
+  const a = P.filter((p) => hit(p, q) && !p.ext),
     st = a.filter((p) => !isBoost(p)),
     nb = a.length - st.length;
   const bl = nb
@@ -1675,7 +1676,7 @@ function snSync() {
     tr = box && box.firstElementChild;
   if (!tr || !tr.classList.contains("sn-track")) return;
   const [, r, id] = (location.hash || "#/").split("?")[0].split("/"),
-    cur = r == "c" ? dec(id || "") : r == "boost" ? (boostCat() || {}).id ?? null : r ? null : "";
+    cur = r == "c" || r == "x" ? dec(id || "") : r == "boost" ? (boostCat() || {}).id ?? null : r ? null : "";
   let on = null;
   tr.querySelectorAll(".sn").forEach((a) => {
     const is = cur !== null && a.dataset.s == cur;
@@ -1816,7 +1817,7 @@ function footer() {
 
 function nav() {
   const r = (location.hash || "#/").split("?")[0].split("/")[1] || "",
-    active = r == "c" || r == "p" ? "" : r == "done" ? "orders" : r == "partner" ? "account" : r;
+    active = r == "c" || r == "p" || r == "x" ? "" : r == "done" ? "orders" : r == "partner" ? "account" : r;
   const n = cartCount(),
     v = $("#nv");
   const items = [
@@ -1935,7 +1936,7 @@ function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
   if (q) return searchPage();
   return (
-    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> <h2>${t("all")}</h2>${grid(P.filter((p) => !isBoost(p)))}`
+    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> <h2>${t("all")}</h2>${grid(P.filter((p) => !isBoost(p) && !p.ext))}`
   );
 }
 
@@ -4558,7 +4559,7 @@ async function handleAuthRedirect() {
    Platform and service type are detected from the product text (tag / spec / names), so no data has to be changed. */
 const isBoost = (p) => !!p && !isVisit(p) && needsLink(p);
 const boostCat = () => C.find((c) => c.ty == "boost") || null;
-const catHref = (c) => (c && c.ty == "boost" ? "#/boost" : "#/c/" + ex(c && c.id));
+const catHref = (c) => (c && c.ty == "boost" ? "#/boost" : c && window.AMXExt && AMXExt.has(c.id) ? "#/x/" + ex(c.id) : "#/c/" + ex(c && c.id));
 const sbT = (ar, en) => (lang == "ar" ? ar : en);
 
 /* [id, Arabic, English, detection regex (runs on normalised text), glyph (BR code or letters), background, text colour] */
@@ -5197,7 +5198,9 @@ function render0() {
     return;
   }
   m.innerHTML =
-    r == "c"
+    (r == "x" || r == "c") && window.AMXExt && AMXExt.has(dec(id || ""))
+      ? AMXExt.page(dec(id || ""))
+      : r == "c"
       ? catPage(dec(id || ""))
       : r == "p"
       ? prodPage(dec(id || ""))
