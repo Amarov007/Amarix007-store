@@ -278,5 +278,5 @@
       return String(a.id || "").localeCompare(String(b.id || ""));
     });
   }
-  g.AMXSvc = { parse, typeOf, brandOf, hubOf, providerOf, deliveryOf, availOf, typeLabel, requiredOf, denomination, refine, sortList };
+  g.AMXSvc = { norm, parse, typeOf, brandOf, hubOf, providerOf, deliveryOf, availOf, typeLabel, requiredOf, denomination, refine, sortList };
 })(typeof window !== "undefined" ? window : globalThis);

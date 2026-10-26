@@ -2352,11 +2352,23 @@ async function setTicketStatus(sel) {
 
 /* ---------- SMM & payment helpers (Edge Function `smm`) ---------- */
 async function fn(name, body) {
-  const r = await api("/functions/v1/" + name, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body || {}),
-  });
+  /* مهلة 50 ثانية: بدونها يبقى زر «جارٍ الجلب…» معلّقاً للأبد إن لم يردّ Supabase / المزوّد */
+  const ac = new AbortController();
+  const tm = setTimeout(() => ac.abort(), 50000);
+  let r;
+  try {
+    r = await api("/functions/v1/" + name, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+      signal: ac.signal,
+    });
+  } catch (e) {
+    if (e && e.name === "AbortError") throw new Error("انتهت المهلة (50 ثانية) — لم تردّ الدالة " + name + " أو المزوّد بطيء/محجوب");
+    throw new Error("تعذّر الاتصال بالدالة " + name + ": " + String((e && e.message) || e));
+  } finally {
+    clearTimeout(tm);
+  }
   if (r.status == 404)
     throw new Error(
       "الدالة " + name + " غير منشورة في Supabase (Edge Functions)"

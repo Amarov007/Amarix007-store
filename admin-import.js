@@ -49,7 +49,7 @@
 
   /* ------------------------------------------------------------------ small helpers ------------------------------------------------------------------ */
   const SV = () => g.AMXSvc;
-  const norm = (s) => (SV() ? SV().norm(s) : String(s || "").toLowerCase());
+  const norm = (s) => (SV() && typeof SV().norm === "function" ? SV().norm(s) : String(s == null ? "" : s).normalize("NFKD").toLowerCase());
   const r2 = (v) => Math.round(v * 100) / 100;
   const r6 = (v) => Math.round(v * 1e6) / 1e6;
   const num = (v, d) => (isFinite(parseFloat(v)) ? parseFloat(v) : d);
