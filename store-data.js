@@ -90,6 +90,8 @@ window.AMX={
    • Prices are in the BASE currency (USD) — the store converts them with AMX.rates. ALL PRICES BELOW ARE SAMPLES: edit them.
    • provider_id / provider_service_id: leave "" = manual fulfilment (admin delivers). Fill them to let smm-order call the provider.
      A package may override the service-level values with its own provider_service_id.
+   • provider_category (optional): for providers whose order needs a category AND an offer (e.g. FazerCards: category_id + offer_id).
+     provider_service_id = the offer id, provider_category = the category id (e.g. "pubg_mobile_auto"). Sent to the provider as {country}.
    • Every sellable package becomes one flat product  "<service.id>__<package.id>"  (ext-store.js builds it),
      because orders_enforce_pricing() only accepts ids found in store_config.products → run `node tools/export-ext-products.mjs`
      and import the result once (see README block in that file).
@@ -105,7 +107,7 @@ window.AMX_EXT = {
   services: [
     /* ---------- 1) PUBG Mobile — Midasbuy flow: Player ID → verify → pick UC → checkout ---------- */
     { id: "pubg_mobile", category: "pubg", ar: "ببجي موبايل", en: "PUBG Mobile", color: "#f5a623", logo: "",
-      provider_id: "", provider_service_id: "",
+      provider_id: "", provider_service_id: "", provider_category: "",
       input_type: "player_id", requires_player_id: true,
       id_label: "Player ID", id_hint: "تجده في ملفك الشخصي داخل اللعبة", id_pattern: "^[0-9]{5,12}$", unit: "UC",
       packages: [
@@ -119,7 +121,7 @@ window.AMX_EXT = {
 
     /* ---------- 2) Live & chat apps — Codashop flow: brand card → modal (account ID + coin grid) ---------- */
     { id: "bigo_live", category: "live", ar: "بيجو لايف", en: "Bigo Live", color: "#1ec8ff", logo: "",
-      provider_id: "", provider_service_id: "", input_type: "user_id", requires_player_id: true,
+      provider_id: "", provider_service_id: "", provider_category: "", input_type: "user_id", requires_player_id: true,
       id_label: "Bigo ID", id_hint: "المعرّف الظاهر في صفحة حسابك", id_pattern: "^[A-Za-z0-9_.-]{3,30}$", unit: "ماسة",
       packages: [
         { id: "d100",   amount: 100,   price: 1.6 },

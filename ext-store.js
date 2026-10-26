@@ -57,7 +57,7 @@
   /* flat sellable product (the shape app.js / the server expect in store_config.products) */
   function toProduct(s, p) {
     const o = { id: p.product_id, c: s.category, ar: pkgName(s, p, false), en: pkgName(s, p, true), p: p.price, o: 0, r: 5, n: 0, d: 0, tg: s.en, sp: "", img: "", images: [], ext: { svc: s.id, pkg: p.id } };
-    if (p.provider_service_id) Object.assign(o, { smm_provider: s.provider_id || "", smm_service: p.provider_service_id, smm_qty: 1, smm_input: p.input_type === "none" ? "none" : "text" });
+    if (p.provider_service_id) Object.assign(o, { smm_provider: s.provider_id || "", smm_service: p.provider_service_id, smm_qty: 1, smm_input: p.input_type === "none" ? "none" : "text", smm_country: p.provider_category || s.provider_category || "" });
     return o;
   }
   const products = () => SV.flatMap((s) => s.packages.map((p) => toProduct(s, p)));
