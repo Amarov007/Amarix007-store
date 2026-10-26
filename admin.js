@@ -2037,7 +2037,7 @@ async function loadOrders() {
 function smmBlock(o, items) {
   const has = items.some((i) => {
     const p = D.products.find((x) => x.id == i.id);
-    return p && p.smm_service;
+    return p && p.smm_service && p.auto !== false;
   });
   if (!has && !o.smm) return "";
   const res = Array.isArray(o.smm)
@@ -2656,17 +2656,18 @@ function smmList() {
   const mk = $("#smm-mk"), ct = $("#smm-cat");
   if (mk) SMM_MK = mk.value;
   if (ct) SMM_CAT = ct.value;
-  if (!SMM_CAT) SMM_CAT = ((D.categories.find((c) => c.ty == "boost") || D.categories[0] || {}).id) || "";
+  /* FIX: there is NO default target any more (it used to fall back to the first "boost" category, which dumped games / apps into SMM). */
+  if (SMM_CAT && !D.categories.some((c) => c.id == SMM_CAT)) SMM_CAT = "";
   const all = smmFiltered(), L = all.slice(0, 80);
   const bar =
     '<p class="hint" style="margin:6px 0">المصدر: <b>' + esc(provName(SMM_SVC_PROV || "main")) + '</b> — المنتجات المستوردة تُربط بهذا الموقع.</p>' +
     '<div class="g2" style="margin:8px 0;align-items:end">' +
-    '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641</span><select class="inp" id="smm-cat">' +
-    D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("") +
+    '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641 (\u0625\u0644\u0632\u0627\u0645\u064a)</span><select class="inp" id="smm-cat"><option value="">\u2014 \u0627\u062e\u062a\u0631 \u0627\u0644\u0642\u0633\u0645 \u0642\u0628\u0644 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u2014</option>' +
+    D.categories.filter((c) => c.ty != "hub").map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)} \u00b7 ${esc(typeof AMXImport != "undefined" ? AMXImport.catHubLabel(c) : "")}</option>`).join("") +
     '</select></label>' +
     `<label class="fld"><span>\u0647\u0627\u0645\u0634 \u0627\u0644\u0631\u0628\u062d %</span><input class="inp" id="smm-mk" type="number" min="0" step="1" value="${esc(SMM_MK)}" dir="ltr"></label>` +
     `<label class="fld"><span>الحد الأقصى للاستيراد (0 = كل النتائج)</span><input class="inp" id="smm-lim" type="number" min="0" step="100" value="${esc(String(smmLim() === Infinity ? 0 : smmLim()))}" dir="ltr"></label></div>` +
-    `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button>`;
+    `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button> <button class="b b2" type="button" data-tab="import">\u0645\u0631\u0643\u0632 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0627\u0644\u0645\u062a\u0642\u062f\u0645 (\u0645\u0639\u0627\u064a\u0646\u0629 \u0648\u062a\u0639\u062f\u064a\u0644 \u0642\u0628\u0644 \u0627\u0644\u062d\u0641\u0638) \u2190</button>`;
   smmOut(
     smmCatPick() + (L.length
       ? bar + (smmGroupsOf(all.slice(0, smmLim())) ? smmMapBox(smmGroupsOf(all.slice(0, smmLim()))) : "") +
@@ -2722,7 +2723,7 @@ const smmLimits = (min, max, u) => {
 function smmImport(btn) {
   const mk = Math.max(0, parseFloat(($("#smm-mk") || {}).value) || 0);
   const cat = ($("#smm-cat") || {}).value || SMM_CAT;
-  if (!cat) return toast("اختر قسماً", "e");
+  if (!cat && !smmGroupsOf(smmFiltered().slice(0, smmLim()))) return toast("اختر القسم المستهدف أولاً (لا يوجد قسم افتراضي)", "e");
   try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {}
   const src = btn.dataset.id == "*" ? smmFiltered().slice(0, smmLim()) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
   const r = smmImportMapped(src, cat, mk, SMM_SVC_PROV || "main");
@@ -2738,26 +2739,8 @@ function smmImportList(src, cat, mk, prov) {
     // the same service number can exist on two different sites, so "already imported" is checked per site
     const kd0 = PROV_KIND[pv] || "smm", cty = kd0 == "custom" && x.country ? String(x.country) : "";
     if (!(rate > 0) || D.products.some((p) => String(p.smm_service) == sid && provOf(p) == pv && p.c == cat && (!cty || String(p.smm_country || "") == cty))) { skip++; return; }
-    const it = NEW.products(), mt = smmMeta(x), name = String(x.name || ("Service " + sid)).trim();
-    Object.assign(it, {
-      id: pv == "main" ? "smm" + sid : "smm_" + pv + "_" + sid + (cty ? "_" + cty.replace(/[^A-Za-z0-9_-]/g, "_") : ""), c: cat, k: "buy", ar: mt.ar, en: name,
-      p: smmUnitPrice(rate, 1, mk),
-      o: 0, d: 0, r: 5, n: 0, bs: 0, tg: mt.tg, sp: mt.plAr + " · " + mt.ty,
-      smm_service: sid, smm_qty: 1, smm_mk: mk,
-      ...(pv == "main" ? {} : { smm_provider: pv }),
-      ...smmLimits(x.min, x.max, 1),
-    });
-    // numbers / custom providers: ordinary products (not per-1000 boost); the code and country of the provider travel with the product
-    const kd = PROV_KIND[pv] || "smm";
-    if (kd != "smm") {
-      it.smm_input = kd == "smsactivate" ? "none" : "text";
-      if (x.country) it.smm_country = String(x.country);
-      if (kd == "smsactivate") { it.qmin = 1; it.qmax = 1; }
-      if (cty && x.category) { // عرض شحن داخل فئة (لعبة): الاسم يحمل اسم اللعبة حتى لا تتشابه العروض بين الألعاب
-        it.ar = x.category + " · " + name; it.en = x.category + " — " + name; it.tg = x.category + " " + name; it.sp = x.category;
-        it.qmin = 1; it.qmax = 1;
-      }
-    }
+    if (typeof AMXImport == "undefined") { skip++; return; } // admin-import.js is required (see admin.html)
+    const it = AMXImport.build(x, { cat, mk, prov: pv, kind: PROV_KIND[pv] || "smm" }), mt = smmMeta(x);
     D.products.push(it);
     smmEnsureFilter(cat, mt.plEn, mt.ty);
     add++;
@@ -2766,7 +2749,7 @@ function smmImportList(src, cat, mk, prov) {
 }
 
 /* ---- حذف كل منتجات الرشق (المستوردة + القديمة داخل أقسام الرشق) وإعادة جلبها ---- */
-const isBoostProduct = (p) => !!p.smm_service || (D.categories.find((c) => c.id == p.c) || {}).ty == "boost";
+const isBoostProduct = (p) => (p.ptype ? p.ptype == "smm" : !!p.smm_service || (D.categories.find((c) => c.id == p.c) || {}).ty == "boost"); // typed products: only real SMM ones (games / apps are never wiped as "boost")
 async function smmLoadServices(prov, cat) {
   const pv = prov || smmProv();
   // a non-main site needs the multi-site function: the old one would answer with the MAIN site's services
@@ -2774,7 +2757,7 @@ async function smmLoadServices(prov, cat) {
   const j = await fn("smm-order", { action: "services", provider: pv, ...(cat ? { category: cat } : {}) });
   if (!Array.isArray(j) && !Array.isArray(j.services)) throw new Error(j.error || "رد غير متوقع من موقع الرشق — تحقق من الرابط والمفتاح في إعدادات APIs");
   SMM_SVC = Array.isArray(j)
-    ? j.map((x) => ({ id: x.service, name: x.name, category: x.category, rate: x.rate, min: x.min, max: x.max, country: x.country }))
+    ? j.map((x) => ({ id: x.service, name: x.name, category: x.category, rate: x.rate, min: x.min, max: x.max, country: x.country, image: x.image, amount: x.amount, available: x.available, type: x.type, count: x.count }))
     : j.services || [];
   SMM_SVC_PROV = pv; // the site this list really came from: imports are tagged with it, not with the dropdown's current value
 }
@@ -2794,8 +2777,8 @@ async function smmWipe(btn, redo) {
   if (!old.length && !redo) return toast("لا توجد منتجات رشق لحذفها لهذا الموقع", "e");
   const mkEl = $("#smm-mk"), catEl = $("#smm-cat");
   const mk = Math.max(0, parseFloat(mkEl ? mkEl.value : localStorage.getItem("amx_smm_mk")) || 30);
-  const cat = (catEl && catEl.value) || SMM_CAT || (D.categories.find((c) => c.ty == "boost") || {}).id || "";
-  if (redo && !cat) return toast("لا يوجد قسم رشق لاستيراد المنتجات إليه", "e");
+  const cat = (catEl && catEl.value) || SMM_CAT || ""; // no hidden fallback to the SMM category
+  if (redo && !cat && !smmGroupsOf((SMM_SVC || []).slice(0, smmLim()))) return toast("اختر القسم المستهدف قبل «حذف وإعادة جلب» (لن يُختار قسم الرشق تلقائياً)", "e");
   busy(btn, true);
   try {
     if (redo) {
@@ -2893,7 +2876,7 @@ function smmReprice() {
 /* ---- automatic send to the provider + status refresh (runs while the panel is open) ---- */
 const autoOn = () => localStorage.getItem("amx_autosend") !== "0";
 const orderItems = (o) => { let it = o.items; if (typeof it == "string") { try { it = JSON.parse(it); } catch (e) { it = []; } } return Array.isArray(it) ? it : []; };
-const hasSmmItems = (o) => orderItems(o).some((i) => { const p = D.products.find((x) => x.id == i.id); return p && p.smm_service; });
+const hasSmmItems = (o) => orderItems(o).some((i) => { const p = D.products.find((x) => x.id == i.id); return p && p.smm_service && p.auto !== false; }); // auto:false = manual fulfilment
 const smmDone = (o) => /complete|cancel|refund|fail|partial/i.test(String(o.smm_status || ""));
 async function autoSend(o, quiet) {
   if (!autoOn() || !o || o.smm || o.payment_status != "paid" || !hasSmmItems(o)) return;

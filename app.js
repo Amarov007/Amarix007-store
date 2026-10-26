@@ -804,7 +804,7 @@ function setCfg(cfg) {
     })),
   }));
   P = (CFG.products || [])
-    .filter((p) => p && p.dup !== true) // dup:true = duplicate copy hidden from the store (still in the database / admin)
+    .filter((p) => p && p.dup !== true && p.hid !== true) // dup:true = duplicate copy, hid:true = hidden by the admin (bulk action): both stay in the database / admin only
     .map((p) => ({
       tg: "",
       sp: "",
@@ -979,9 +979,17 @@ const inputOk = (v) => {
   v = String(v || "").trim();
   return v.length >= 2 && v.length <= 120 && !/[\u0000-\u001f<>]/.test(v);
 };
+const isSmmType = (p) => !p.ptype || p.ptype === "smm"; // products typed by the importer as game_topup / app_subscription / gift_card are never boosting (no link + quantity form)
 const needsLink = (p) => {
   const c = cat(p.c);
-  return !apiMode(p) && ((c && c.ty == "boost") || hasSmm(p));
+  return isSmmType(p) && !apiMode(p) && ((c && c.ty == "boost") || hasSmm(p));
+};
+/* what the buyer must type for an API product (set per product in the admin: req = player_id / server_id / email / phone) */
+const REQ_L = { player_id: ["معرّف اللاعب (Player ID)", "Player ID"], server_id: ["رقم السيرفر (Server ID)", "Server ID"], email: ["البريد الإلكتروني", "Email"], phone: ["رقم الهاتف", "Phone"] };
+const reqHint = (p) => {
+  const r = Array.isArray(p.req) ? p.req.filter((k) => REQ_L[k]) : [];
+  if (!r.length) return lang == "ar" ? "المعرّف أو الإيميل" : "ID or email";
+  return r.map((k) => REQ_L[k][lang == "ar" ? 0 : 1]).join(r.length > 1 ? " | " : "");
 };
 const qLimited = (p) => needsLink(p) || apiMode(p); // products whose quantity follows the product's own min / max
 function linkOk(v) {
@@ -1034,7 +1042,7 @@ const ratingHtml = (p) => {
 
 /* ---- category filters & sorting ---- */
 const FS = {};
-const fstate = (id) => FS[id] || (FS[id] = { sel: {}, sort: "def" });
+const fstate = (id) => FS[id] || (FS[id] = { sel: {}, sort: "def", ty: "", pv: "", dl: "", av: "av" }); // av: "av" = available only (default), "" = all, "out" = unavailable
 const fhay = (p) =>
   nz(plain([p.tg, p.sp, p.ar, p.en, p.ds && p.ds.ar, p.ds && p.ds.en].join(" ")));
 function optHit(hay, opt) {
@@ -1057,14 +1065,33 @@ function catList(c) {
       return s.some((j) => optHit(h, g.o[j]));
     });
   });
-  /* bs is a rank set in the admin: 1 = first, 0 / empty = unranked (last) */
+  /* strict filters from svc-parse.js: type / provider / delivery / availability */
+  if (window.AMXSvc) a = AMXSvc.refine(a, { type: st.ty, provider: st.pv, delivery: st.dl, avail: st.av == "av" ? "available" : st.av == "out" ? "out" : "" }, {});
+  else if (st.av == "av") a = a.filter((p) => p.oos !== true);
+  /* bs is a rank set in the admin: 1 = first, 0 / empty = unranked (last). Every sort ends with the same tie-breakers, so equal values never shuffle */
+  if (["pa", "pd", "bs"].includes(st.sort) && window.AMXSvc) return AMXSvc.sortList(a, st.sort, { price: pr });
   const rk = (p) => (+p.bs > 0 ? +p.bs : 1e9);
   const by = {
-    pa: (x, y) => pr(x) - pr(y),
-    pd: (x, y) => pr(y) - pr(x),
-    bs: (x, y) => rk(x) - rk(y),
+    pa: (x, y) => pr(x) - pr(y) || String(x.id).localeCompare(String(y.id)),
+    pd: (x, y) => pr(y) - pr(x) || String(x.id).localeCompare(String(y.id)),
+    bs: (x, y) => rk(x) - rk(y) || String(x.id).localeCompare(String(y.id)),
   }[st.sort];
   return by ? [...a].sort(by) : a;
+}
+/* extra filter selects of a category page (only the ones that make sense for the products inside) */
+function catAdv(c) {
+  const all = P.filter((p) => p.c == c.id), sv = window.AMXSvc;
+  if (!sv || all.length < 2) return "";
+  const st = fstate(c.id), ar = lang == "ar";
+  const types = [...new Set(all.map((p) => sv.typeOf(p)))], provs = [...new Set(all.map((p) => sv.providerOf(p)))].sort();
+  const sel = (k, label, opts, cur) => `<label class="fsort"><span>${label}</span><select class="sel" data-a="cfx" data-k="${k}" data-c="${ex(c.id)}">${opts.map(([v, l]) => `<option value="${ex(v)}"${cur == v ? " selected" : ""}>${ex(l)}</option>`).join("")}</select></label>`;
+  const pvName = (k) => (k == "main" ? (ar ? "المزوّد الرئيسي (SMM)" : "Main provider (SMM)") : k == "manual" ? (ar ? "يدوي" : "Manual") : k == "fazer" ? "FazerCards" : k);
+  return (
+    (types.length > 1 ? sel("ty", ar ? "النوع" : "Type", [["", ar ? "الكل" : "All"], ...types.map((k) => [k, sv.typeLabel(k, ar)])], st.ty) : "") +
+    (provs.length > 1 ? sel("pv", ar ? "المزوّد" : "Provider", [["", ar ? "الكل" : "All"], ...provs.map((k) => [k, pvName(k)])], st.pv) : "") +
+    sel("dl", ar ? "التسليم" : "Delivery", [["", ar ? "الكل" : "All"], ["auto", ar ? "تلقائي" : "Automatic"], ["manual", ar ? "يدوي" : "Manual"]], st.dl) +
+    (all.some((p) => p.oos === true) ? sel("av", ar ? "التوفر" : "Availability", [["av", ar ? "المتاح فقط" : "Available only"], ["", ar ? "الكل" : "All"], ["out", ar ? "غير متاح" : "Unavailable"]], st.av) : "")
+  );
 }
 function catControls(c, total) {
   const st = fstate(c.id);
@@ -1092,8 +1119,10 @@ function catControls(c, total) {
           .map(([k, l]) => `<option value="${k}"${st.sort == k ? " selected" : ""}>${t(l)}</option>`)
           .join("")}</select></label>`
       : "";
-  const clr = n ? `<button type="button" class="b b2 sm" data-a="ffclr" data-c="${ex(c.id)}">${t("fclear")}</button>` : "";
-  return chips || sort ? `<div class="box fbar">${chips}<div class="fact">${sort}${clr}</div></div>` : "";
+  const nx = (st.ty ? 1 : 0) + (st.pv ? 1 : 0) + (st.dl ? 1 : 0);
+  const clr = n || nx ? `<button type="button" class="b b2 sm" data-a="ffclr" data-c="${ex(c.id)}">${t("fclear")}</button>` : "";
+  const adv = catAdv(c);
+  return chips || sort || adv ? `<div class="box fbar">${chips}<div class="fact">${adv}${sort}${clr}</div></div>` : "";
 }
 function toggleFilter(b) {
   const st = fstate(b.dataset.c),
@@ -1105,7 +1134,7 @@ function toggleFilter(b) {
   render();
 }
 function clearFilters(id) {
-  FS[id] = { sel: {}, sort: fstate(id).sort };
+  FS[id] = { sel: {}, sort: fstate(id).sort, ty: "", pv: "", dl: "", av: "av" };
   render();
 }
 function searchPage() {
@@ -1449,6 +1478,7 @@ function totals() {
 function addToCart(id, n = 1) {
   if (isVisit(prod(id))) return; // visit-only items are never ordered
   const pp = prod(id);
+  if (pp && pp.oos === true) { toast(lang == "ar" ? "هذا المنتج غير متاح حالياً" : "This product is currently unavailable", "er"); return; }
   n = Math.max(1, Math.min(QCAP, Math.floor(+n) || 1));
   if (pp && qLimited(pp)) n = qClamp(pp, n);
   const x = cart.find((c) => c.id == id);
@@ -2261,7 +2291,7 @@ function cartPage() {
     cp = cpOf(coupon);
   const rows = lines
     .map(
-      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? (lang == "ar" ? "المعرّف أو الإيميل" : "ID or email") : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
+      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
     )
     .join("");
   const couponBox = cp
@@ -3985,6 +4015,11 @@ document.addEventListener("change", (e) => {
     render();
     return;
   }
+  if (da == "cfx") {
+    fstate(e.target.dataset.c)[e.target.dataset.k] = e.target.value;
+    render();
+    return;
+  }
   if (da == "wproof") {
     uploadWalletProof(e.target);
     return;
@@ -4559,7 +4594,7 @@ async function handleAuthRedirect() {
    A page of its own for the followers / likes / views services (the SMM catalogue), so hundreds of services never flood the store.
    Flow on one screen: 1 platform icons -> 2 service type (+ search) -> 3 pick a service, enter the link + quantity, buy.
    Platform and service type are detected from the product text (tag / spec / names), so no data has to be changed. */
-const isBoost = (p) => !!p && !isVisit(p) && needsLink(p);
+const isBoost = (p) => !!p && !isVisit(p) && needsLink(p) && isSmmType(p); // strict: only products of type smm appear on the boosting page
 const boostCat = () => C.find((c) => c.ty == "boost") || null;
 const catHref = (c) => (c && c.ty == "hub" ? "#/g/" + ex(String(c.id).replace(/^hub_/, "")) : c && c.ty == "boost" ? "#/boost" : c && window.AMXExt && AMXExt.has(c.id) ? "#/x/" + ex(c.id) : "#/c/" + ex(c && c.id));
 const sbT = (ar, en) => (lang == "ar" ? ar : en);
@@ -4611,6 +4646,12 @@ function sbMeta(p) {
   try {
     s = window.AMXSvc ? window.AMXSvc.parse(plain(p.en) || plain(p.ar)) : null;
   } catch {}
+  /* badges set by hand in the admin (إدارة الرشق): p.rf = refill days (-1 = lifetime), p.dr = drip-feed */
+  if (p.rf || p.dr) {
+    s = s || { title: "", tags: [], full: "" };
+    if (p.rf && !s.tags.some((x) => x.id == "refill")) s.tags.unshift({ id: "refill", ar: p.rf > 0 ? "تعويض " + p.rf + " يوم" : "تعويض مدى الحياة", en: p.rf > 0 ? "Refill " + p.rf + "d" : "Lifetime refill" });
+    if (p.dr && !s.tags.some((x) => x.id == "drip")) s.tags.push({ id: "drip", ar: "تقطير (Drip-feed)", en: "Drip-feed" });
+  }
   return (SBM[p.id] = { pl: pl ? pl[0] : "other", ty: ty ? ty[0] : "other", h, s, ft: s ? s.tags.map((x) => x.id) : [] });
 }
 /* Titles made by the importer ("<type> <platform> — <name>" or "<platform> · <name>") repeat the platform on every row: for those the clean title is shown.
