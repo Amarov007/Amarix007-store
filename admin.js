@@ -124,6 +124,7 @@ const TYPES = [
   ["embed", "تضمين مواقع"],
   ["funded", "حسابات ممولة"],
   ["numbers", "أرقام (مجانية ومدفوعة)"],
+  ["hub", "قسم رئيسي (يجمع أقساماً أخرى)"],
 ];
 const KINDS = [
   ["buy", "🛒 للشراء (سلة + طلب)"],
@@ -563,7 +564,8 @@ const VIEW = {
   banners() {
     const hs = [
       ["#/", "الرئيسية"],
-      ...D.categories.map((c) => ["#/c/" + c.id, "قسم: " + c.ar]),
+      ...D.categories.filter((c) => c.ty == "hub").map((c) => ["#/g/" + String(c.id).replace(/^hub_/, ""), "قسم رئيسي: " + c.ar]),
+      ...D.categories.filter((c) => c.ty != "hub").map((c) => ["#/c/" + c.id, "قسم: " + c.ar]),
     ];
     return (
       `<div class="card"><h2>البانرات</h2><button class="b" data-a="add" data-k="banners">+ بانر جديد</button></div>` +
@@ -576,12 +578,13 @@ const VIEW = {
     );
   },
   categories() {
+    const hubOpts = () => [["", "تلقائي (حسب نوع المنتجات)"], ...["games", "apps"].map((h) => [h, (D.categories.find((x) => x.id == "hub_" + h) || {}).ar || h]), ["none", "مستقل (بدون قسم رئيسي)"]];
     return (
       `<div class="card"><h2>الأقسام</h2><div class="acts"><button class="b" data-a="add" data-k="categories">+ قسم جديد</button><button class="b b2" data-a="add-numbers-cat">+ قسم الأرقام (مجانية ومدفوعة)</button></div></div>` +
       D.categories
         .map((c, i) => {
           const k = "categories." + i + ".";
-          return `<div class="card"><div class="g2">${F( "الاسم (عربي)", k + "ar" )}${F("الاسم (إنجليزي)", k + "en", { d: 1 })}${F( "الوصف (عربي)", k + "da" )}${F("الوصف (إنجليزي)", k + "de", { d: 1 })}${F("النوع", k + "ty", { t: "sel", o: TYPES, re: 1, })}${F("الأيقونة", k + "i", { t: "sel", o: ICONS.map((x) => [x, x]), re: 1, })}${F("صورة القسم", k + "image_url", { t: "img", w: 1 })}${F( "رابط تضمين (iframe) للقسم", k + "embed_url", { d: 1, w: 1 } )}</div>${filtersEditor(c, i)}${c.ty == "numbers" ? freeEditor(c, i) : ""}${mv("categories", i)}</div>`;
+          return `<div class="card"><div class="g2">${F( "الاسم (عربي)", k + "ar" )}${F("الاسم (إنجليزي)", k + "en", { d: 1 })}${F( "الوصف (عربي)", k + "da" )}${F("الوصف (إنجليزي)", k + "de", { d: 1 })}${F("النوع", k + "ty", { t: "sel", o: TYPES, re: 1, })}${F("الأيقونة", k + "i", { t: "sel", o: ICONS.map((x) => [x, x]), re: 1, })}${c.ty == "hub" ? "" : F("ينتمي إلى القسم الرئيسي", k + "hub", { t: "sel", o: hubOpts(), re: 1 })}${F("صورة القسم", k + "image_url", { t: "img", w: 1 })}${F( "رابط تضمين (iframe) للقسم", k + "embed_url", { d: 1, w: 1 } )}</div>${c.ty == "hub" ? "" : filtersEditor(c, i)}${c.ty == "numbers" ? freeEditor(c, i) : ""}${mv("categories", i)}</div>`;
         })
         .join("")
     );
@@ -590,7 +593,7 @@ const VIEW = {
     if (ed != null && D.products[ed]) {
       const k = "products." + ed + ".",
         p = D.products[ed],
-        opts = D.categories.map((x) => [x.id, x.ar]);
+        opts = D.categories.filter((x) => x.ty != "hub").map((x) => [x.id, x.ar]);
       return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}${F("تثبيت في الرئيسية (1 = الأول، 0 = غير مثبّت)", k + "pin", { t: "num" })}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F("موقع الرشق (المزوّد)", k + "smm_provider", { t: "sel", o: provOpts(p.smm_provider) })}${F( "رقم أو رمز الخدمة في الموقع (service id / wa / uc_60)", k + "smm_service", { d: 1 } )}${F("نوع التسليم", k + "smm_input", { t: "sel", o: [["", "رشق: الزبون يكتب رابطاً + كمية"], ["none", "رقم أو كود جاهز: بلا مدخل من الزبون"], ["text", "شحن أو اشتراك: الزبون يكتب معرّفاً أو إيميل"]] })}${F("الدولة أو خيار إضافي (رمز دولة الرقم)", k + "smm_country", { d: 1 })}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql). منتجات الرشق المستوردة تلقائياً تكون «كمية الرشق لكل وحدة = 1» والسعر هو سعر وحدة واحدة (سعر الألف ÷ 1000)، وأقل/أعلى كمية تأتي مباشرة من المزوّد (شغّل supabase-boost-units.sql مرة واحدة).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
     }
     const q = pq.trim().toLowerCase(),
@@ -605,7 +608,7 @@ const VIEW = {
     return `<div class="card"><h2>المنتجات (${ D.products.length })</h2><div class="sw"><input class="inp" id="pq" placeholder="بحث…" value="${esc( pq )}"><button class="b" data-a="add" data-k="products">+ منتج</button><button class="b b2" data-a="ppin">📌 المثبّتة في الرئيسية (${D.products.filter((x) => +x.pin > 0).length})${ppin ? " ✓" : ""}</button></div> ${L.map( ([p, i]) => `<div class="it"><span class="thm">${ p.img ? `<img src="${esc(p.img)}" alt="">` : ic("box") }</span><div class="im"><b>${esc(p.ar)}</b><small>${esc(catName(p.c))} · ${ p.k == "link" ? "🔗 رابط للزيارة" : p.p }${p.dup ? " · 🙈 مكرر مخفي" : ""}${+p.pin > 0 ? " · 📌 " + p.pin : ""}</small></div><button class="b b2 sm" data-a="pin" data-i="${i}" title="تثبيت في الرئيسية">${+p.pin > 0 ? "📌" : "📍"}</button><button class="b b2 sm" data-a="edit" data-i="${i}">تعديل</button><button class="b bd2 sm" data-a="del" data-k="products" data-i="${i}">حذف</button></div>` ).join("")}</div>`;
   },
   embeds() {
-    const opts = D.categories.map((x) => [x.id, x.ar]);
+    const opts = D.categories.filter((x) => x.ty != "hub").map((x) => [x.id, x.ar]);
     if (ed != null && D.embeds[ed]) {
       const k = "embeds." + ed + ".",
         e = D.embeds[ed];
@@ -2593,7 +2596,7 @@ function smmCatFor(g) {
 function smmMapBox(gs) {
   const fm = smmFmap(), cats = D.categories.map((c) => `<option value="${esc(c.id)}">${esc(c.ar || c.en || c.id)}</option>`).join("");
   const opts = (sel) => '<option value="">— تخطّي (لا تستورد) —</option><option value="__new__"' + (sel == "__new__" ? " selected" : "") + '>＋ قسم جديد باسم اللعبة</option>' +
-    D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == sel ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("");
+    D.categories.filter((c) => c.ty != "hub").map((c) => `<option value="${esc(c.id)}"${c.id == sel ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("");
   void fm;
   return '<div class="card" style="background:var(--bg)"><h3>توزيع الألعاب على أقسام المتجر (' + gs.length + ' لعبة)</h3>' +
     '<p class="hint">لكل لعبة اختر قسمها في المتجر. الافتراضي: قسم موجود باسم مطابق، وإلا يُنشأ قسم جديد باسم اللعبة. اختياراتك تُحفظ للمرات القادمة. بعد الاستيراد اضغط «نشر».</p>' +

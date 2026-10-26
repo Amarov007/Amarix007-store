@@ -43,18 +43,23 @@
   /* ---------- membership ---------- */
   function hubKey(c) {
     if (!c) return null;
+    if (c.hub === "none") return null; // admin: keep this category standalone
     if (c.hub === "games" || c.hub === "apps") return c.hub;
     if (c.id === "pubg") return "games";
     if (c.id === "live" || c.id === "ai") return "apps";
     if (c.ty === "shop" && prods().some((p) => p.c == c.id && p.smm_provider)) return APP_RE.test(String(c.en || "")) ? "apps" : "games";
     return null;
   }
-  const pseudo = (h) => ({ id: "hub_" + h.id, ty: "hub", hub: true, i: h.i, ar: h.ar, en: h.en, da: h.da, de: h.de, f: [], embed_url: "", image_url: "" });
+  /* the two hubs are real records in store_config.categories (type "hub", ids hub_games / hub_apps) so the admin can rename,
+     re-icon, re-order or describe them; the built-in text is only the fallback when the record is missing */
+  const pseudo = (h, r) => ({ id: "hub_" + h.id, ty: "hub", hub: true, i: (r && r.i) || h.i, ar: (r && r.ar) || h.ar, en: (r && r.en) || h.en, da: (r && r.da) || h.da, de: (r && r.de) || h.de, f: [], embed_url: "", image_url: (r && r.image_url) || "" });
+  let INFO = {};
 
   /* app.js calls this on the visible-category list: members are replaced by one entry per hub (at the position of its first member) */
-  function apply(list) {
+  function apply(list, all) {
     MEM = { games: [], apps: [] };
     OF = {};
+    INFO = {};
     const rest = [], pos = {};
     (list || []).forEach((c) => {
       const h = hubKey(c);
@@ -64,9 +69,15 @@
       if (!(h in pos)) pos[h] = rest.length;
     });
     const out = rest.slice();
+    const ix = (id) => { const n = (all || []).findIndex((c) => c.id === id); return n < 0 ? 1e9 : n; };
     HUBS.filter((h) => MEM[h.id].length)
-      .sort((a, b) => pos[a.id] - pos[b.id])
-      .forEach((h, n) => out.splice(pos[h.id] + n, 0, pseudo(h)));
+      .map((h) => {
+        const r = (all || []).find((c) => c.id === "hub_" + h.id && c.ty === "hub");
+        INFO[h.id] = pseudo(h, r);
+        return { e: INFO[h.id], k: r ? ix(r.id) : Math.min(...MEM[h.id].map((c) => ix(c.id))) };
+      })
+      .sort((a, b) => a.k - b.k)
+      .forEach((m) => { let at = out.findIndex((c) => ix(c.id) > m.k); if (at < 0) at = out.length; out.splice(at, 0, m.e); });
     loadBrands();
     return out;
   }
@@ -150,11 +161,11 @@
     return `<div class="hx-g" id="hx-g">${list.map(card).join("")}</div>`;
   }
   function page(id, sub) {
-    const h = HUBS.find((x) => x.id === id);
+    const h = INFO[id] || HUBS.find((x) => x.id === id);
     if (!h || !MEM[id] || !MEM[id].length) return `<div class="box hx-none">${L("هذا القسم غير متاح حالياً.", "This section is not available right now.")} <a class="b sm" href="#/">${L("الرئيسية", "Home")}</a></div>`;
     CUR = { id, sub: sub || "" };
     const list = items(id), fam = sub && list.find((x) => x.kind === "fam" && x.key === sub);
-    const head = `<div class="box row sb-hero hx-hero"><span class="tile big">${ic(h.i, 30)}</span><div style="flex:1"><h1>${esc(fam ? nm(fam) : h[typeof lang !== "undefined" ? lang : "ar"])}</h1><p class="pd">${esc(fam ? L("اختر منطقة حسابك", "Choose your account region") : lang === "en" ? h.de : h.da)}</p></div></div>`;
+    const head = `<div class="box row sb-hero hx-hero"><span class="tile big${h.image_url ? " img" : ""}">${typeof ico === "function" ? ico(h, 30) : ic(h.i, 30)}</span><div style="flex:1"><h1>${esc(fam ? nm(fam) : h[typeof lang !== "undefined" ? lang : "ar"])}</h1><p class="pd">${esc(fam ? L("اختر منطقة حسابك", "Choose your account region") : lang === "en" ? h.de : h.da)}</p></div></div>`;
     const back = fam ? `<a class="b b2 sm sb-back" href="#/g/${esc(id)}">${ic("chev", 14)} ${esc(nm(h))}</a>` : "";
     const grps = [...new Set(list.map((x) => x.grp).filter((k) => GROUPS[k]))];
     const chips = !fam && grps.length > 1 ? `<div class="hx-f" role="group"><button type="button" class="hx-chip on" data-hx="f" data-f="">${L("الكل", "All")}</button>${grps.map((k) => `<button type="button" class="hx-chip" data-hx="f" data-f="${k}">${GROUPS[k][lang === "en" ? 1 : 0]}</button>`).join("")}</div>` : "";
