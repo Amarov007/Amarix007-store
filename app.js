@@ -830,6 +830,21 @@ function setCfg(cfg) {
   CP = CFG.coupons && typeof CFG.coupons == "object" ? CFG.coupons : {}; // only the coupons the server chose to publish; the rest are checked through check_coupon()
   CV = C.filter((c) => P.some((p) => p.c == c.id) || (c.ty == "numbers" && freeOf(c).length) || E.some((e) => e.c == c.id && embedOk(e)) || catEmbedOk(c)); // sections with nothing to show are hidden from the strip and the home grid (data is untouched)
   if (window.AMXHub) CV = AMXHub.apply(CV, C); // hubs.js: games / apps are folded into two master sections (members keep their ids and routes)
+  /* The strip, home grid and drawer must never show the same section twice: drop repeated ids, entries without any name, and standalone
+     categories that carry the same name as a master section (games / apps). Data is untouched; only the lists are cleaned. */
+  {
+    const nk = (v) => String(v == null ? "" : v).normalize("NFKD").toLowerCase().replace(/[\u0300-\u036f\u064b-\u065f\u0640]/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
+    const hubNames = new Set();
+    CV.forEach((c) => { if (c.ty == "hub") [c.ar, c.en].forEach((v) => nk(v) && hubNames.add(nk(v))); });
+    const seen = new Set();
+    CV = CV.filter((c) => {
+      if (!c || !String(c.ar || c.en || "").trim()) return false;
+      if (seen.has(String(c.id))) return false;
+      seen.add(String(c.id));
+      if (c.ty != "hub" && [c.ar, c.en].some((v) => nk(v) && hubNames.has(nk(v)))) return false;
+      return true;
+    });
+  }
   // Payment methods: blank name/icon/colour/instructions fall back to the embedded default of the same id (or same icon); a card with no name and no logo is not shown
   const PM0 = CFG0.payments || [];
   PM = (CFG.payments || [])
