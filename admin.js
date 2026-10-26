@@ -1025,6 +1025,14 @@ document.addEventListener("change", async (e) => {
   if (t.id == "smm-fcat") { SMM_FCAT = t.value; return; }
   if (t.id == "smm-lim") return smmList(); // refresh the "import N results" button
   if (t.id == "smm-prov") { SMM_PROV = t.value || "main"; SMM_SVC = []; SMM_SVC_PROV = null; SMM_FCATS = []; SMM_FCATS_PROV = null; SMM_FCAT = ""; return smmOut("اضغط «عرض الخدمات» لجلب خدمات «" + esc(provName(SMM_PROV)) + "»."); } // never keep another site's list on screen
+  if (d.fmap != null) { smmFmap()[d.fmap] = t.value; smmFmapSave(); return; }
+  if (t.id == "smm-fmap-all") {
+    const v = t.value, gs = smmGroupsOf(smmFiltered());
+    if (!v || !gs) return;
+    gs.forEach((g) => { smmFmap()[g.id] = v == "__skip__" ? "" : v; });
+    smmFmapSave();
+    return smmList();
+  }
   if (d.up) return upl(t);
   if (d.imp) return imp(t);
   if (d.pst) return setPayment(t);
@@ -2522,6 +2530,77 @@ function smmCatPick() {
 function smmShowPicker() {
   smmOut(smmCatPick() + '<p class="hint">اختر الفئة ثم اضغط «عرض عروض الفئة». لاستبدال منتجات فئة واحدة فقط اضغط «حذف وإعادة جلب» بعد اختيارها؛ منتجات الفئات الأخرى لن تُمسّ.</p>');
 }
+/* توزيع ألعاب المزوّد (فئاته) على أقسام المتجر: كل لعبة تذهب لقسمها بدل قسم واحد.
+   القيمة لكل لعبة: معرّف قسم في المتجر | "__new__" = ينشئ قسماً باسم اللعبة | "" = تخطّي. تُحفظ لكل مزوّد في المتصفح. */
+let SMM_FMAP = {}, SMM_FMAP_PROV = null;
+function smmFmap() {
+  const pv = SMM_SVC_PROV || smmProv();
+  if (SMM_FMAP_PROV != pv) {
+    try { SMM_FMAP = JSON.parse(localStorage.getItem("amx_fmap_" + pv) || "{}") || {}; } catch (e) { SMM_FMAP = {}; }
+    SMM_FMAP_PROV = pv;
+  }
+  return SMM_FMAP;
+}
+function smmFmapSave() { try { localStorage.setItem("amx_fmap_" + (SMM_FMAP_PROV || smmProv()), JSON.stringify(SMM_FMAP)); } catch (e) {} }
+function smmGroupsOf(list) {
+  if (!(SMM_FCATS.length && SMM_FCATS_PROV && SMM_FCATS_PROV == SMM_SVC_PROV)) return null;
+  const g = new Map();
+  list.forEach((x) => {
+    if (!x.country) return;
+    const k = String(x.country), e = g.get(k) || { id: k, name: String(x.category || k), n: 0 };
+    e.n++;
+    g.set(k, e);
+  });
+  return g.size > 1 ? [...g.values()] : null; // لعبة واحدة فقط: يُستخدم «القسم المستهدف» كما هو
+}
+const smmGuessCat = (name) => {
+  const n = String(name || "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (!n) return "";
+  const c = D.categories.find((k) => [k.ar, k.en].some((v) => { v = String(v || "").toLowerCase().trim(); return v && (v.includes(n) || n.includes(v)); }));
+  return c ? c.id : "";
+};
+function smmMapCur(g) {
+  let v = smmFmap()[g.id];
+  if (v && v != "__new__" && !D.categories.some((c) => c.id == v)) v = undefined; // القسم حُذف من المتجر
+  return v === undefined ? (smmGuessCat(g.name) || "__new__") : v;
+}
+function smmCatFor(g) {
+  let v = smmMapCur(g);
+  if (v == "__new__") {
+    const c = NEW.categories();
+    Object.assign(c, { ar: g.name, en: g.name, i: "bolt", ty: "shop" });
+    D.categories.push(c);
+    v = c.id;
+    smmFmap()[g.id] = v; // مرة قادمة يُعاد استخدام نفس القسم بدل إنشاء قسم آخر
+    smmFmapSave();
+  }
+  return v;
+}
+function smmMapBox(gs) {
+  const fm = smmFmap(), cats = D.categories.map((c) => `<option value="${esc(c.id)}">${esc(c.ar || c.en || c.id)}</option>`).join("");
+  const opts = (sel) => '<option value="">— تخطّي (لا تستورد) —</option><option value="__new__"' + (sel == "__new__" ? " selected" : "") + '>＋ قسم جديد باسم اللعبة</option>' +
+    D.categories.map((c) => `<option value="${esc(c.id)}"${c.id == sel ? " selected" : ""}>${esc(c.ar || c.en || c.id)}</option>`).join("");
+  void fm;
+  return '<div class="card" style="background:var(--bg)"><h3>توزيع الألعاب على أقسام المتجر (' + gs.length + ' لعبة)</h3>' +
+    '<p class="hint">لكل لعبة اختر قسمها في المتجر. الافتراضي: قسم موجود باسم مطابق، وإلا يُنشأ قسم جديد باسم اللعبة. اختياراتك تُحفظ للمرات القادمة. بعد الاستيراد اضغط «نشر».</p>' +
+    '<label class="fld"><span>تطبيق على كل الألعاب</span><select class="inp" id="smm-fmap-all"><option value="">— اختر لتطبيقه على الكل —</option><option value="__skip__">تخطّي الكل</option><option value="__new__">قسم جديد لكل لعبة</option>' + cats + '</select></label>' +
+    gs.map((g) => `<label class="fld"><span>${esc(g.name)} · ${g.n} عرض</span><select class="inp" data-fmap="${esc(g.id)}">${opts(smmMapCur(g))}</select></label>`).join("") + '</div>';
+}
+function smmImportMapped(src, cat, mk, prov) {
+  const gs = smmGroupsOf(src);
+  if (!gs) return smmImportList(src, cat, mk, prov);
+  const before = D.categories.length;
+  let add = 0, skip = 0;
+  gs.forEach((g) => {
+    const rows = src.filter((x) => String(x.country || "") == g.id), cid = smmCatFor(g);
+    if (!cid) { skip += rows.length; return; }
+    const r = smmImportList(rows, cid, mk, prov);
+    add += r.add; skip += r.skip;
+  });
+  const rest = src.filter((x) => !x.country);
+  if (rest.length && cat) { const r = smmImportList(rest, cat, mk, prov); add += r.add; skip += r.skip; }
+  return { add, skip, made: D.categories.length - before };
+}
 async function smmFcatGo(btn) {
   const v = (($("#smm-fcat") || {}).value) || "";
   if (!v) return toast("اختر فئة أولاً", "e");
@@ -2573,7 +2652,7 @@ function smmList() {
     `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button>`;
   smmOut(
     smmCatPick() + (L.length
-      ? bar +
+      ? bar + (smmGroupsOf(all.slice(0, smmLim())) ? smmMapBox(smmGroupsOf(all.slice(0, smmLim()))) : "") +
           '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
           L.map(
             (x) =>
@@ -2629,9 +2708,10 @@ function smmImport(btn) {
   if (!cat) return toast("اختر قسماً", "e");
   try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {}
   const src = btn.dataset.id == "*" ? smmFiltered().slice(0, smmLim()) : SMM_SVC.filter((x) => String(x.id) == btn.dataset.id);
-  const r = smmImportList(src, cat, mk, SMM_SVC_PROV || "main");
+  const r = smmImportMapped(src, cat, mk, SMM_SVC_PROV || "main");
   save();
-  toast(`تمت إضافة ${r.add} · تخطّي ${r.skip}. اضغط نشر للحفظ`, r.add ? "" : "e");
+  toast(`تمت إضافة ${r.add} · تخطّي ${r.skip}${r.made ? " · أُنشئ " + r.made + " قسم" : ""}. اضغط نشر للحفظ`, r.add ? "" : "e");
+  smmList();
 }
 function smmImportList(src, cat, mk, prov) {
   const pv = String(prov || "main").toLowerCase();
@@ -2706,8 +2786,9 @@ async function smmWipe(btn, redo) {
       if (!SMM_SVC.length) throw new Error("المزوّد لم يُرجع أي خدمة — لم يُحذف شيء");
     }
     const n = Math.min(SMM_SVC.length, smmLim());
+    const mapped = redo && !!smmGroupsOf(SMM_SVC.slice(0, smmLim()));
     const msg = redo
-      ? `سيتم حذف ${old.length} منتج رشق تابع لـ «${pn}» ثم استيراد ${n} خدمة جديدة منه بهامش ${mk}% إلى قسم «${catName(cat)}». منتجات المواقع الأخرى لن تتأثر. متابعة؟`
+      ? `سيتم حذف ${old.length} منتج رشق تابع لـ «${pn}» ثم استيراد ${n} خدمة جديدة منه بهامش ${mk}% ${mapped ? "موزّعة على أقسام المتجر حسب اللعبة (كما في جدول التوزيع، والألعاب بلا قسم تُنشأ لها أقسام جديدة)" : "إلى قسم «" + catName(cat) + "»"}. منتجات المواقع الأخرى لن تتأثر. متابعة؟`
       : `سيتم حذف ${old.length} منتج رشق تابع لـ «${pn}» فقط. منتجات المواقع الأخرى لن تتأثر. متابعة؟`;
     if (!confirm(msg)) return;
     try { localStorage.setItem("amx_smm_backup", JSON.stringify({ ts: Date.now(), items: old })); } catch (e) {
@@ -2715,7 +2796,7 @@ async function smmWipe(btn, redo) {
     }
     for (let i = D.products.length - 1; i >= 0; i--) if (inProv(D.products[i])) D.products.splice(i, 1);
     let r = { add: 0, skip: 0 };
-    if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportList(SMM_SVC.slice(0, smmLim()), cat, mk, prov); }
+    if (redo) { try { localStorage.setItem("amx_smm_mk", String(mk)); } catch (e) {} r = smmImportMapped(SMM_SVC.slice(0, smmLim()), cat, mk, prov); }
     save();
     toast(redo ? `حُذف ${old.length} وأُضيف ${r.add} منتج جديد. اضغط نشر للحفظ` : `حُذف ${old.length} منتج. اضغط نشر للحفظ`);
     smmOut(smmCatPick() + (redo ? `✓ «${esc(pn)}»: حُذف ${old.length} وأُضيف ${r.add} (تخطّي ${r.skip}). اضغط «نشر» لتطبيق التغيير على المتجر.` : `✓ «${esc(pn)}»: حُذف ${old.length} منتج رشق. اضغط «نشر» لتطبيق التغيير.`));
