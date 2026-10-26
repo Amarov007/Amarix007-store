@@ -1,1 +1,45 @@
 
+name: Replace Store Files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract replacement archive
+        run: |
+          set -e
+          test -f Amarix007-store-fixed.zip
+          mkdir -p /tmp/amarix-release
+          unzip -q Amarix007-store-fixed.zip -d /tmp/amarix-release
+          test -d /tmp/amarix-release/Amarix007-store-main
+          test -f /tmp/amarix-release/Amarix007-store-main/index.html
+
+      - name: Replace repository files
+        run: |
+          set -e
+          rsync -a --delete \
+            --exclude='/.git/' \
+            --exclude='/.github/workflows/replace-store.yml' \
+            /tmp/amarix-release/Amarix007-store-main/ ./
+          rm -f Amarix007-store-fixed.zip
+
+      - name: Commit replacement
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Replace store with updated release"
+            git push
+          else
+            echo "No file changes to commit"
+          fi
