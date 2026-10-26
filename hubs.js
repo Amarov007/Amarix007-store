@@ -1,0 +1,209 @@
+/* AMARIX007 — hubs.js (v1)
+   Two master sections ("hubs") that replace dozens of flat tabs, same idea as the Numbers and Boost panels:
+     #/g/games   شحن الألعاب               PUBG + every game top-up category (regional variants are folded into one card)
+     #/g/apps    تطبيقات واشتراكات          live / chat apps, AI subscriptions, CapCut …
+     #/g/games/<family>                    the regions of one game (EAFC Mobile -> ID / KH / MY / SG)
+   Nothing is moved or renamed: every category keeps its id, its products and its own route (#/c/<id>, #/x/<id>),
+   so provider sync, carts and old links keep working. The hubs only change how the strip, the home grid and the drawer list them.
+
+   Membership (first match wins, all optional overrides live on the category object in store_config):
+     category.hub = "games" | "apps"     explicit
+     id pubg                            -> games      ids live / ai -> apps
+     type shop + products with smm_provider -> apps if the name looks like a live / chat / creative app, else games
+   Brand logos: category.image_url, else  <storage>/store-media/brands/<file>  listed in brands/index.json
+   (an array of file names such as "pubg_mobile.webp"), else a coloured letter tile. */
+(function (g) {
+  "use strict";
+
+  const HUBS = [
+    { id: "games", i: "bolt", ar: "شحن الألعاب", en: "Game Top-up", da: "اشحن ألعابك المفضلة مباشرة — اختر اللعبة وأكمل طلبك", de: "Top up your favourite games — pick a game and order", gold: "pubg_mobile" },
+    { id: "apps", i: "users", ar: "تطبيقات واشتراكات", en: "Apps & Subscriptions", da: "عملات تطبيقات البث والدردشة واشتراكات الذكاء الاصطناعي وأدوات الإبداع", de: "Coins for live & chat apps, AI subscriptions and creative tools", gold: "" }
+  ];
+  const APP_RE = /\b(bigo|chamet|dazz|capcut|yalla|imo|tiktok|soul\s?chill|weplay|likee|tango|hago|poppo|uplive|live|chat|netflix|spotify|canva|discord)\b/i;
+  const LIVE_RE = /\b(bigo|chamet|dazz|yalla|imo|tiktok|soul\s?chill|weplay|likee|tango|hago|poppo|uplive|live|chat)\b/i;
+  const REGION_RE = /^(.*?)\s*\(([^()]+)\)\s*$/;
+  const BRAND_DIR = "/storage/v1/object/public/store-media/brands/";
+
+  let MEM = { games: [], apps: [] }; // hub id -> member categories (from the last apply)
+  let OF = {}; // member category id -> hub id
+  let BRANDS = null; // Map slug -> file name (from brands/index.json)
+  let CUR = null; // { id, sub } of the page on screen, to repaint when logos arrive
+
+  /* ---------- tiny helpers (app.js globals are read at call time: lang, P, pr, money, ic, SB_URL, ex) ---------- */
+  const L = (ar, en) => (typeof lang !== "undefined" && lang === "en" ? en : ar);
+  const esc = (x) => String(x ?? "").replace(/[&<>"']/g, (c) => "&#" + c.charCodeAt(0) + ";");
+  const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const nm = (o) => (typeof lang !== "undefined" && lang === "en" ? o.en || o.ar : o.ar || o.en) || "";
+  const hue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+  const colorOf = (c, seed) => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : `hsl(${hue(seed)} 62% 48%)`);
+  const prods = () => (typeof P !== "undefined" && Array.isArray(P) ? P : []);
+  const services = (cat) => ((g.AMXExt && g.AMXExt.data && g.AMXExt.data.services) || []).filter((s) => s.category === cat);
+  const minPrice = (list) => { let m = Infinity; list.forEach((p) => { const v = pr(p); if (v < m) m = v; }); return m === Infinity ? 0 : m; };
+
+  /* ---------- membership ---------- */
+  function hubKey(c) {
+    if (!c) return null;
+    if (c.hub === "games" || c.hub === "apps") return c.hub;
+    if (c.id === "pubg") return "games";
+    if (c.id === "live" || c.id === "ai") return "apps";
+    if (c.ty === "shop" && prods().some((p) => p.c == c.id && p.smm_provider)) return APP_RE.test(String(c.en || "")) ? "apps" : "games";
+    return null;
+  }
+  const pseudo = (h) => ({ id: "hub_" + h.id, ty: "hub", hub: true, i: h.i, ar: h.ar, en: h.en, da: h.da, de: h.de, f: [], embed_url: "", image_url: "" });
+
+  /* app.js calls this on the visible-category list: members are replaced by one entry per hub (at the position of its first member) */
+  function apply(list) {
+    MEM = { games: [], apps: [] };
+    OF = {};
+    const rest = [], pos = {};
+    (list || []).forEach((c) => {
+      const h = hubKey(c);
+      if (!h) return void rest.push(c);
+      MEM[h].push(c);
+      OF[c.id] = "hub_" + h;
+      if (!(h in pos)) pos[h] = rest.length;
+    });
+    const out = rest.slice();
+    HUBS.filter((h) => MEM[h.id].length)
+      .sort((a, b) => pos[a.id] - pos[b.id])
+      .forEach((h, n) => out.splice(pos[h.id] + n, 0, pseudo(h)));
+    loadBrands();
+    return out;
+  }
+
+  /* ---------- items of a hub (one card each) ---------- */
+  function items(hubId) {
+    const out = [];
+    MEM[hubId].forEach((c) => {
+      if (c.id === "live" || c.id === "ai") {
+        services(c.id).forEach((s) => {
+          const ps = prods().filter((p) => p.ext && p.ext.svc === s.id);
+          out.push({ kind: "svc", id: s.id, ar: s.ar, en: s.en, color: s.color, logo: s.logo, keys: [s.id, slug(s.en)], grp: c.id, from: minPrice(ps), sub: c.id === "ai" ? s.tagline || "" : L(s.packages.length + " باقات", s.packages.length + " packs") });
+        });
+      } else if (c.id === "pubg") {
+        const s = services("pubg")[0] || {};
+        out.push({ kind: "link", href: "#/x/pubg", ar: s.ar ? "ببجي موبايل" : c.ar, en: "PUBG Mobile", color: s.color || "#f5a623", logo: s.logo, keys: ["pubg_mobile", "pubg"], grp: "pubg", top: 1, badge: L("الأكثر طلباً", "Top seller"), from: minPrice(prods().filter((p) => p.ext && p.ext.svc === "pubg_mobile")), sub: L("شحن UC بمعرّف اللاعب", "UC via Player ID") });
+      } else {
+        const ps = prods().filter((p) => p.c == c.id);
+        const first = ps.find((p) => p.smm_country) || {};
+        out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "apps" ? (LIVE_RE.test(c.en) ? "live" : "tools") : "game", from: minPrice(ps), n: ps.length, sub: L(ps.length + " باقة", ps.length + " packs") });
+      }
+    });
+    /* fold regional variants "Game (ID)" "Game (KH)" … into one family card (needs two or more regions) */
+    const fam = {};
+    out.forEach((it) => {
+      if (it.kind !== "cat") return;
+      const m = REGION_RE.exec(it.en || "");
+      if (m && m[1].length > 1) (fam[m[1].trim().toLowerCase()] = fam[m[1].trim().toLowerCase()] || []).push({ it, base: m[1].trim(), region: m[2].trim() });
+    });
+    const gone = new Set(), folded = [];
+    Object.keys(fam).forEach((k) => {
+      const f = fam[k];
+      if (f.length < 2) return;
+      f.forEach((x) => gone.add(x.it));
+      const key = slug(f[0].base);
+      folded.push({ kind: "fam", key, href: "#/g/" + hubId + "/" + encodeURIComponent(key), ar: f[0].base, en: f[0].base, keys: [key, ...f[0].it.keys], grp: f[0].it.grp, regions: f.map((x) => ({ ...x.it, region: x.region })), from: Math.min(...f.map((x) => x.it.from).filter((v) => v > 0).concat([Infinity])), n: f.reduce((a, x) => a + x.it.n, 0), sub: L(f.length + " مناطق", f.length + " regions") });
+      if (!isFinite(folded[folded.length - 1].from)) folded[folded.length - 1].from = 0;
+    });
+    const all = out.filter((it) => !gone.has(it)).concat(folded);
+    all.sort((a, b) => (b.top || 0) - (a.top || 0) || String(a.en).localeCompare(String(b.en), "en", { sensitivity: "base" }));
+    return all;
+  }
+
+  /* ---------- cards ---------- */
+  function logoFile(keys) {
+    if (!BRANDS) return "";
+    for (const k of keys || []) if (k && BRANDS.has(slug(k))) return BRANDS.get(slug(k));
+    return "";
+  }
+  function logoHtml(it) {
+    const url = it.logo || (logoFile(it.keys) && SB_URL + BRAND_DIR + logoFile(it.keys));
+    const letter = esc((String(it.en || it.ar || "?").match(/[A-Za-z0-9]/) || [String(it.ar || "?").charAt(0)])[0].toUpperCase());
+    return `<span class="hb-l${url ? " img" : ""}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : letter}</span>`;
+  }
+  function card(it) {
+    const name = nm(it), isBtn = it.kind === "svc";
+    const attrs = isBtn ? `type="button" data-x="open" data-id="${esc(it.id)}"` : `href="${esc(it.href)}"`;
+    const tag = isBtn ? "button" : "a";
+    const price = it.from ? `<span class="hb-p"><small>${L("من", "From")}</small><b class="n">${money(it.from)}</b></span>` : "";
+    const badge = it.badge ? `<i class="hb-bd gold">${esc(it.badge)}</i>` : it.kind === "fam" ? `<i class="hb-bd">${esc(it.sub)}</i>` : "";
+    return `<${tag} class="hb-c" ${attrs} data-n="${esc((it.en + " " + it.ar).toLowerCase())}" data-g="${esc(it.grp || "")}" style="--bc:${colorOf(it.color, it.en)}">${badge}${logoHtml(it)}<span class="hb-t"><b>${esc(name)}</b><small>${esc(it.kind === "fam" ? L("اختر المنطقة", "Choose region") : it.sub || "")}</small></span>${price}</${tag}>`;
+  }
+  function regionCard(r) {
+    return `<a class="hb-c" href="${esc(r.href)}" data-n="${esc((r.region + " " + r.en).toLowerCase())}" style="--bc:${colorOf(null, r.region)}"><span class="hb-l rg">${esc(r.region)}</span><span class="hb-t"><b>${esc(r.region)}</b><small>${esc(r.sub)}</small></span>${r.from ? `<span class="hb-p"><small>${L("من", "From")}</small><b class="n">${money(r.from)}</b></span>` : ""}</a>`;
+  }
+
+  /* ---------- page ---------- */
+  const GROUPS = { live: ["بث ودردشة", "Live & chat"], ai: ["ذكاء اصطناعي", "AI"], tools: ["أدوات", "Tools"] };
+  function body(hubId, sub) {
+    const list = items(hubId);
+    if (sub) {
+      const f = list.find((x) => x.kind === "fam" && x.key === sub);
+      if (f) return `<div class="hb-g" id="hb-g">${f.regions.sort((a, b) => a.region.localeCompare(b.region)).map(regionCard).join("")}</div>`;
+    }
+    return `<div class="hb-g" id="hb-g">${list.map(card).join("")}</div>`;
+  }
+  function page(id, sub) {
+    const h = HUBS.find((x) => x.id === id);
+    if (!h || !MEM[id] || !MEM[id].length) return `<div class="box hb-none">${L("هذا القسم غير متاح حالياً.", "This section is not available right now.")} <a class="b sm" href="#/">${L("الرئيسية", "Home")}</a></div>`;
+    CUR = { id, sub: sub || "" };
+    const list = items(id), fam = sub && list.find((x) => x.kind === "fam" && x.key === sub);
+    const head = `<div class="box row sb-hero hb-hero"><span class="tile big">${ic(h.i, 30)}</span><div style="flex:1"><h1>${esc(fam ? nm(fam) : h[typeof lang !== "undefined" ? lang : "ar"])}</h1><p class="pd">${esc(fam ? L("اختر منطقة حسابك", "Choose your account region") : lang === "en" ? h.de : h.da)}</p></div></div>`;
+    const back = fam ? `<a class="b b2 sm sb-back" href="#/g/${esc(id)}">${ic("chev", 14)} ${esc(nm(h))}</a>` : "";
+    const grps = [...new Set(list.map((x) => x.grp).filter((k) => GROUPS[k]))];
+    const chips = !fam && grps.length > 1 ? `<div class="hb-f" role="group"><button type="button" class="hb-chip on" data-hb="f" data-f="">${L("الكل", "All")}</button>${grps.map((k) => `<button type="button" class="hb-chip" data-hb="f" data-f="${k}">${GROUPS[k][lang === "en" ? 1 : 0]}</button>`).join("")}</div>` : "";
+    const search = `<div class="hb-s"><span class="sb-si">${ic("search", 18)}</span><input id="hb-q" class="inp" type="search" placeholder="${esc(L("ابحث عن لعبة أو تطبيق…", "Search a game or app…"))}" autocomplete="off" enterkeyhint="search" aria-label="${esc(L("بحث", "Search"))}"></div>`;
+    return `<div class="hb" data-hub="${esc(id)}">${back}${head}<div class="box hb-bar">${search}${chips}</div>${body(id, sub)}<p class="hb-empty" id="hb-e" hidden>${L("لا توجد نتائج مطابقة.", "No matches.")}</p></div>`;
+  }
+
+  /* ---------- live filtering (no re-render, the keyboard stays open) ---------- */
+  let fq = "", ff = "";
+  function filter() {
+    const cs = document.querySelectorAll("#hb-g .hb-c");
+    let shown = 0;
+    cs.forEach((c) => {
+      const ok = (!fq || (c.dataset.n || "").includes(fq)) && (!ff || c.dataset.g === ff);
+      c.hidden = !ok;
+      if (ok) shown++;
+    });
+    const e = document.getElementById("hb-e");
+    if (e) e.hidden = shown > 0;
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.id === "hb-q") { fq = e.target.value.trim().toLowerCase(); filter(); }
+    });
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest && e.target.closest('[data-hb="f"]');
+      if (!b) return;
+      ff = b.dataset.f || "";
+      document.querySelectorAll(".hb-chip").forEach((c) => c.classList.toggle("on", c === b));
+      filter();
+    });
+    addEventListener("hashchange", () => { fq = ""; ff = ""; });
+  }
+
+  /* ---------- brand logos manifest (one tiny request; absent = letter tiles) ---------- */
+  function loadBrands() {
+    if (BRANDS !== null || typeof fetch !== "function" || typeof SB_URL === "undefined") return;
+    BRANDS = new Map();
+    fetch(SB_URL + BRAND_DIR + "index.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((a) => {
+        (Array.isArray(a) ? a : []).forEach((f) => { if (typeof f === "string") BRANDS.set(slug(f.replace(/\.[a-z0-9]+$/i, "")), f); });
+        const el = document.getElementById("hb-g");
+        if (el && CUR) el.outerHTML = body(CUR.id, CUR.sub);
+        filter();
+      })
+      .catch(() => {});
+  }
+
+  g.AMXHub = {
+    v: 1,
+    hubs: HUBS,
+    apply,
+    page,
+    hubKey: (id) => OF[id] || null,
+    count: (c) => (MEM[String(c && c.id).replace(/^hub_/, "")] ? items(String(c.id).replace(/^hub_/, "")).length : 0),
+  };
+})(window);
