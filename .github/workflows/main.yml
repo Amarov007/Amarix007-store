@@ -1,42 +1,45 @@
-name: Unzip Inner Folder Safely
+
+name: Replace Store Files
+
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  unzip:
+  replace:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Extract files ignoring .github folder
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract replacement archive
         run: |
-          shopt -s dotglob nullglob
-          for z in *.zip; do
-            if [ -f "$z" ]; then
-              mkdir -p /tmp/extracted
-              unzip -q -o "$z" -d /tmp/extracted
-              rm -f "$z"
-              
-              items=(/tmp/extracted/*)
-              if [ ${#items[@]} -eq 1 ] && [ -d "${items[0]}" ]; then
-                src="${items[0]}"
-              else
-                src="/tmp/extracted"
-              fi
-              
-              # حذف مجلد .github من الملفات المستخرجة حتى لا يرفض GitHub عملية الرفع
-              rm -rf "$src/.github"
-              rm -rf "$src/.git"
-              
-              cp -rf "$src"/* .
-              rm -rf /tmp/extracted
-            fi
-          done
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          set -e
+          test -f Amarix007-store-fixed.zip
+          mkdir -p /tmp/amarix-release
+          unzip -q Amarix007-store-fixed.zip -d /tmp/amarix-release
+          test -d /tmp/amarix-release/Amarix007-store-main
+          test -f /tmp/amarix-release/Amarix007-store-main/index.html
+
+      - name: Replace repository files
+        run: |
+          set -e
+          rsync -a --delete \
+            --exclude='/.git/' \
+            --exclude='/.github/workflows/replace-store.yml' \
+            /tmp/amarix-release/Amarix007-store-main/ ./
+          rm -f Amarix007-store-fixed.zip
+
+      - name: Commit replacement
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --staged --quiet || (git commit -m "Extract project files to root" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "Replace store with updated release"
+            git push
+          else
+            echo "No file changes to commit"
+          fi
