@@ -17,7 +17,7 @@ jobs:
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -iname "*.zip" | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found in the repository!"
+            echo "ERROR: No ZIP file found!"
             exit 1
           fi
           echo "Found ZIP file: $ZIP_FILE"
@@ -29,17 +29,17 @@ jobs:
           rm -rf /tmp/extracted/__MACOSX
           DIR_COUNT=$(find /tmp/extracted -mindepth 1 -maxdepth 1 | wc -l)
           FIRST_ITEM=$(find /tmp/extracted -mindepth 1 -maxdepth 1 | head -n 1)
-          shopt -s dotglob
           if [ "$DIR_COUNT" -eq 1 ] && [ -d "$FIRST_ITEM" ]; then
-            mv "$FIRST_ITEM"/* .
+            cp -rf "$FIRST_ITEM"/. .
           else
-            mv /tmp/extracted/* .
+            cp -rf /tmp/extracted/. .
           fi
+          rm -rf /tmp/extracted /tmp/archive.zip
           if [ -f /tmp/CNAME_backup ] && [ ! -f CNAME ]; then
             cp /tmp/CNAME_backup CNAME
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Replace repository with ZIP contents" || echo "No changes"
+          git commit -m "Replace repository with Amarix007-store-fixed.zip" || echo "No changes"
           git push
