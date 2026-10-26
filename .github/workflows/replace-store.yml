@@ -30,8 +30,10 @@ jobs:
           DIR_COUNT=$(find /tmp/extracted -mindepth 1 -maxdepth 1 | wc -l)
           FIRST_ITEM=$(find /tmp/extracted -mindepth 1 -maxdepth 1 | head -n 1)
           if [ "$DIR_COUNT" -eq 1 ] && [ -d "$FIRST_ITEM" ]; then
+            rm -rf "$FIRST_ITEM/.github"
             cp -rf "$FIRST_ITEM"/. .
           else
+            rm -rf /tmp/extracted/.github
             cp -rf /tmp/extracted/. .
           fi
           rm -rf /tmp/extracted /tmp/archive.zip
