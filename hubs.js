@@ -78,7 +78,7 @@
       if (c.id === "live" || c.id === "ai") {
         services(c.id).forEach((s) => {
           const ps = prods().filter((p) => p.ext && p.ext.svc === s.id);
-          out.push({ kind: "svc", id: s.id, ar: s.ar, en: s.en, color: s.color, logo: s.logo, keys: [s.id, slug(s.en)], grp: c.id, from: minPrice(ps), sub: c.id === "ai" ? s.tagline || "" : L(s.packages.length + " باقات", s.packages.length + " packs") });
+          out.push({ kind: "svc", id: s.id, ar: s.ar, en: s.en, color: s.color, logo: s.logo, keys: [s.id, slug(s.en)], grp: c.id, manual: !s.provider_id, from: minPrice(ps), sub: c.id === "ai" ? s.tagline || "" : L(s.packages.length + " باقات", s.packages.length + " packs") });
         });
       } else if (c.id === "pubg") {
         const s = services("pubg")[0] || {};
@@ -89,6 +89,10 @@
         out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "apps" ? (LIVE_RE.test(c.en) ? "live" : "tools") : "game", from: minPrice(ps), n: ps.length, sub: L(ps.length + " باقة", ps.length + " packs") });
       }
     });
+    /* same brand twice (a manual static service and an automatic provider category): keep the automatic one */
+    const dbKeys = new Set();
+    out.forEach((it) => { if (it.kind === "cat") (it.keys || []).forEach((k) => k && dbKeys.add(slug(k))); });
+    for (let i = out.length - 1; i >= 0; i--) { const it = out[i]; if (it.kind === "svc" && it.manual && (it.keys || []).some((k) => k && dbKeys.has(slug(k)))) out.splice(i, 1); }
     /* fold regional variants "Game (ID)" "Game (KH)" … into one family card (needs two or more regions) */
     const fam = {};
     out.forEach((it) => {
@@ -119,18 +123,20 @@
   function logoHtml(it) {
     const url = it.logo || (logoFile(it.keys) && SB_URL + BRAND_DIR + logoFile(it.keys));
     const letter = esc((String(it.en || it.ar || "?").match(/[A-Za-z0-9]/) || [String(it.ar || "?").charAt(0)])[0].toUpperCase());
-    return `<span class="hb-l${url ? " img" : ""}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : letter}</span>`;
+    return `<span class="hx-l${url ? " img" : ""}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : letter}</span>`;
   }
   function card(it) {
     const name = nm(it), isBtn = it.kind === "svc";
     const attrs = isBtn ? `type="button" data-x="open" data-id="${esc(it.id)}"` : `href="${esc(it.href)}"`;
     const tag = isBtn ? "button" : "a";
-    const price = it.from ? `<span class="hb-p"><small>${L("من", "From")}</small><b class="n">${money(it.from)}</b></span>` : "";
-    const badge = it.badge ? `<i class="hb-bd gold">${esc(it.badge)}</i>` : it.kind === "fam" ? `<i class="hb-bd">${esc(it.sub)}</i>` : "";
-    return `<${tag} class="hb-c" ${attrs} data-n="${esc((it.en + " " + it.ar).toLowerCase())}" data-g="${esc(it.grp || "")}" style="--bc:${colorOf(it.color, it.en)}">${badge}${logoHtml(it)}<span class="hb-t"><b>${esc(name)}</b><small>${esc(it.kind === "fam" ? L("اختر المنطقة", "Choose region") : it.sub || "")}</small></span>${price}</${tag}>`;
+    const price = it.from ? `<span class="hx-p"><small>${L("من", "From")}</small><b class="n">${money(it.from)}</b></span>` : "";
+    const badge = it.badge ? `<i class="hx-bd gold">${esc(it.badge)}</i>` : it.kind === "fam" ? `<i class="hx-bd">${esc(it.sub)}</i>` : "";
+    return `<${tag} class="hx-c${badge ? " has-bd" : ""}" ${attrs} data-n="${esc((it.en + " " + it.ar).toLowerCase())}" data-g="${esc(it.grp || "")}" style="--bc:${colorOf(it.color, it.en)}">${badge}${logoHtml(it)}<span class="hx-t"><b><bdi>${esc(name)}</bdi></b><small>${esc(it.kind === "fam" ? L("اختر المنطقة", "Choose region") : it.sub || "")}</small></span>${price}</${tag}>`;
   }
+  const RG = { ID: ["إندونيسيا", "Indonesia"], KH: ["كمبوديا", "Cambodia"], MY: ["ماليزيا", "Malaysia"], SG: ["سنغافورة", "Singapore"], TH: ["تايلاند", "Thailand"], VN: ["فيتنام", "Vietnam"], PH: ["الفلبين", "Philippines"], IN: ["الهند", "India"], EU: ["أوروبا", "Europe"], EUROPE: ["أوروبا", "Europe"], SEA: ["جنوب شرق آسيا", "Southeast Asia"], ASIA: ["آسيا", "Asia"], AMERICAS: ["الأمريكتان", "Americas"], TW: ["تايوان", "Taiwan"], "TW/HK/MO": ["تايوان / هونغ كونغ / ماكاو", "Taiwan / HK / Macau"], GLOBAL: ["عالمي", "Global"] };
   function regionCard(r) {
-    return `<a class="hb-c" href="${esc(r.href)}" data-n="${esc((r.region + " " + r.en).toLowerCase())}" style="--bc:${colorOf(null, r.region)}"><span class="hb-l rg">${esc(r.region)}</span><span class="hb-t"><b>${esc(r.region)}</b><small>${esc(r.sub)}</small></span>${r.from ? `<span class="hb-p"><small>${L("من", "From")}</small><b class="n">${money(r.from)}</b></span>` : ""}</a>`;
+    const rn = RG[String(r.region).toUpperCase()], label = rn ? rn[typeof lang !== "undefined" && lang === "en" ? 1 : 0] : r.region, fs = r.region.length <= 2 ? 22 : r.region.length <= 3 ? 18 : 12;
+    return `<a class="hx-c" href="${esc(r.href)}" data-n="${esc((r.region + " " + r.en).toLowerCase())}" style="--bc:${colorOf(null, r.region)}"><span class="hx-l rg" style="font-size:${fs}px">${esc(r.region)}</span><span class="hx-t"><b><bdi>${esc(label)}</bdi></b><small>${esc(r.sub)}</small></span>${r.from ? `<span class="hx-p"><small>${L("من", "From")}</small><b class="n">${money(r.from)}</b></span>` : ""}</a>`;
   }
 
   /* ---------- page ---------- */
@@ -139,45 +145,45 @@
     const list = items(hubId);
     if (sub) {
       const f = list.find((x) => x.kind === "fam" && x.key === sub);
-      if (f) return `<div class="hb-g" id="hb-g">${f.regions.sort((a, b) => a.region.localeCompare(b.region)).map(regionCard).join("")}</div>`;
+      if (f) return `<div class="hx-g" id="hx-g">${f.regions.sort((a, b) => a.region.localeCompare(b.region)).map(regionCard).join("")}</div>`;
     }
-    return `<div class="hb-g" id="hb-g">${list.map(card).join("")}</div>`;
+    return `<div class="hx-g" id="hx-g">${list.map(card).join("")}</div>`;
   }
   function page(id, sub) {
     const h = HUBS.find((x) => x.id === id);
-    if (!h || !MEM[id] || !MEM[id].length) return `<div class="box hb-none">${L("هذا القسم غير متاح حالياً.", "This section is not available right now.")} <a class="b sm" href="#/">${L("الرئيسية", "Home")}</a></div>`;
+    if (!h || !MEM[id] || !MEM[id].length) return `<div class="box hx-none">${L("هذا القسم غير متاح حالياً.", "This section is not available right now.")} <a class="b sm" href="#/">${L("الرئيسية", "Home")}</a></div>`;
     CUR = { id, sub: sub || "" };
     const list = items(id), fam = sub && list.find((x) => x.kind === "fam" && x.key === sub);
-    const head = `<div class="box row sb-hero hb-hero"><span class="tile big">${ic(h.i, 30)}</span><div style="flex:1"><h1>${esc(fam ? nm(fam) : h[typeof lang !== "undefined" ? lang : "ar"])}</h1><p class="pd">${esc(fam ? L("اختر منطقة حسابك", "Choose your account region") : lang === "en" ? h.de : h.da)}</p></div></div>`;
+    const head = `<div class="box row sb-hero hx-hero"><span class="tile big">${ic(h.i, 30)}</span><div style="flex:1"><h1>${esc(fam ? nm(fam) : h[typeof lang !== "undefined" ? lang : "ar"])}</h1><p class="pd">${esc(fam ? L("اختر منطقة حسابك", "Choose your account region") : lang === "en" ? h.de : h.da)}</p></div></div>`;
     const back = fam ? `<a class="b b2 sm sb-back" href="#/g/${esc(id)}">${ic("chev", 14)} ${esc(nm(h))}</a>` : "";
     const grps = [...new Set(list.map((x) => x.grp).filter((k) => GROUPS[k]))];
-    const chips = !fam && grps.length > 1 ? `<div class="hb-f" role="group"><button type="button" class="hb-chip on" data-hb="f" data-f="">${L("الكل", "All")}</button>${grps.map((k) => `<button type="button" class="hb-chip" data-hb="f" data-f="${k}">${GROUPS[k][lang === "en" ? 1 : 0]}</button>`).join("")}</div>` : "";
-    const search = `<div class="hb-s"><span class="sb-si">${ic("search", 18)}</span><input id="hb-q" class="inp" type="search" placeholder="${esc(L("ابحث عن لعبة أو تطبيق…", "Search a game or app…"))}" autocomplete="off" enterkeyhint="search" aria-label="${esc(L("بحث", "Search"))}"></div>`;
-    return `<div class="hb" data-hub="${esc(id)}">${back}${head}<div class="box hb-bar">${search}${chips}</div>${body(id, sub)}<p class="hb-empty" id="hb-e" hidden>${L("لا توجد نتائج مطابقة.", "No matches.")}</p></div>`;
+    const chips = !fam && grps.length > 1 ? `<div class="hx-f" role="group"><button type="button" class="hx-chip on" data-hx="f" data-f="">${L("الكل", "All")}</button>${grps.map((k) => `<button type="button" class="hx-chip" data-hx="f" data-f="${k}">${GROUPS[k][lang === "en" ? 1 : 0]}</button>`).join("")}</div>` : "";
+    const search = `<div class="hx-s"><span class="sb-si">${ic("search", 18)}</span><input id="hx-q" class="inp" type="search" placeholder="${esc(L("ابحث عن لعبة أو تطبيق…", "Search a game or app…"))}" autocomplete="off" enterkeyhint="search" aria-label="${esc(L("بحث", "Search"))}"></div>`;
+    return `<div class="hx" data-hub="${esc(id)}">${back}${head}${fam ? "" : `<div class="box hx-bar">${search}${chips}</div>`}${body(id, sub)}<p class="hx-empty" id="hx-e" hidden>${L("لا توجد نتائج مطابقة.", "No matches.")}</p></div>`;
   }
 
   /* ---------- live filtering (no re-render, the keyboard stays open) ---------- */
   let fq = "", ff = "";
   function filter() {
-    const cs = document.querySelectorAll("#hb-g .hb-c");
+    const cs = document.querySelectorAll("#hx-g .hx-c");
     let shown = 0;
     cs.forEach((c) => {
       const ok = (!fq || (c.dataset.n || "").includes(fq)) && (!ff || c.dataset.g === ff);
       c.hidden = !ok;
       if (ok) shown++;
     });
-    const e = document.getElementById("hb-e");
+    const e = document.getElementById("hx-e");
     if (e) e.hidden = shown > 0;
   }
   if (typeof document !== "undefined") {
     document.addEventListener("input", (e) => {
-      if (e.target && e.target.id === "hb-q") { fq = e.target.value.trim().toLowerCase(); filter(); }
+      if (e.target && e.target.id === "hx-q") { fq = e.target.value.trim().toLowerCase(); filter(); }
     });
     document.addEventListener("click", (e) => {
-      const b = e.target.closest && e.target.closest('[data-hb="f"]');
+      const b = e.target.closest && e.target.closest('[data-hx="f"]');
       if (!b) return;
       ff = b.dataset.f || "";
-      document.querySelectorAll(".hb-chip").forEach((c) => c.classList.toggle("on", c === b));
+      document.querySelectorAll(".hx-chip").forEach((c) => c.classList.toggle("on", c === b));
       filter();
     });
     addEventListener("hashchange", () => { fq = ""; ff = ""; });
@@ -191,7 +197,7 @@
       .then((r) => (r.ok ? r.json() : []))
       .then((a) => {
         (Array.isArray(a) ? a : []).forEach((f) => { if (typeof f === "string") BRANDS.set(slug(f.replace(/\.[a-z0-9]+$/i, "")), f); });
-        const el = document.getElementById("hb-g");
+        const el = document.getElementById("hx-g");
         if (el && CUR) el.outerHTML = body(CUR.id, CUR.sub);
         filter();
       })
