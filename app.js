@@ -1684,16 +1684,30 @@ document.addEventListener(
 );
 
 /* ---------- 9. Views ---------- */
-function card(p) {
+function cardBig(p) {
   const c = cat(p.c),
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "";
   const rating = ratingHtml(p);
   const vis = isVisit(p);
   return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div> <button class="b add" data-a="add" data-id="${ex(p.id)}">${ic( "cart", 15 )} ${t("add")}</button>`}</div></div>`;
 }
+/* Compact product row (default everywhere): thumbnail · name · category · price · quick add. Same look as the boost list. */
+function card(p) {
+  const c = cat(p.c),
+    old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "",
+    vis = isVisit(p),
+    price = p.smm_service && !apiMode(p) ? money(sbPrice(p).v) + " <small>" + ex(sbPrice(p).l) + "</small>" : money(pr(p));
+  const href = `#/p/${ex(p.id)}`;
+  return `<div class="pr-r${vis ? " visit" : ""}"><a class="pr-t" href="${href}" tabindex="-1" aria-hidden="true">${art(p, c)}</a><a class="pr-b" href="${href}"><h3>${p[lang]}</h3><small>${c[lang]}</small><span class="pr-p">${vis ? `<i class="vchip">${ic("ext", 12)}</i> ${t("visitshort")}` : `<b class="n">${price}</b>${old}${p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}`}</span></a><span class="pr-x"><button class="hb ${fav.includes(p.id) ? "on" : ""}" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic("heart", 15)}</button>${vis ? visitBtn(p) : `<button class="pr-add" data-a="add" data-id="${ex(p.id)}" aria-label="${t("add")}">${ic("cart", 16)}</button>`}</span></div>`;
+}
 const grid = (a) =>
   a.length
-    ? `<div class="grid">${a.map(card).join("")}</div>`
+    ? `<div class="pr-list">${a.map(card).join("")}</div>`
+    : `<p class="emp">${t("none")}</p>`;
+/* Big cards: only for the "featured" section of the home page (products pinned from the admin). */
+const gridBig = (a) =>
+  a.length
+    ? `<div class="grid">${a.map(cardBig).join("")}</div>`
     : `<p class="emp">${t("none")}</p>`;
 const ico = (o, z) =>
   o.image_url
@@ -1983,7 +1997,7 @@ function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
   if (q) return searchPage();
   return (
-    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = c.ty == "hub" ? AMXHub.count(c) : P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${c.ty == "hub" ? (lang == "ar" ? "خيار" : "options") : lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> ${(() => { const pn = P.filter((p) => +p.pin > 0).sort((a, b) => a.pin - b.pin); return pn.length ? `<h2>${lang == "ar" ? "منتجات مميزة" : "Featured"}</h2>${grid(pn)}` : ""; })()}`
+    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = c.ty == "hub" ? AMXHub.count(c) : P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${c.ty == "hub" ? (lang == "ar" ? "خيار" : "options") : lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> ${(() => { const pn = P.filter((p) => +p.pin > 0).sort((a, b) => a.pin - b.pin); return pn.length ? `<h2>${lang == "ar" ? "منتجات مميزة" : "Featured"}</h2>${gridBig(pn)}` : ""; })()}`
   );
 }
 

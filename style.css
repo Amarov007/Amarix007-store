@@ -3961,3 +3961,25 @@ body.xm-open{overflow:hidden}
 @media(min-width:900px){.hx-g{grid-template-columns:repeat(5,minmax(0,1fr))}}
 @media(min-width:1180px){.hx-g{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.hx-c,.hx-l{transition:none}.hx-c:hover{transform:none}}
+
+/* ---------- Compact product rows (all product lists) ---------- */
+.pr-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pr-r{position:relative;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:8px;min-width:0;transition:border-color .2s}
+.pr-r:hover{border-color:var(--ac-line)}
+.pr-t{flex:none;width:42px;height:42px;border-radius:11px;overflow:hidden;background:var(--bg);display:block}
+.pr-t .pim,.pr-t .ph{width:100%;height:100%;object-fit:cover}
+.pr-t .ph em{font-size:20px;opacity:.5}
+.pr-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;color:inherit;text-decoration:none}
+.pr-b h3{margin:0;font-size:12.5px;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pr-b small{font-size:10.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-p{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:12px}
+.pr-p b{font-weight:800;color:var(--tx)}
+.pr-p s{display:none}
+.pr-p .bd{position:static;font-style:normal;font-size:10px;line-height:1.4;padding:0 6px;border-radius:99px;white-space:nowrap}
+.pr-x{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px}
+.pr-x .hb{position:static;width:26px;height:26px;display:grid;place-items:center;padding:0}
+.pr-add{width:30px;height:30px;border-radius:10px;border:0;display:grid;place-items:center;cursor:pointer;background:var(--cta);color:var(--cta-tx)}
+.pr-add:active{transform:scale(.94)}
+@media(max-width:340px){.pr-list{grid-template-columns:1fr}}
+@media(min-width:700px){.pr-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1000px){.pr-list{grid-template-columns:repeat(4,minmax(0,1fr))}}
