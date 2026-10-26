@@ -22,11 +22,12 @@
   const color = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : "#b9ff66");
   const sec = (id) => SEC.find((s) => s.id === id);
   const svc = (id) => SV.find((s) => s.id === id);
-  const pk = (s, id) => (s && s.packages.find((p) => p.id === id)) || null;
+  const pk = (s, id) => (s && Array.isArray(s.packages) ? s.packages.find((p) => p.id === id) : null) || null;
   const $id = (id) => document.getElementById(id);
 
   /* ---------- normalise: derive AI packages, product ids, provider fallbacks ---------- */
   SV.forEach((s) => {
+    s.packages = Array.isArray(s.packages) ? s.packages : [];
     if (s.category === "ai") {
       s.packages = [];
       s.types.forEach((t) =>
@@ -44,19 +45,24 @@
 
   const typeOf = (s, id) => (s.types || []).find((t) => t.id === id);
   const durOf = (s, id) => (s.durations || []).find((d) => d.id === id);
-  const pkgTitle = (s, p) =>
-    s.category === "pubg" ? `${nf(p.base)}${p.bonus ? " + " + nf(p.bonus) : ""} UC`
-    : s.category === "live" ? `${nf(p.amount)} ${s.unit}`
-    : `${typeOf(s, p.type).ar} · ${durOf(s, p.dur).ar}`;
+  const pkgTitle = (s, p) => {
+    if (s.category === "pubg") return `${nf(p.base ?? p.amount ?? 0)}${p.bonus ? " + " + nf(p.bonus) : ""} UC`;
+    if (s.category === "live") return `${nf(p.amount ?? p.base ?? 0)} ${s.unit || ""}`.trim();
+    const t = typeOf(s, p.type), d = durOf(s, p.dur);
+    return `${t ? t.ar : p.type || "اشتراك"} · ${d ? d.ar : p.dur || ""}`.trim();
+  };
   const pkgName = (s, p, en) =>
     s.category === "pubg" ? `${en ? s.en : s.ar} — ${pkgTitle(s, p)}`
     : s.category === "live" ? `${en ? s.en : s.ar} — ${nf(p.amount)}${en ? "" : " " + s.unit}`
-    : en ? `${s.en} — ${typeOf(s, p.type).en} — ${durOf(s, p.dur).months} mo`
-    : `${s.ar} — ${typeOf(s, p.type).ar} — ${durOf(s, p.dur).ar}`;
+    : en ? `${s.en} — ${(typeOf(s, p.type) || {}).en || p.type || "Subscription"} — ${(durOf(s, p.dur) || {}).months || p.dur || ""} mo`
+    : `${s.ar} — ${(typeOf(s, p.type) || {}).ar || p.type || "اشتراك"} — ${(durOf(s, p.dur) || {}).ar || p.dur || ""}`;
 
   /* flat sellable product (the shape app.js / the server expect in store_config.products) */
   function toProduct(s, p) {
-    const o = { id: p.product_id, c: s.category, ar: pkgName(s, p, false), en: pkgName(s, p, true), p: p.price, o: 0, r: 5, n: 0, d: 0, tg: s.en, sp: "", img: "", images: [], ext: { svc: s.id, pkg: p.id } };
+    const category = s.category === "pubg" ? "pubg" : s.category === "live" ? "live" : "ai";
+    const ptype = category === "pubg" ? "game_topup" : category === "live" ? "app_subscription" : (p.input_type === "none" ? "gift_card" : "app_subscription");
+    const price = Number(p.price);
+    const o = { id: p.product_id, c: s.category, ar: pkgName(s, p, false), en: pkgName(s, p, true), p: Number.isFinite(price) ? price : 0, o: 0, r: 5, n: 0, d: 0, tg: s.en, sp: "", img: p.image || p.image_url || s.image || s.image_url || s.logo || "", images: Array.isArray(p.images) ? p.images.slice() : [], ptype, bk: s.id, amount: Number(p.amount ?? p.base ?? 0) || undefined, unit: p.unit || s.unit || "", auto: !!p.provider_service_id, ext: { svc: s.id, pkg: p.id } };
     if (p.provider_service_id) Object.assign(o, { smm_provider: s.provider_id || "", smm_service: p.provider_service_id, smm_qty: 1, smm_input: p.input_type === "none" ? "none" : "text", smm_country: p.provider_category || s.provider_category || "" });
     return o;
   }

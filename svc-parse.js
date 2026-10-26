@@ -191,5 +191,92 @@
     return out;
   }
 
-  g.AMXSvc = { parse };
+  /* Deterministic product classification shared by import, admin and storefront. */
+  const norm = (v) => String(v == null ? "" : v).normalize("NFKD").toLowerCase()
+    .replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const GAME_RE = /\b(pubg|pubg mobile|free fire|freefire|mobile legends|mlbb|genshin|valorant|roblox|fortnite|steam|playstation|xbox|riot points|uc|diamonds|شدات|جواهر|ببجي|فري فاير|فريفاير|شحن العاب|شحن ألعاب)\b/i;
+  const APP_RE = /\b(netflix|shahid|spotify|youtube premium|youtube music|chatgpt|claude|midjourney|perplexity|discord nitro|canva|crunchyroll|osn|disney|prime video|اشتراك|اشتراكات|نتفلكس|شاهد|سبوتيفاي)\b/i;
+  const SMM_RE = /\b(followers?|likes?|views?|comments?|shares?|members?|subscribers?|reactions?|instagram|telegram|tiktok|youtube|facebook|twitter|linkedin|متابعين|لايكات|مشاهدات|تعليقات|أعضاء|اعضاء|رشق)\b/i;
+  function typeOf(x) {
+    const name = String((x && (x.name || x.en || x.ar || x.title)) || "");
+    const cat = String((x && (x.category || x.smm_cat || "")) || "");
+    const explicit = String((x && (x.ptype || x.product_type || x.service_type)) || "").toLowerCase();
+    if (["smm","game_topup","app_subscription","gift_card"].includes(explicit)) return explicit;
+    if (x && (x.smm_input === "none" || x.input_type === "none" || x.delivery_type === "pin")) return "gift_card";
+    if (GAME_RE.test(name + " " + cat) || x && (x.requires_player_id || x.player_id_required)) return "game_topup";
+    if (APP_RE.test(name + " " + cat) || x && (x.requires_email || x.requires_phone)) return "app_subscription";
+    if (SMM_RE.test(name + " " + cat) && (x && (x.provider_kind === "smm" || x.smm_service || x.smm_provider || x.min != null || x.max != null))) return "smm";
+    if (x && x.provider_kind === "custom") return APP_RE.test(name + " " + cat) ? "app_subscription" : GAME_RE.test(name + " " + cat) ? "game_topup" : "gift_card";
+    return "smm";
+  }
+  const BRANDS = [
+    ["pubg","PUBG Mobile","ببجي موبايل",/\b(pubg|pubg mobile|uc|ببجي|شدات)\b/i,"games"],
+    ["free_fire","Free Fire","فري فاير",/\b(free ?fire|freefire|فري ?فاير|جواهر فري)\b/i,"games"],
+    ["mobile_legends","Mobile Legends","موبايل ليجندز",/\b(mobile legends|mlbb|موبايل ليجندز)\b/i,"games"],
+    ["genshin","Genshin Impact","جينشن إمباكت",/\b(genshin|جينشن)\b/i,"games"],
+    ["roblox","Roblox","روبلوكس",/\b(roblox|روبلوكس)\b/i,"games"],
+    ["netflix","Netflix","نتفلكس",/\b(netflix|نتفلكس)\b/i,"apps"],
+    ["shahid","Shahid","شاهد",/\b(shahid|شاهد)\b/i,"apps"],
+    ["spotify","Spotify","سبوتيفاي",/\b(spotify|سبوتيفاي)\b/i,"apps"],
+    ["chatgpt","ChatGPT","ChatGPT",/\b(chatgpt|gpt ?plus)\b/i,"apps"],
+    ["claude","Claude","Claude",/\b(claude)\b/i,"apps"],
+    ["telegram","Telegram","تيليجرام",/\b(telegram|تيليجرام|تيليغرام)\b/i,"smm"],
+    ["instagram","Instagram","إنستغرام",/\b(instagram|انستغرام|انستجرام)\b/i,"smm"]
+  ];
+  function brandOf(x) {
+    const text = String((x && (x.name || x.en || x.ar || "")) || "") + " " + String((x && x.category) || "");
+    const explicit = String((x && (x.bk || x.brand_key)) || "");
+    if (explicit) {
+      const found = BRANDS.find((b) => b[0] === explicit);
+      if (found) return { key: found[0], en: found[1], ar: found[2], kind: found[4] === "games" ? "game" : found[4] === "apps" ? "app" : "smm" };
+    }
+    const found = BRANDS.find((b) => b[3].test(text));
+    if (found) return { key: found[0], en: found[1], ar: found[2], kind: found[4] === "games" ? "game" : found[4] === "apps" ? "app" : "smm" };
+    const clean = String((x && (x.category || x.name || x.en || x.ar)) || "Other").trim();
+    return { key: norm(clean).replace(/\s+/g, "_").slice(0, 64) || "other", en: clean, ar: clean, kind: "other" };
+  }
+  const hubOf = (x) => ({ smm: "smm", game_topup: "games", app_subscription: "apps", gift_card: "apps" })[typeOf(x)];
+  const providerOf = (x) => !x || !x.smm_service ? "manual" : String(x.smm_provider || "main").toLowerCase();
+  const deliveryOf = (x) => x && (x.auto === false || x.delivery === "manual" || x.delivery_type === "manual" || !x.smm_service) ? "manual" : "auto";
+  const availOf = (x) => x && (x.oos === true || x.available === false || x.active === false || x.hidden === true) ? "hidden" : "available";
+  const typeLabel = (t, en) => ({ smm: en ? "SMM" : "رشق متابعين", game_topup: en ? "Game top-up" : "شحن ألعاب", app_subscription: en ? "App subscription" : "تطبيق / اشتراك", gift_card: en ? "Gift card / PIN" : "بطاقة / كود فوري" })[t] || String(t || "");
+  function requiredOf(x) {
+    const t = typeOf(x);
+    if (t === "smm") return [];
+    if (t === "gift_card") return [];
+    if (t === "game_topup") return Array.isArray(x && x.req) ? x.req : ["player_id"];
+    return Array.isArray(x && x.req) ? x.req : (/\b(email|mail|إيميل|بريد)\b/i.test(String((x && x.name) || "")) ? ["email"] : ["email"]);
+  }
+  function denomination(name) {
+    const m = String(name || "").match(/(\d[\d,]*(?:\.\d+)?)\s*(UC|diamonds?|gems?|coins?|credits?|months?|days?|GB|USD|EUR|ليرة|شدات|جوهرة|جواهر|كريديت)/i);
+    return m ? { amount: Number(m[1].replace(/,/g, "")), unit: m[2] } : null;
+  }
+  function refine(list, filters) {
+    const f = filters || {};
+    return (Array.isArray(list) ? list : []).filter((p) => {
+      if (f.type && typeOf(p) !== f.type) return false;
+      if (f.provider) {
+        const pv = providerOf(p);
+        const wanted = String(f.provider).toLowerCase();
+        if (wanted === "fazer") { if (!/fazer/.test(pv)) return false; }
+        else if (wanted === "main") { if (pv !== "main") return false; }
+        else if (pv !== wanted) return false;
+      }
+      if (f.delivery && deliveryOf(p) !== f.delivery) return false;
+      if (f.avail === "available" && availOf(p) !== "available") return false;
+      if (f.avail === "out" && availOf(p) !== "hidden") return false;
+      return true;
+    });
+  }
+  function sortList(list, mode, opts) {
+    const price = opts && typeof opts.price === "function" ? opts.price : (p) => Number(p && p.p) || 0;
+    const rank = (p) => Number(p && p.bs) > 0 ? Number(p.bs) : Number.MAX_SAFE_INTEGER;
+    return [...(Array.isArray(list) ? list : [])].sort((a, b) => {
+      if (mode === "pa") return price(a) - price(b) || String(a.id || "").localeCompare(String(b.id || ""));
+      if (mode === "pd") return price(b) - price(a) || String(a.id || "").localeCompare(String(b.id || ""));
+      if (mode === "bs") return rank(a) - rank(b) || String(a.id || "").localeCompare(String(b.id || ""));
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
+  }
+  g.AMXSvc = { parse, typeOf, brandOf, hubOf, providerOf, deliveryOf, availOf, typeLabel, requiredOf, denomination, refine, sortList };
 })(typeof window !== "undefined" ? window : globalThis);

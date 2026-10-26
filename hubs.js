@@ -47,7 +47,17 @@
     if (c.hub === "games" || c.hub === "apps") return c.hub;
     if (c.id === "pubg") return "games";
     if (c.id === "live" || c.id === "ai") return "apps";
-    if (c.ty === "shop" && prods().some((p) => p.c == c.id && p.smm_provider)) return APP_RE.test(String(c.en || "")) ? "apps" : "games";
+    if (c.ty === "boost") return null;
+    if (c.ty === "shop") {
+      const members = prods().filter((p) => String(p.c) === String(c.id));
+      const types = new Set(members.map((p) => String(p.ptype || "")).filter(Boolean));
+      // Explicit product types outrank provider fields and category-name heuristics.
+      if (types.size && [...types].every((t) => t === "game_topup")) return "games";
+      if (types.size && [...types].every((t) => t === "app_subscription" || t === "gift_card")) return "apps";
+      if (types.size && [...types].every((t) => t === "smm")) return null;
+      if (c.hub === "games" || c.hub === "apps") return c.hub;
+      if (members.some((p) => p.smm_provider || p.smm_service)) return APP_RE.test(String(c.en || "") + " " + String(c.ar || "")) ? "apps" : "games";
+    }
     return null;
   }
   /* the two hubs are real records in store_config.categories (type "hub", ids hub_games / hub_apps) so the admin can rename,

@@ -81,7 +81,9 @@
   function priceOf(x, type, mk) {
     const rate = parseFloat(x.rate);
     if (!(rate > 0)) return 0;
-    const v = (rate / 1000) * (1 + (mk || 0) / 100);
+    // SMM provider rates are normally per 1,000 units; game/app offers are package prices.
+    const unitCost = type === "smm" ? rate / 1000 : rate;
+    const v = unitCost * (1 + (mk || 0) / 100);
     return type === "smm" ? Math.max(0.000001, r6(v)) : Math.max(0.01, r2(v));
   }
   function classifyService(x, kind) {
@@ -208,15 +210,15 @@
       const key = prov + "|" + sid + "|" + cty;
       const rate = parseFloat(x.rate);
       const auto = classifyService(x, kind);
-      let type = auto;
-      if (IC.target && IC.target !== "auto" && HUB_OF_TYPE[auto] !== IC.target) type = DEFAULT_TYPE[IC.target]; // explicit target wins over the guess
+      const type = auto; // Keep semantic classification independent from the destination hub.
+      const target = IC.target && IC.target !== "auto" ? IC.target : HUB_OF_TYPE[type];
       const status = !(rate > 0) ? "invalid" : have.has(key) || seen.has(key) ? "exists" : "new";
       seen.add(key);
-      return { x, key, type, auto, cat: "auto", mk: IC.mk, status, sel: status === "new" };
+      return { x, key, type, auto, target, cat: "auto", mk: IC.mk, status, sel: status === "new" };
     });
   }
   const provKey = (p) => String(p.smm_provider || "main").toLowerCase() + "|" + String(p.smm_service || "") + "|" + String(p.smm_country || "");
-  const rowHub = (r) => HUB_OF_TYPE[r.type];
+  const rowHub = (r) => r.target || HUB_OF_TYPE[r.type];
   const rowPrice = (r) => priceOf(r.x, r.type, r.mk);
   function rowPriceTxt(r) {
     const p = rowPrice(r);
@@ -280,8 +282,18 @@
     try {
       if (pv !== "main" && !(await siteSupport())) throw new Error(SITES_OLD);
       const j = await fn("smm-order", { action: "services", provider: pv, ...(IC.cat && IC.cat !== "*" ? { category: IC.cat } : {}) });
-      const list = Array.isArray(j) ? j.map((x) => ({ id: x.service, name: x.name, category: x.category, rate: x.rate, min: x.min, max: x.max, country: x.country, image: x.image, amount: x.amount, available: x.available, type: x.type })) : j.services || [];
-      if (!list.length) throw new Error("المزوّد لم يُرجع أي خدمة");
+      const source = Array.isArray(j) ? j : (Array.isArray(j && j.services) ? j.services : Array.isArray(j && j.data) ? j.data : Array.isArray(j && j.results) ? j.results : []);
+      const list = source.map((x) => {
+        const id = x.id ?? x.service ?? x.service_id ?? x.offer_id ?? x.product_id;
+        const name = x.name ?? x.title ?? x.product_name ?? x.offer_name ?? x.service_name;
+        const category = x.category ?? x.category_name ?? x.group ?? x.game ?? x.brand ?? x.category_id ?? "";
+        const rate = x.rate ?? x.price_per_1000 ?? x.pricePer1000 ?? x.cost ?? x.price ?? x.amount_price;
+        const image = x.image ?? x.image_url ?? x.icon ?? x.logo ?? x.thumbnail ?? x.product_image ?? "";
+        const amount = x.amount ?? x.denomination ?? x.value ?? x.package_amount ?? x.quantity_value;
+        const available = x.available ?? x.is_available ?? x.active ?? x.enabled;
+        return { ...x, id: String(id ?? ""), name: String(name ?? ""), category: String(category ?? ""), rate: Number(rate), min: x.min ?? x.min_quantity ?? x.minimum, max: x.max ?? x.max_quantity ?? x.maximum, country: x.country ?? x.country_code ?? x.region ?? "", image: String(image || ""), amount, available: available === false || available === 0 || available === "false" ? false : true, type: x.type ?? x.delivery_type ?? "" };
+      }).filter((x) => x.id && x.name);
+      if (!list.length) throw new Error("لم يُرجع المزوّد خدمات قابلة للاستيراد؛ تحقّق من صيغة الاستجابة وإعدادات API.");
       IC.rows = mkRows(list, pv, kind); IC.fetched = true; IC.page = 0; IC.fq = ""; IC.ft = ""; IC.fs = "";
       IC.msg = `✓ تم جلب ${list.length} خدمة من «${provName(pv)}». راجع الجدول ثم احفظ.`;
     } catch (e) {
@@ -536,7 +548,7 @@
     const i = +t.dataset.i;
     switch (a) {
       case "prov": IC.prov = t.value; IC.catList = []; IC.cat = ""; IC.fetched = false; IC.rows = []; IC.msg = ""; return render();
-      case "target": IC.target = t.value; return render();
+      case "target": IC.target = t.value; if (IC.fetched) IC.rows = IC.rows.map((r) => ({ ...r, target: t.value && t.value !== "auto" ? t.value : HUB_OF_TYPE[r.type], cat: "auto" })); return render();
       case "cat": IC.cat = t.value; return;
       case "mk": IC.mk = Math.max(0, num(t.value, 30)); return;
       case "ft": IC.ft = t.value; IC.page = 0; return refreshPrev();
@@ -664,5 +676,7 @@
   const grp = TG.find((x) => x[0] === "المتجر");
   if (grp) { const at = Math.max(0, grp[1].indexOf("products")); grp[1].splice(at, 0, "import", "topups", "smmmgr"); }
 
-  g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, v: 1 };
+  g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, v: 2 };
+  // admin.js may have rendered its first screen before this extension was loaded.
+  if (typeof render === "function") render();
 })(window);

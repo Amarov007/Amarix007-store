@@ -221,3 +221,29 @@ h2{font-size:18px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
 .stat small{font-size:12px;font-weight:600;color:var(--mu)}
 .stat.hot{border-color:#f87171}.stat.hot b{color:#f87171}
 .hint.warn{color:var(--wn)}
+
+
+/* Import / catalog management extension */
+.ic-modes{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.ic-modes .b{flex:1 1 145px}
+.ic-tb{min-width:920px}
+.ic-tb th,.ic-tb td{vertical-align:middle}
+.ic-th{width:42px;height:42px;object-fit:contain;border-radius:8px;background:var(--card2,#20212b);display:inline-block;vertical-align:middle;margin-inline-end:8px}
+.ic-nm{min-width:220px;max-width:340px}
+.ic-nm b{display:inline-block;max-width:300px;overflow-wrap:anywhere}
+.ic-bd{display:inline-flex;align-items:center;border:1px solid var(--line,#333);border-radius:999px;padding:3px 8px;margin:2px;font-size:11px;font-style:normal;white-space:nowrap}
+.ic-bd.ok{border-color:#238a68;color:#4fd1a1}
+.ic-bd.er{border-color:#b45353;color:#ff9999}
+.ic-bd.t-game_topup{border-color:#a87924}
+.ic-bd.t-app_subscription,.ic-bd.t-gift_card{border-color:#4e83c4}
+.ic-brow,.ic-filters,.ic-bulkbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ic-brow{margin:12px 0}
+.ic-filters>*{flex:1 1 145px;min-width:130px}
+.ic-bulkbar{padding:12px;background:var(--card2,#20212b);border-radius:10px;margin:12px 0}
+.ic-chk{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ic-chk input{width:17px;height:17px}
+.ic-prev,.tbw{max-width:100%;overflow:auto}
+.ic-prev{margin-top:14px}
+.ic-prev .card{margin-top:12px}
+.ic-th + b{vertical-align:middle}
+@media(max-width:700px){.ic-tb{min-width:760px}.ic-nm{min-width:180px}.ic-modes .b{flex-basis:125px}.ic-bulkbar>*{flex:1 1 100%}}
