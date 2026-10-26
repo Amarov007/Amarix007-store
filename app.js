@@ -1964,50 +1964,187 @@ function freeOf(c) {
     }))
     .filter((x) => x.nums.length);
 }
-const nHit = (p, c, gi, oi) => optHit(fhay(p), c.f[gi].o[oi]);
-function numStepper(step, c) {
-  const L = [t("n_svc"), t("n_cty"), t("n_buy")];
-  return `<div class="nsteps">${L.map(
-    (x, i) =>
-      `<button type="button" class="nst${i == step ? " on" : ""}${i < step ? " done" : ""}" ${i < step ? `data-a="nstep" data-c="${ex(c.id)}" data-s="${i}"` : "disabled"}><i>${i + 1}</i> ${x}</button>`
-  ).join("")}</div>`;
+/* ---- Paid numbers (one screen, same look as the boost panel): 1 service tiles + search -> 2 country list (flag, price, buy) ----
+   A product of a synced numbers provider is named "<service> · <country>" (see admin numSync), so service and country are read from its name:
+   nothing in the data has to change. A product without a country (custom provider) is listed under its service as one row. */
+const NM = { sv: "", q: "", cq: "", sort: "pa", lim: 30, sm: false };
+const NMM = {};
+const nmKey = (x) =>
+  String(x)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\bst\.?\s/g, "saint ")
+    .replace(/\s(?:&|and)\s/g, " ")
+    .replace(/[^a-z0-9\u0600-\u06ff]/g, "");
+const NM_POP = ["whatsapp", "telegram", "instagram", "facebook", "tiktok", "google", "twitter", "x", "discord", "snapchat", "viber", "chatgpt", "openai", "linkedin", "amazon", "microsoft", "apple", "paypal"];
+let NM_ISO = null;
+function nmIso(name) {
+  if (!NM_ISO) {
+    NM_ISO = {};
+    try {
+      const dn = new Intl.DisplayNames(["en"], { type: "region" });
+      for (let i = 65; i < 91; i++)
+        for (let j = 65; j < 91; j++) {
+          const c = String.fromCharCode(i, j),
+            n = dn.of(c);
+          if (n && n !== c && n !== "Unknown Region") NM_ISO[nmKey(n)] = c;
+        }
+    } catch {}
+    const al = { usa: "US", unitedstates: "US", america: "US", england: "GB", greatbritain: "GB", uk: "GB", scotland: "GB", wales: "GB", ivorycoast: "CI", swaziland: "SZ", czechrepublic: "CZ", hongkong: "HK", macau: "MO", macao: "MO", palestine: "PS", macedonia: "MK", myanmar: "MM", burma: "MM", turkey: "TR", bosnia: "BA", drcongo: "CD", dr: "CD", congo: "CG", capeverde: "CV", easttimor: "TL", timorleste: "TL", falklandislands: "FK", uae: "AE", southkorea: "KR", korea: "KR", russia: "RU", vietnam: "VN", laos: "LA", moldova: "MD", syria: "SY", iran: "IR", tanzania: "TZ", brunei: "BN", micronesia: "FM", curacao: "CW", reunion: "RE", guineabissau: "GW", saintkittsnevis: "KN", saintlucia: "LC", saintvincent: "VC", trinidadtobago: "TT", antiguabarbuda: "AG", saotomeprincipe: "ST", taiwan: "TW", kosovo: "XK" };
+    Object.keys(al).forEach((k) => !NM_ISO[k] && (NM_ISO[k] = al[k]));
+  }
+  return NM_ISO[nmKey(name)] || "";
+}
+const nmFlag = (name) => {
+  const c = nmIso(name);
+  return c ? String.fromCodePoint(...[...c].map((x) => 127397 + x.charCodeAt(0))) : "";
+};
+function nmMeta(p) {
+  const sig = p.en + "|" + p.ar;
+  let m = NMM[p.id];
+  if (m && m.sig == sig) return m;
+  const sp = (s) => plain(s).split(/\s[·•]\s/).map((x) => x.trim());
+  const e = sp(p.en),
+    a = sp(p.ar),
+    sv = e[0] || a[0] || "",
+    cEn = e.length > 1 ? e.slice(1).join(" · ") : "",
+    cAr = a.length > 1 ? a.slice(1).join(" · ") : "";
+  return (NMM[p.id] = { sig, sv, key: nmKey(sv), cEn, cAr, c: cEn || cAr, flag: nmFlag(cEn || cAr), h: nz(plain([p.tg, p.en, p.ar].join(" "))) });
+}
+const nmCty = (m) => (lang == "ar" ? m.cAr || m.cEn : m.cEn || m.cAr);
+function nmBadge(name, z) {
+  const h = nz(plain(name)),
+    pl = SBP.find((r) => r[3].test(h));
+  if (pl) return sbBadge(pl[0], z);
+  let s = 0;
+  for (const ch of String(name)) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
+  const L = (String(name).match(/[\p{L}\p{N}]/u) || ["#"])[0].toUpperCase();
+  return `<span class="sb-pi" style="background:hsl(${s % 360} 55% 38%);color:#fff"><b class="sb-lt">${ex(L)}</b></span>`;
+}
+function nmCalc(c) {
+  const all = P.filter((p) => p.c == c.id),
+    sv = new Map();
+  all.forEach((p) => {
+    const m = nmMeta(p);
+    let x = sv.get(m.key);
+    if (!x) sv.set(m.key, (x = { key: m.key, name: m.sv, items: [] }));
+    x.items.push(p);
+  });
+  const rank = (x) => {
+    const i = NM_POP.indexOf(x.key);
+    return i < 0 ? 99 : i;
+  };
+  const list = [...sv.values()].sort((a, b) => rank(a) - rank(b) || b.items.length - a.items.length || a.name.localeCompare(b.name));
+  const w = nz(NM.q).split(/\s+/).filter(Boolean),
+    shown = w.length ? list.filter((x) => w.every((k) => nz(x.name).includes(k))) : list;
+  const cur = sv.get(NM.sv) || list[0] || null;
+  let rows = cur ? cur.items : [];
+  const cw = nz(NM.cq).split(/\s+/).filter(Boolean);
+  if (cw.length) rows = rows.filter((p) => cw.every((k) => nmMeta(p).h.includes(k)));
+  const cmp = {
+    pa: (x, y) => pr(x) - pr(y),
+    pd: (x, y) => pr(y) - pr(x),
+    nm: (x, y) => String(nmCty(nmMeta(x))).localeCompare(String(nmCty(nmMeta(y))), lang),
+  }[NM.sort];
+  if (cmp) rows = [...rows].sort(cmp);
+  return { all: list, shown, cur, rows, n: all.length };
+}
+const NM_SV_SHOWN = 8;
+function nmSvcs(f) {
+  const q = NM.q.trim(),
+    show = q || NM.sm ? f.shown : f.shown.slice(0, NM_SV_SHOWN);
+  if (!show.length) return `<p class="pd" style="margin:6px 2px">${sbT("لا توجد خدمة بهذا الاسم", "No service with this name")}</p>`;
+  const tile = (x) => {
+    const on = f.cur && f.cur.key == x.key;
+    return `<button type="button" class="sb-p${on ? " on" : ""}" data-a="nmsv" data-k="${ex(x.key)}" aria-pressed="${on}">${nmBadge(x.name, 20)}<small>${ex(x.name)}</small><span class="sb-ct n">${fmtN(x.items.length)} ${sbT("عرض", "offers")}</span></button>`;
+  };
+  const more = !q && f.shown.length > NM_SV_SHOWN;
+  return `<div class="sb-pls">${show.map(tile).join("")}${more ? `<button type="button" class="sb-p sb-mo" data-a="nmsm" aria-expanded="${NM.sm}"><span class="sb-pi sb-all">${ic(NM.sm ? "x" : "grid", 20)}</span><small>${NM.sm ? sbT("أقل", "Less") : sbT("المزيد", "More")} (${fmtN(f.shown.length - NM_SV_SHOWN)})</small></button>` : ""}</div>`;
+}
+function nmRow(p) {
+  const m = nmMeta(p),
+    cn = nmCty(m);
+  return `<div class="nm-r"><span class="nm-fl">${m.flag ? m.flag : ic("globe", 18)}</span><span class="sb-nm"><b>${ex(cn || m.sv)}</b><small>${ex(m.sv)} · ${sbT("استلام الكود فوراً", "Instant code")}</small></span><span class="sb-pr"><b class="n">${money(pr(p))}</b><small>${sbT("للرقم", "per number")}</small></span><button type="button" class="b nm-b" data-a="buy" data-id="${ex(p.id)}">${sbT("اشترِ", "Buy")}</button><button type="button" class="nm-cb" data-a="add" data-id="${ex(p.id)}" aria-label="${t("add")}">${ic("cart", 16)}</button></div>`;
+}
+function nmRes(f) {
+  if (!f.cur) return "";
+  const a = f.rows,
+    show = a.slice(0, NM.lim);
+  const bar = `<div class="sb-meta"><span><b class="n">${fmtN(a.length)}</b> ${sbT("دولة متاحة", "countries")}</span><label class="fsort"><span>${t("sortl")}</span><select class="sel" data-a="nmsort" aria-label="${t("sortl")}">${[
+    ["pa", sbT("الأرخص أولاً", "Cheapest first")],
+    ["pd", sbT("الأغلى أولاً", "Priciest first")],
+    ["nm", sbT("حسب الاسم", "By name")],
+  ]
+    .map(([k, l]) => `<option value="${k}"${NM.sort == k ? " selected" : ""}>${l}</option>`)
+    .join("")}</select></label></div>`;
+  if (!a.length) return bar + emptyBox("search", sbT("لا توجد دولة مطابقة", "No matching country"), "", `<button type="button" class="b b2" data-a="nmclr">${t("fclear")}</button>`);
+  return `${bar}<div class="sb-list">${show.map(nmRow).join("")}</div>${a.length > show.length ? `<button type="button" class="b b2 block sb-more" data-a="nmmore">${sbT("عرض المزيد", "Show more")} (${fmtN(a.length - show.length)})</button>` : ""}`;
 }
 function numPaid(c) {
-  const all = P.filter((p) => p.c == c.id);
-  if (!all.length) return emptyBox("box", t("catempty"));
-  const plain1 = () => {
-    const a = catList(c);
-    return catControls(c, all.length) + (a.length ? grid(a) : emptyBox("search", t("nofilt"), "", `<button class="b b2" data-a="ffclr" data-c="${ex(c.id)}">${t("fclear")}</button>`));
-  };
-  if (c.f.length < 2 || !c.f[0].o.length || !c.f[1].o.length) return plain1();
-  const st = fstate(c.id),
-    si = (st.sel[0] || [])[0],
-    ci = (st.sel[1] || [])[0],
-    step = si == null ? 0 : ci == null ? 1 : 2,
-    pick = (g, list, oi) => {
-      const a = list.filter((p) => nHit(p, c, g, oi)),
-        n = a.length;
-      return n
-        ? `<button type="button" class="nopt" data-a="npick" data-c="${ex(c.id)}" data-g="${g}" data-o="${oi}"><b>${ex(c.f[g].o[oi])}</b><small>${n} ${t("n_off")} · ${t("n_from")} ${money(Math.min(...a.map(pr)))}</small></button>`
-        : "";
-    };
-  if (step == 0) {
-    const h = c.f[0].o.map((_, oi) => pick(0, all, oi)).join("");
-    return h ? `${numStepper(0, c)}<h2 class="nh">${t("n_pickS")}</h2><div class="ngrid">${h}</div>` : plain1();
-  }
-  const sub = all.filter((p) => nHit(p, c, 0, si));
-  if (step == 1) {
-    const h = c.f[1].o.map((_, oi) => pick(1, sub, oi)).join("");
-    /* none of this service's products names a country (e.g. a custom provider that sells "WhatsApp" with no country): skip the country step and list them directly instead of an empty page */
-    if (!h) {
-      const a0 = catList(c);
-      return `${numStepper(2, c)}<div class="box nsel">${ex(c.f[0].o[si])}</div>${a0.length ? grid(a0) : emptyBox("box", t("catempty"), "", `<button class="b b2" data-a="nstep" data-c="${ex(c.id)}" data-s="0">${t("n_back")}</button>`)}`;
-    }
-    return `${numStepper(1, c)}<div class="box nsel">${ex(c.f[0].o[si])}</div><h2 class="nh">${t("n_pickC")}</h2><div class="ngrid">${h}</div>`;
-  }
-  const a = catList(c);
-  return `${numStepper(2, c)}<div class="box nsel">${ex(c.f[0].o[si])} · ${ex(c.f[1].o[ci])}</div>${a.length ? grid(a) : emptyBox("search", t("nofilt"), "", `<button class="b b2" data-a="nstep" data-c="${ex(c.id)}" data-s="${sub.some((p) => c.f[1].o.some((_, oi) => nHit(p, c, 1, oi))) ? 1 : 0}">${t("n_back")}</button>`)}`;
+  if (!P.some((p) => p.c == c.id)) return emptyBox("box", t("catempty"));
+  const f = nmCalc(c);
+  return `<div class="box sb-panel"><div class="sb-lab"><i>1</i>${sbT("الخدمة التي تريد تفعيلها", "Service to verify")}</div>
+<div class="sb-s"><span class="sb-si">${ic("search", 18)}</span><input id="nm-q" class="inp" type="search" data-a="nmq" value="${ex(NM.q)}" placeholder="${sbT("ابحث عن خدمة: واتساب، تيليجرام…", "Search a service: WhatsApp, Telegram…")}" autocomplete="off" enterkeyhint="search" aria-label="${sbT("بحث", "Search")}"></div>
+<div id="nm-svcs">${nmSvcs(f)}</div>
+<div class="sb-lab"><i>2</i>${sbT("الدولة", "Country")}${f.cur ? ` <small class="nm-cur">${ex(f.cur.name)}</small>` : ""}</div>
+<div class="sb-s"><span class="sb-si">${ic("search", 18)}</span><input id="nm-cq" class="inp" type="search" data-a="nmcq" value="${ex(NM.cq)}" placeholder="${sbT("ابحث عن دولة…", "Search a country…")}" autocomplete="off" enterkeyhint="search" aria-label="${sbT("بحث", "Search")}"></div></div>
+<div class="sb-lab out"><i>3</i>${sbT("اشترِ وستجد رقمك والكود في «طلباتي» فور تأكيد الدفع", "Buy it and find your number and code in “My orders” once payment is confirmed")}</div><div id="nm-res">${nmRes(f)}</div>`;
 }
+function nmDraw() {
+  const g = (id) => document.getElementById(id),
+    c = C.find((x) => x.ty == "numbers");
+  if (!c || !g("nm-res")) return;
+  const f = nmCalc(c);
+  g("nm-svcs").innerHTML = nmSvcs(f);
+  g("nm-res").innerHTML = nmRes(f);
+  const cu = document.querySelector(".nm-cur");
+  if (cu && f.cur) cu.textContent = f.cur.name;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-a^='nm']");
+  if (!b) return;
+  const a = b.dataset.a;
+  if (a == "nmsv") {
+    NM.sv = b.dataset.k;
+    NM.cq = "";
+    NM.lim = 30;
+    const i = document.getElementById("nm-cq");
+    if (i) i.value = "";
+    nmDraw();
+  } else if (a == "nmsm") {
+    NM.sm = !NM.sm;
+    nmDraw();
+  } else if (a == "nmmore") {
+    NM.lim += 30;
+    nmDraw();
+  } else if (a == "nmclr") {
+    NM.cq = "";
+    const i = document.getElementById("nm-cq");
+    if (i) i.value = "";
+    nmDraw();
+  }
+});
+document.addEventListener("input", (e) => {
+  const el = e.target,
+    a = el.dataset && el.dataset.a;
+  if (a == "nmq") {
+    NM.q = el.value;
+    nmDraw();
+  } else if (a == "nmcq") {
+    NM.cq = el.value;
+    NM.lim = 30;
+    nmDraw();
+  }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.dataset && el.dataset.a == "nmsort") {
+    NM.sort = el.value;
+    NM.lim = 30;
+    nmDraw();
+  }
+});
 function numFree(c) {
   const free = freeOf(c),
     warn = `<div class="box nwarn">${ic("shield", 18)} <span>${t("n_warn")}</span></div>`;
@@ -3056,13 +3193,74 @@ const orderItemsOf = (o) => {
 const apiLinesOf = (o) => (Array.isArray(o.smm) ? o.smm.filter((r) => r && r.kind && r.kind != "smm") : []);
 const apiPending = (r) => !!r.order && !(r.provider && (r.provider.status == "Completed" || r.provider.status == "Canceled"));
 const DLV_LABELS = { number: ["الرقم", "Number"], code: ["الرمز", "Code"], email: ["الإيميل", "Email"], password: ["كلمة المرور", "Password"], pin: ["PIN", "PIN"], serial: ["الرقم التسلسلي", "Serial"], link: ["الرابط", "Link"] };
+/* ---- Number delivery card (like 5sim / Grizzly): number + copy, live wait timer, big code + copy ---- */
+const NM_STEPS = [["تم الدفع", "Paid"], ["تم تخصيص الرقم", "Number ready"], ["وصول الكود", "Code received"]];
+const nmFmtT = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+function nmT0(o, r) {
+  if (+r.at > 0) return +r.at;
+  const k = "amx_nt_" + o.id + "_" + r.order;
+  try {
+    let v = +localStorage.getItem(k);
+    if (!v) localStorage.setItem(k, (v = Date.now()));
+    return v;
+  } catch {
+    return Date.now();
+  }
+}
+const isNumItem = (i) => {
+  const p = prod(i.id),
+    c = p && cat(p.c);
+  return !!p && apiMode(p) && !!c && c.ty == "numbers";
+};
+function nmSteps(n) {
+  return `<div class="nm-st">${NM_STEPS.map((x, i) => `<span class="${i < n ? "on" : i == n ? "cur" : ""}">${i < n ? "✓ " : ""}${sbT(x[0], x[1])}</span>`).join("")}</div>`;
+}
+function nmCard(o, r) {
+  const d = r.delivery || {},
+    stt = r.provider && r.provider.status,
+    p = prod(r.item_id),
+    m = p ? nmMeta(p) : null,
+    svc = m ? m.sv : "",
+    cty = m ? nmCty(m) : "",
+    num = String(d.number || "").replace(/[^\d]/g, ""),
+    raw = String(d.code || "").trim(),
+    hit = raw.length > 10 ? raw.match(/\b\d{4,8}\b/) : null,
+    code = hit ? hit[0] : raw;
+  const st = r.error ? "fail" : stt == "Canceled" ? "cancel" : raw ? "got" : "wait";
+  const pill = {
+    fail: sbT("تعذّر التنفيذ", "Failed"),
+    cancel: sbT("أُلغي", "Cancelled"),
+    got: sbT("✓ وصل الكود", "✓ Code received"),
+    wait: sbT("بانتظار الكود", "Waiting for code"),
+  }[st];
+  const top = `<div class="nm-top">${svc ? nmBadge(svc, 20) : ""}<div><b>${ex(svc || (p ? p[lang] || p.ar : ""))}</b><small>${m && m.flag ? m.flag + " " : ""}${ex(cty)}</small></div><span class="nm-pill">${pill}</span></div>`;
+  if (st == "fail" || st == "cancel")
+    return `<div class="nm-card ${st}">${top}<p class="nm-tip">${st == "fail" ? sbT("تعذّر تخصيص رقم لهذا الطلب. لا تقلق، تواصل مع الدعم من زر المساعدة وسنعوّضك أو نعيد المبلغ.", "We could not assign a number for this order. Contact support with the help button and we will fix it or refund you.") : sbT("أُلغي هذا الرقم. تواصل مع الدعم من زر المساعدة للتعويض.", "This number was cancelled. Contact support with the help button.")}</p></div>`;
+  const numBox = num
+    ? `<div class="nm-box"><div><small>${sbT("رقمك", "Your number")}</small><b class="nm-num" dir="ltr">+${ex(num)}</b></div><button type="button" class="b b2 sm" data-a="copy" data-v="+${ex(num)}">${ic("copy", 14)} ${t("copy")}</button></div>`
+    : "";
+  const codeBox = raw
+    ? `<div class="nm-box got"><div><small>${sbT("كود التفعيل", "Verification code")}</small><b class="nm-code" dir="ltr">${ex(code)}</b></div><button type="button" class="b sm" data-a="copy" data-v="${ex(code)}">${ic("copy", 14)} ${t("copy")}</button></div>${hit ? `<p class="nm-tip" dir="auto">${ex(raw)}</p>` : ""}`
+    : `<div class="nm-box wait"><span class="nm-spin" aria-hidden="true"></span><div><b>${sbT("بانتظار وصول الرسالة…", "Waiting for the SMS…")}</b><small>${sbT("منذ", "for")} <bdi dir="ltr" data-t0="${nmT0(o, r)}">00:00</bdi></small></div></div>`;
+  const tip = raw
+    ? sbT("استخدم الكود الآن. إن لم يعمل تواصل مع الدعم من زر المساعدة.", "Use the code now. If it does not work, contact support with the help button.")
+    : sbT("اكتب الرقم في التطبيق أو الموقع واطلب إرسال الكود، وسيظهر هنا تلقائياً دون تحديث الصفحة.", "Enter the number in the app or site and request the code. It appears here automatically, no refresh needed.");
+  return `<div class="nm-card ${st}">${top}${nmSteps(raw ? 3 : 2)}${numBox}${codeBox}<p class="nm-tip">${tip}</p></div>`;
+}
 function apiBlock(o) {
   const L = apiLinesOf(o);
-  if (!L.length) return "";
   const A = lang == "ar";
+  if (!L.length) {
+    /* numbers not assigned yet: say so, instead of showing nothing */
+    const its = orderItemsOf(o).filter(isNumItem);
+    if (!its.length || o.status == "cancelled") return "";
+    const paid = o.payment_status == "paid";
+    return `<div class="dlv"><div class="nm-card ${paid ? "wait" : ""}"><div class="nm-box wait">${paid ? '<span class="nm-spin" aria-hidden="true"></span>' : ""}<div><b>${paid ? sbT("جارٍ تجهيز رقمك…", "Preparing your number…") : sbT("رقمك جاهز بعد تأكيد الدفع", "Your number is ready after payment")}</b><small>${paid ? sbT("يظهر هنا خلال ثوانٍ تلقائياً", "It appears here within seconds") : sbT("سيظهر هنا تلقائياً فور تأكيد الدفع، أبقِ هذه الصفحة مفتوحة أو عد إليها", "It appears here automatically as soon as payment is confirmed")}</small></div></div></div></div>`;
+  }
   return (
     `<div class="dlv">` +
     L.map((r) => {
+      if (r.kind == "smsactivate") return nmCard(o, r);
       const d = r.delivery || {},
         stt = r.provider && r.provider.status,
         p = prod(r.item_id),
@@ -3070,13 +3268,10 @@ function apiBlock(o) {
           .filter((k) => d[k])
           .map((k) => `<div class="dlv-r"><span>${DLV_LABELS[k][A ? 0 : 1]}</span><b class="n" dir="ltr">${ex(d[k])}</b></div>`)
           .join("");
-      const wait = r.order && !r.error && stt != "Completed" && stt != "Canceled" && !d.code && r.kind == "smsactivate";
       const msg = r.error
         ? A ? "تعذّر تنفيذ هذا البند — تواصل مع الدعم" : "This item could not be fulfilled — contact support"
         : stt == "Canceled"
         ? A ? "أُلغي هذا البند — تواصل مع الدعم" : "This item was cancelled — contact support"
-        : wait
-        ? A ? "⏳ بانتظار وصول الرمز… يتحدّث تلقائياً" : "⏳ Waiting for the code… updates automatically"
         : stt == "Completed"
         ? A ? "✓ تم التسليم" : "✓ Delivered"
         : A ? "⏳ قيد التنفيذ" : "⏳ In progress";
@@ -3096,10 +3291,12 @@ async function apiCall(o, action) {
 }
 /* Paid orders made only of provider items are sent by the customer's own session (the function allows it for self-service providers only),
    then polled every few seconds while the orders page is open until the code / delivery arrives. */
+const hasCode = (o) => apiLinesOf(o).some((r) => r.delivery && r.delivery.code);
 async function apiAuto(rows, seq, n = 0) {
-  if (seq !== routeSeq || !/^#\/orders/.test(location.hash) || n > 40 || !user) return;
+  if (seq !== routeSeq || !/^#\/orders/.test(location.hash) || n > 240 || !user) return;
   let changed = false,
-    again = false;
+    again = false,
+    got = false;
   for (const o of rows) {
     if (o.payment_status != "paid") continue;
     const its = orderItemsOf(o),
@@ -3108,6 +3305,7 @@ async function apiAuto(rows, seq, n = 0) {
         return p && apiMode(p);
       });
     if (!api.length) continue;
+    const had = hasCode(o);
     try {
       if (!o.smm && api.length == its.length) {
         if (await apiCall(o, "send")) changed = true;
@@ -3115,13 +3313,35 @@ async function apiAuto(rows, seq, n = 0) {
         if (await apiCall(o, "poll")) changed = true;
       }
     } catch {}
+    if (!had && hasCode(o)) got = true;
     if (apiLinesOf(o).some(apiPending)) again = true;
   }
   if (changed && seq === routeSeq) {
     $("#m").innerHTML = ordersHTML(rows);
     decorate();
+    nmTick();
   }
-  if (again) setTimeout(() => apiAuto(rows, seq, n + 1), 6000);
+  if (got) {
+    toast(sbT("وصل كود التفعيل ✓", "Your code has arrived ✓"));
+    try {
+      beep("ok");
+      navigator.vibrate && navigator.vibrate([120, 60, 120]);
+    } catch {}
+  }
+  if (again) setTimeout(() => apiAuto(rows, seq, n + 1), 5000);
+}
+/* wait timers on the number cards tick every second without redrawing the page */
+let NM_TK = 0;
+function nmTick() {
+  clearInterval(NM_TK);
+  const go = () => {
+    if (!/^#\/orders/.test(location.hash)) return clearInterval(NM_TK);
+    document.querySelectorAll("[data-t0]").forEach((el) => {
+      el.textContent = nmFmtT(Math.max(0, Math.floor((Date.now() - +el.dataset.t0) / 1000)));
+    });
+  };
+  go();
+  NM_TK = setInterval(go, 1000);
 }
 async function ordersPage(seq) {
   $("#m").innerHTML = loadingBox();
@@ -3141,6 +3361,7 @@ async function ordersPage(seq) {
     if (seq === routeSeq) {
       $("#m").innerHTML = ordersHTML(rows);
       decorate();
+      nmTick();
       apiAuto(rows, seq);
     }
   } catch (err) {

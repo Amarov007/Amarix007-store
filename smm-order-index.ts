@@ -735,6 +735,7 @@ Deno.serve(async (req: Request) => {
               kind: site.kind,
               service: m.service_id,
               quantity,
+              at: Date.now(),
               order: r.order ?? null,
               error: r.error ?? null,
               ...(r.status ? { provider: { status: r.status } } : {}),
