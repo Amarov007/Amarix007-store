@@ -15,6 +15,9 @@
 | 7 | `supabase-live-sync.sql` | **جديد:** الجداول والسياسات والدوال التي كانت في القاعدة الحية فقط (التقييمات، الإشعارات، السلة، طلبات السحب، إحصاءات اللوحة…). يتطلب `profiles` و`orders` و`support_tickets` و`rl_hit` و`notify_telegram` و`notify_settings`. آمن لإعادة التشغيل. |
 | 7b | `supabase-user-uid.sql` | **جديد:** عمود `profiles.uid` (8 أرقام فريدة لكل مستخدم، ثابت لا يعدّله المستخدم) + دالة `admin_find_user(uid)` لبحث الإدارة. بعد 3 و6. |
 | 7c | `supabase-invoices.sql` | **جديد:** نظام الفواتير: جدول `invoices` + فاتورة تلقائية لكل طلب (تريغر) + `get_invoice` و`admin_invoices`. بعد 7b. |
+| 7d | `supabase-payment-lockdown.sql` | **جديد (إصلاح عاجل):** يمنع تغيير `payment_status` مباشرة من REST، سجل تدقيق `order_payment_audit`، ويعرّف `approve_manual_payment`. بعد 7c. على قاعدة حية: اقرأ نسختك الحالية من الدالة أولاً (انظر رأس الملف). |
+| 7e | `supabase-payments.sql` | **جديد:** نظام الدفع الموحّد (payments، الأحداث، الاسترجاع، آلة الحالات، الدوال، cron انتهاء الصلاحية). بعد 7d. يعمل خلف العلم `payments_v2.on` (مغلق افتراضياً). |
+| 7f | `supabase-payments-migrate.sql` | **يدوي مرة واحدة** قبل تفعيل العلم: ترحيل الطلبات/الشحنات القديمة وأرصدة الأقسام إلى الرصيد العام مع مطابقة المجموع. |
 | 8 | `supabase-rls-audit.sql` | استعلامات قراءة فقط للتدقيق (لا تغيّر شيئاً). الاستعلام 1 يجب أن يعود فارغاً. |
 | 9 | `supabase-final-grants.sql` | **الأخير دائماً.** `revoke` شامل ثم كل صلاحيات `grant execute` (بالاسم لا بالتوقيع)، مطابقة لصلاحيات القاعدة الحية. آمن لإعادة التشغيل في أي وقت. |
 
@@ -84,3 +87,12 @@ select jobname, schedule, active from cron.job order by jobname;
    node tools/lint-html-escape.mjs
    ```
 
+
+## تفعيل نظام الدفع الموحّد (payments_v2)
+
+```sql
+update public.store_config
+   set data = jsonb_set(data, '{payments_v2}', '{"on": true, "dual_threshold": 200, "expiry_minutes": 1440}'::jsonb)
+ where id = 1;
+```
+**إيقاف/تراجع:** `update public.store_config set data = jsonb_set(data, '{payments_v2,on}', 'false') where id = 1;` — دوال العميل الجديدة تعطي `payments_disabled` والمسارات القديمة تبقى كما هي.

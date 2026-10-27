@@ -21,7 +21,7 @@ grant  execute on all functions in schema public to service_role;
 do $grants$
 declare
   anon_and_auth text[] := array[
-    'public_config', 'check_coupon', 'track_ref_click',
+    'public_config', 'payment_methods_public', 'check_coupon', 'track_ref_click',
     'product_stats', 'track_view', 'recent_reviews', 'product_reviews', 'public_stats', 'sale_active'
   ];
   auth_only text[] := array[
@@ -29,6 +29,9 @@ declare
     'my_proof_count', 'set_payment_proof', 'claim_payment', 'my_ticket_file_count', 'rate_ticket',
     'save_cart', 'push_register', 'my_reviews', 'submit_review',
     'apply_affiliate', 'affiliate_balance', 'my_affiliate_balance', 'my_affiliate_monthly', 'my_affiliate_payouts', 'request_payout',
+    'approve_manual_payment', 'payment_create', 'payment_create_wallet_pay', 'payment_create_topup', 'payment_instructions',
+    'payment_attach_proof', 'payment_submit', 'payment_cancel', 'payment_review_queue', 'payment_approve', 'payment_reject',
+    'refund_request', 'refund_approve', 'refund_reject', 'payments_reconcile', 'payment_settings_save', 'fx_rate_set',
     'pay_order_with_wallet', 'wallet_reconcile', 'wallet_topup_create', 'wallet_topup_set_proof', 'wallet_topup_claim',
     'wallet_topup_approve', 'wallet_topup_reject', 'wallet_admin_adjust',
     'admin_stats', 'admin_product_stats', 'admin_push_stats', 'admin_send_broadcast',

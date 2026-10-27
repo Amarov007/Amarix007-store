@@ -28,7 +28,7 @@ create index if not exists invoices_user_idx on public.invoices (user_id, issued
 -- ---------- بناء/مزامنة فاتورة من طلب ----------
 create or replace function public.invoice_status_of(p_status text, p_pay text) returns text
 language sql immutable set search_path = public as $$
-  select case when p_status = 'cancelled' then 'void' when p_pay = 'paid' then 'paid' else 'issued' end
+  select case when p_status = 'cancelled' or p_pay = 'refunded' then 'void' when p_pay = 'paid' then 'paid' else 'issued' end
 $$;
 
 create or replace function public.orders_invoice() returns trigger

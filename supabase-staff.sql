@@ -18,7 +18,7 @@ create table if not exists public.staff_members (
   perms      text[] not null default '{}',
   active     boolean not null default true,
   created_at timestamptz not null default now(),
-  constraint staff_members_perms_valid check (perms <@ array['orders','tickets','users','products']::text[])
+  constraint staff_members_perms_valid check (perms <@ array['orders','tickets','users','products','payments.review','payments.refund','payments.settings']::text[])
 );
 alter table public.staff_members enable row level security;
 
