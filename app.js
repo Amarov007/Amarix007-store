@@ -1048,6 +1048,25 @@ function convRow(total) {
   if (!k || !R[k]) return "";
   return `<div class="row conv"><span>${t("payin")} (${ex(k == "USD" ? "USDT" : k)})</span><b class="n"><bdi dir="ltr">${fmt(total, k)}</bdi></b></div>`;
 }
+/* Per-method transfer limits (admin › وسائل الدفع: min / max, in the method's own currency, else USD). Shared by the cart, quick buy and wallet top-up. */
+const pmCur = (m) => (m && m.currency && R[m.currency] ? m.currency : BASE);
+const pmAmt = (v, k) => fmt(v / ((R[k] && R[k][0]) || 1), k); // v is already in currency k
+function pmLimitErr(m, usd) {
+  if (!m || !(usd > 0)) return "";
+  const k = pmCur(m),
+    v = usd * ((R[k] && R[k][0]) || 1),
+    mn = +m.min || 0,
+    mx = +m.max || 0,
+    A = lang == "ar",
+    nm = plain(pmName(m));
+  if (mn > 0 && v + 1e-9 < mn) return `${A ? "أقل مبلغ للتحويل عبر" : "Minimum transfer with"} ${nm}: ${pmAmt(mn, k)}`;
+  if (mx > 0 && v - 1e-9 > mx) return `${A ? "أعلى مبلغ للتحويل عبر" : "Maximum transfer with"} ${nm}: ${pmAmt(mx, k)}`;
+  return "";
+}
+const pmLimitHint = (m, usd) => {
+  const e = pmLimitErr(m, usd);
+  return e ? `<p class="hint wl-low">${ic("warn", 14)} ${ex(e)}</p>` : "";
+};
 function emptyBox(icon, title, hint, extra) {
   return `<div class="emp">${ic(icon, 40)}<br><b>${title}</b>${hint ? `<br><small>${hint}</small>` : ""}${extra ? `<br><br>${extra}` : ""}</div>`;
 }
@@ -2342,7 +2361,7 @@ function cartPage() {
   const wSec = user && walletOn() ? walletCartSec(lines) : null; // wallet is offered only for all-boost carts
   if (payMethod == "wallet" && !wSec) payMethod = "";
   const payBox = PM.length || wSec
-    ? `<div class="box"><h3 style="margin-bottom:10px">${ic("card", 16)} ${t( "paychoose" )}</h3> <div class="pchips" role="radiogroup">${walletChip(wSec)}${PM.map( (m) => `<button type="button" role="radio" aria-checked="${ m.id == payMethod }" class="pchip${ m.id == payMethod ? " on" : "" }" data-a="pay" data-id="${ex(m.id)}">${payLogo(m, 34)}<span>${pmName( m )}</span><i>${ic("check", 14)}</i></button>` ).join("")}</div>${walletHint(wSec, T_.total)}</div>`
+    ? `<div class="box"><h3 style="margin-bottom:10px">${ic("card", 16)} ${t( "paychoose" )}</h3> <div class="pchips" role="radiogroup">${walletChip(wSec)}${PM.map( (m) => `<button type="button" role="radio" aria-checked="${ m.id == payMethod }" class="pchip${ m.id == payMethod ? " on" : "" }" data-a="pay" data-id="${ex(m.id)}">${payLogo(m, 34)}<span>${pmName( m )}</span><i>${ic("check", 14)}</i></button>` ).join("")}</div>${walletHint(wSec, T_.total)}${payMethod != "wallet" ? pmLimitHint(pmOf(payMethod), T_.total) : ""}</div>`
     : "";
   return (
     rows +
@@ -2357,7 +2376,8 @@ function payInstructions(m) {
   const note = lang == "ar" ? m.da : m.de;
   const network = String(m.network || "").trim();
   const min = Number(m.min || 0), max = Number(m.max || 0);
-  const limits = (min > 0 || max > 0) ? `<p class="pd"><b>${lang == "ar" ? "حدود التحويل:" : "Transfer limits:"}</b> ${min > 0 ? (lang == "ar" ? "من " : "Min ") + ex(min) : ""}${min > 0 && max > 0 ? " — " : ""}${max > 0 ? (lang == "ar" ? "حتى " : "Max ") + ex(max) : (min > 0 ? (lang == "ar" ? " (لا حد أعلى)" : " (no upper limit)") : "")}</p>` : "";
+  const lk = pmCur(m);
+  const limits = (min > 0 || max > 0) ? `<p class="pd"><b>${lang == "ar" ? "حدود التحويل:" : "Transfer limits:"}</b> ${min > 0 ? (lang == "ar" ? "من " : "Min ") + `<bdi dir="ltr">${pmAmt(min, lk)}</bdi>` : ""}${min > 0 && max > 0 ? " — " : ""}${max > 0 ? (lang == "ar" ? "حتى " : "Max ") + `<bdi dir="ltr">${pmAmt(max, lk)}</bdi>` : (min > 0 ? (lang == "ar" ? " (لا حد أعلى)" : " (no upper limit)") : "")}</p>` : "";
   const memo = String(m.memo || "").trim();
   return `<div class="box payi"><div class="payi-h">${payLogo(m, 46)}<div><small>${t("payhow")}</small><b>${pmName(m)}</b><small>${lang == "ar" ? "دفع يدوي — تتم مراجعة التحويل قبل اعتماد الطلب" : "Manual payment — transfer is reviewed before order approval"}</small></div></div>${
     network ? `<div class="payi-acc"><small>${lang == "ar" ? "الشبكة / نوع التحويل" : "Network / transfer type"}</small><div><bdi dir="ltr">${ex(network)}</bdi></div></div>` : ""
@@ -2371,9 +2391,10 @@ function payInstructions(m) {
 function donePage(id) {
   const o = lastOrder && lastOrder.id == id ? lastOrder : { id };
   if (o.method == "wallet") return walletDonePage(o);
+  if (walletPaid[id]) return walletDonePage({ ...o, wpaid: true });
   const m = o.method ? pmOf(o.method) : null,
     done = claimed[id];
-  return `<div class="box done"><div class="okc">${ic( "check", 36 )}</div><h1>${t("donet")}</h1> <p class="pd">${t("doned")}</p><div class="oid" dir="ltr">${ex(o.id)}</div> ${ o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : "" }</div> ${payInstructions(m)}${ticketBox(o.id)}${proofBox(o.id, done, false)} <div class="box"><div class="acts"> ${ done ? `<p class="pd okmsg">${ic("check", 16)} ${t("pay_review")}</p>` : claimBtn(o.id, !!proofDone[o.id]) + (proofDone[o.id] ? "" : `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`) } <a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a> <a class="b b2" href="#/">${t("keep")}</a></div></div>`;
+  return `<div class="box done"><div class="okc">${ic( "check", 36 )}</div><h1>${t("donet")}</h1> <p class="pd">${t("doned")}</p><div class="oid" dir="ltr">${ex(o.id)}</div> ${ o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : "" }</div> ${payInstructions(m)}${!done && o.wok && walletOn() && !wl.setup ? `<div class="box">${walletAltBox(o.id)}</div>` : ""}${ticketBox(o.id)}${proofBox(o.id, done, false)} <div class="box"><div class="acts"> ${ done ? `<p class="pd okmsg">${ic("check", 16)} ${t("pay_review")}</p>` : claimBtn(o.id, !!proofDone[o.id]) + (proofDone[o.id] ? "" : `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`) } <a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a> <a class="b b2" href="#/">${t("keep")}</a></div></div>`;
 }
 
 /* Account & favourites */
@@ -2517,13 +2538,20 @@ const walletClaimBtn = (id, hasProof) =>
 const walletConv = () => {
   const m = pmOf(wl.method),
     k = m && m.currency;
-  if (!k || !R[k] || !(wl.amt > 0)) return "";
-  return `${lang == "ar" ? "المبلغ المطلوب تحويله" : "Amount to transfer"}: <b dir="ltr">${fmt(wl.amt, k)}</b>`;
+  if (!m || !(wl.amt > 0)) return "";
+  const le = pmLimitErr(m, wl.amt);
+  return (k && R[k] ? `${lang == "ar" ? "المبلغ المطلوب تحويله" : "Amount to transfer"}: <b dir="ltr">${fmt(wl.amt, k)}</b>` : "") + (le ? `<br><span class="wl-low">${ic("warn", 14)} ${ex(le)}</span>` : "");
 };
 /* "pay this pending order from the wallet" (done page + orders page) */
 const walletPayBox = (id) => {
   const A = lang == "ar";
   return `<div class="wl-pay"><p class="pd">${ic("wallet", 14)} ${A ? "هذا الطلب بانتظار الدفع من المحفظة" : "This order is waiting to be paid from your wallet"}${walletReady() ? ` · ${A ? "رصيدك" : "Balance"}: ${money(walletBal())}` : ""}</p><div class="acts"><button class="b" data-a="wl-pay" data-id="${ex(id)}">${ic("check", 16)} ${A ? "ادفع من المحفظة" : "Pay from wallet"}</button><a class="b b2" href="#/wallet">${A ? "شحن المحفظة" : "Top up"}</a></div></div>`;
+};
+/* A pending manual-transfer order whose items the wallet can pay (all boost) can switch to the wallet instead; pay_order_with_wallet() re-checks everything and sets payment_method = 'wallet' */
+const orderWalletOk = (items) => !!user && walletOn() && !wl.setup && items.length > 0 && items.every((i) => { const p = prod(i && i.id); return !!p && needsLink(p); });
+const walletAltBox = (id) => {
+  const A = lang == "ar";
+  return `<div class="wl-pay"><p class="pd">${ic("wallet", 14)} ${A ? "أو ادفع هذا الطلب فوراً من رصيد محفظتك بدل التحويل" : "Or pay this order instantly from your wallet balance instead of transferring"}${walletReady() ? ` · ${A ? "رصيدك" : "Balance"}: ${money(walletBal())}` : ""}</p><div class="acts"><button class="b b2" data-a="wl-pay" data-id="${ex(id)}">${ic("wallet", 16)} ${A ? "ادفع من المحفظة" : "Pay from wallet"}</button><a class="b b2" href="#/wallet">${A ? "شحن المحفظة" : "Top up"}</a></div></div>`;
 };
 const walletChip = (sec) =>
   sec
@@ -2598,6 +2626,8 @@ async function walletTopup(btn) {
   if (!(amt >= min)) return toast(`${A ? "أقل مبلغ للشحن" : "Minimum top-up"}: ${fmt(min, BASE)}`, "wn");
   if (max > 0 && amt > max) return toast(`${A ? "أعلى مبلغ للشحن" : "Maximum top-up"}: ${fmt(max, BASE)}`, "wn");
   if (!wl.method || !pmOf(wl.method)) return toast(t("paypick"), "wn");
+  const le = pmLimitErr(pmOf(wl.method), amt);
+  if (le) return toast(le, "wn");
   setBusy(btn, true);
   try {
     const m = pmOf(wl.method),
@@ -2996,6 +3026,10 @@ async function placeOrder(btn, viaWhatsApp = false) {
   }
   if (!viaWhatsApp && !useWallet && PM.length && !payMethod) return toast(t("paypick"), "wn");
   const tt = totals();
+  if (!viaWhatsApp && !useWallet) {
+    const le = pmLimitErr(pmOf(payMethod), tt.total);
+    if (le) return toast(le, "wn");
+  }
   if (useWallet) {
     if (!wl.loaded) await loadWallet(true);
     if (walletReady() && walletBal("smm") + 0.005 < tt.total) return toast(lang == "ar" ? "رصيدك غير كافٍ — اشحن المحفظة أولاً" : "Your balance is not enough — top up the wallet first", "wn");
@@ -3073,7 +3107,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
       }
       loadWallet(true);
     }
-    lastOrder = { id, total: tt.total, method: useWallet ? "wallet" : payMethod, wpaid: wOk };
+    lastOrder = { id, total: tt.total, method: useWallet ? "wallet" : payMethod, wpaid: wOk, wok: !!walletCartSec(lines) };
     if (viaWhatsApp) openWhatsApp(buildWhatsAppText(id, lines, tt), waWin);
     cart = [];
     coupon = "";
@@ -3293,7 +3327,7 @@ function ordersHTML(rows) {
         const total = `<bdi dir="ltr">${( (o.total * R[cur][0]) / R[cur0][0] ).toFixed(2)} ${ex(R[cur][1])}</bdi>`;
         const m = o.payment_method ? pmOf(o.payment_method) : null;
         const canClaim = pay == "pending" && st != "cancelled";
-        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } ${apiBlock(o)}<a class="b b2 sm inv-lnk" href="#/invoice/${ex(o.id)}">${ic("card", 14)} ${lang == "ar" ? "الفاتورة" : "Invoice"}</a><details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
+        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>${orderWalletOk(items) ? walletAltBox(o.id) : ""}`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } ${apiBlock(o)}<a class="b b2 sm inv-lnk" href="#/invoice/${ex(o.id)}">${ic("card", 14)} ${lang == "ar" ? "الفاتورة" : "Invoice"}</a><details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
       })
       .join("")
   );

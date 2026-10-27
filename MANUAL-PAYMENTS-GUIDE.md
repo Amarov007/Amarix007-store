@@ -23,3 +23,12 @@ This build keeps the existing Supabase schema and uses the existing `store_confi
 - New payment-method fields (`network`, `min`, `max`, `memo`) are optional properties in the existing JSON store configuration. Older payment methods remain valid without them.
 - The existing admin access and Supabase RLS remain the security boundary. A frontend-only ZIP cannot add durable server-side audit logs, atomic ledger operations, or stronger database permissions without backend/database work.
 - Manual payment review is distinct from automatic fulfilment after a payment has been manually confirmed; existing fulfilment settings are unchanged.
+
+## How payment methods are linked
+
+One list (**وسائل الدفع** in the admin, published to `store_config.payments`) drives every payment surface:
+
+- **Cart + quick-buy sheet, wallet top-up, order success page, "My orders", invoices, admin orders/top-ups/invoices** all read the same method by `id` and show the same name, logo, currency, account, network, memo and limits.
+- **Min / max** are in the method's own currency (USD if none is set). They are shown in the payment instructions and are now enforced in the cart / quick buy (warning + blocked checkout) and in wallet top-up (live warning + blocked request). WhatsApp orders and wallet payments are not affected.
+- **Wallet ↔ manual transfer:** a pending manual-transfer order whose items are all boost services can be paid from the wallet instead (success page and "My orders"). `pay_order_with_wallet()` re-checks balance/eligibility on the server and switches the order's `payment_method` to `wallet`.
+- An enabled method with no account/number is hidden from the store; the admin pre-publish checklist now warns about it, and about a method whose minimum is greater than its maximum.
