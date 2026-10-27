@@ -26,7 +26,7 @@ declare
   ];
   auth_only text[] := array[
     'is_admin', 'has_perm', 'my_staff_perms', 'staff_save_products',
-    'my_proof_count', 'set_payment_proof', 'claim_payment', 'my_ticket_file_count', 'rate_ticket',
+    'my_proof_count', 'set_payment_proof', 'claim_payment', 'approve_manual_payment', 'my_ticket_file_count', 'rate_ticket',
     'save_cart', 'push_register', 'my_reviews', 'submit_review',
     'apply_affiliate', 'affiliate_balance', 'my_affiliate_balance', 'my_affiliate_monthly', 'my_affiliate_payouts', 'request_payout',
     'pay_order_with_wallet', 'wallet_reconcile', 'wallet_topup_create', 'wallet_topup_set_proof', 'wallet_topup_claim',

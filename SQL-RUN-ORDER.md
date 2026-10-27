@@ -12,11 +12,12 @@
 | 4 | `supabase-affiliate-tiers.sql` | شرائح العمولة والتقارير الشهرية. بعد رقم 3 دائماً. |
 | 5 | `supabase-boost-units.sql` | تعريف `orders_enforce_pricing` الوحيد (سعر الوحدة بـ 6 خانات، حد أعلى للكمية 10,000,000) **وتريغره**. |
 | 6 | `supabase-wallet.sql` | المحفظة (`wallets`, `wallet_transactions`, `wallet_topups` + الدوال). يتطلب `profiles` و`rl_hit` و`notify_telegram` من رقم 1. |
-| 7 | `supabase-live-sync.sql` | **جديد:** الجداول والسياسات والدوال التي كانت في القاعدة الحية فقط (التقييمات، الإشعارات، السلة، طلبات السحب، إحصاءات اللوحة…). يتطلب `profiles` و`orders` و`support_tickets` و`rl_hit` و`notify_telegram` و`notify_settings`. آمن لإعادة التشغيل. |
-| 7b | `supabase-user-uid.sql` | **جديد:** عمود `profiles.uid` (8 أرقام فريدة لكل مستخدم، ثابت لا يعدّله المستخدم) + دالة `admin_find_user(uid)` لبحث الإدارة. بعد 3 و6. |
-| 7c | `supabase-invoices.sql` | **جديد:** نظام الفواتير: جدول `invoices` + فاتورة تلقائية لكل طلب (تريغر) + `get_invoice` و`admin_invoices`. بعد 7b. |
-| 8 | `supabase-rls-audit.sql` | استعلامات قراءة فقط للتدقيق (لا تغيّر شيئاً). الاستعلام 1 يجب أن يعود فارغاً. |
-| 9 | `supabase-final-grants.sql` | **الأخير دائماً.** `revoke` شامل ثم كل صلاحيات `grant execute` (بالاسم لا بالتوقيع)، مطابقة لصلاحيات القاعدة الحية. آمن لإعادة التشغيل في أي وقت. |
+| 7 | `supabase-payment-core.sql` | **جديد:** طبقة الدفع الموحدة (`payment_requests`) التي تربط دفعات الطلبات اليدوية وشحن المحفظة، وتعرّف `approve_manual_payment` وتوحّد سجلات الإثبات والمراجعة. بعد 1 و6 دائماً. |
+| 8 | `supabase-live-sync.sql` | **جديد:** الجداول والسياسات والدوال التي كانت في القاعدة الحية فقط (التقييمات، الإشعارات، السلة، طلبات السحب، إحصاءات اللوحة…). يتطلب `profiles` و`orders` و`support_tickets` و`rl_hit` و`notify_telegram` و`notify_settings`. آمن لإعادة التشغيل. |
+| 8b | `supabase-user-uid.sql` | **جديد:** عمود `profiles.uid` (8 أرقام فريدة لكل مستخدم، ثابت لا يعدّله المستخدم) + دالة `admin_find_user(uid)` لبحث الإدارة. بعد 3 و6. |
+| 8c | `supabase-invoices.sql` | **جديد:** نظام الفواتير: جدول `invoices` + فاتورة تلقائية لكل طلب (تريغر) + `get_invoice` و`admin_invoices`. بعد 8b. |
+| 9 | `supabase-rls-audit.sql` | استعلامات قراءة فقط للتدقيق (لا تغيّر شيئاً). الاستعلام 1 يجب أن يعود فارغاً. |
+| 10 | `supabase-final-grants.sql` | **الأخير دائماً.** `revoke` شامل ثم كل صلاحيات `grant execute` (بالاسم لا بالتوقيع)، مطابقة لصلاحيات القاعدة الحية. آمن لإعادة التشغيل في أي وقت. |
 
 لا تشغّل `supabase-security-fixes.sql` ولا `supabase-support-tickets.sql` على قاعدة جديدة: الأول ترقية للقواعد القديمة والثاني مضمَّن في المخطط. بعد توحيد التعريفات لم يعد في هذين الملفين أي `create function` مكرر؛ تعريفات الدوال التي كانت فيهما موجودة الآن في `supabase-schema.sql` (والتريغرات المرتبطة بالدوال المنقولة تُنشأ في الملف الذي يعرّف دالتها: `on_auth_user_created` و`profiles_protect_referral_trg` في `supabase-affiliate-program.sql`، و`orders_affiliate_trg` في `supabase-affiliate-tiers.sql`، و`orders_enforce_pricing` في `supabase-boost-units.sql`). لذلك على قاعدة قديمة جداً شغّل `supabase-schema.sql` أولاً.
 
@@ -38,6 +39,8 @@ on conflict (email) do update set user_id = excluded.user_id;
 إن ظهر خطأ `permission denied for function` لأي سبب: شغّل `supabase-final-grants.sql` فقط.
 
 **دالة جديدة تُستدعى من المتصفح:** أضف اسمها إلى مصفوفة `anon_and_auth` أو `auth_only` في `supabase-final-grants.sql` وإلا فلن تُمنح صلاحية التنفيذ.
+
+**تحديث 2026-10-27 (Payment Core):** بعد تشغيل `supabase-payment-core.sql` تصبح مرجعية مراجعة الدفع اليدوي في جدول `payment_requests`، بينما تبقى `orders` و`wallet_topups` متوافقة مع الواجهة الحالية عبر أغلفة `RPC` نفسها (`set_payment_proof`, `claim_payment`, `approve_manual_payment`, `wallet_topup_*`). هذا يسمح بتوحيد التتبع والمراجعة بدون كسر الواجهة الحالية.
 
 **ملاحظة (2026-10-25):** زُوِّد `supabase-wallet.sql` بتعريفات القاعدة الحية (`wallet_topup_set_proof(bigint, text, text)` و`wallet_topup_claim(bigint, text)` والموافقة المزدوجة والأعمدة `tx_ref` و`proof_hash`…)، فلم يعد هناك اختلاف توقيعات. **لا تشغّل النسخ القديمة من هذه الدوال على القاعدة الحية** (كانت ستُنشئ overload ثانياً).
 
@@ -83,4 +86,3 @@ select jobname, schedule, active from cron.job order by jobname;
    python3 tests/verify-project.py
    node tools/lint-html-escape.mjs
    ```
-
