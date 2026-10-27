@@ -178,7 +178,7 @@
   }
   function importView() {
     if (typeof PROV_LOADED != "undefined" && !PROV_LOADED && !Object.keys(PROV_NAME).length) loadProviders(true).then(() => tab === "import" && render()).catch(() => {});
-    const body = IC.mode === "sync" ? syncView() : fetchView();
+    const body = IC.mode === "sync" ? syncView() : fetchView() + imgCard();
     return `<div class="card"><h2>مركز الاستيراد والمزامنة</h2><p class="hint">اختر نوع الاستيراد، حدّد القسم المستهدف <b>قبل الجلب</b>، ثم راجع جدول المعاينة وعدّل النوع والقسم ونسبة الربح لكل صف (أو لعدة صفوف دفعة واحدة) قبل الحفظ في المتجر. لا يُحفظ شيء إلا بعد ضغط «حفظ المحدد»، ثم «نشر نهائي».</p>${modeBar()}</div>${body}`;
   }
   function fetchView() {
@@ -291,7 +291,7 @@
         const image = x.image ?? x.image_url ?? x.icon ?? x.logo ?? x.thumbnail ?? x.product_image ?? "";
         const amount = x.amount ?? x.denomination ?? x.value ?? x.package_amount ?? x.quantity_value;
         const available = x.available ?? x.is_available ?? x.active ?? x.enabled;
-        return { ...x, id: String(id ?? ""), name: String(name ?? ""), category: String(category ?? ""), rate: Number(rate), min: x.min ?? x.min_quantity ?? x.minimum, max: x.max ?? x.max_quantity ?? x.maximum, country: x.country ?? x.country_code ?? x.region ?? "", image: String(image || ""), amount, available: available === false || available === 0 || available === "false" ? false : true, type: x.type ?? x.delivery_type ?? "" };
+        return { ...x, id: String(id ?? ""), name: String(name ?? ""), category: String(category ?? ""), rate: Number(rate), min: x.min ?? x.min_quantity ?? x.minimum, max: x.max ?? x.max_quantity ?? x.maximum, country: x.country ?? x.country_code ?? x.region ?? "", image: String(image || ""), catImage: String(x.category_image ?? x.categoryImage ?? x.category_icon ?? x.game_image ?? x.game_icon ?? x.brand_image ?? x.brand_logo ?? ""), amount, available: available === false || available === 0 || available === "false" ? false : true, type: x.type ?? x.delivery_type ?? "" };
       }).filter((x) => x.id && x.name);
       if (!list.length) throw new Error("لم يُرجع المزوّد خدمات قابلة للاستيراد؛ تحقّق من صيغة الاستجابة وإعدادات API.");
       IC.rows = mkRows(list, pv, kind); IC.fetched = true; IC.page = 0; IC.fq = ""; IC.ft = ""; IC.fs = "";
@@ -331,6 +331,89 @@
     IC.msg = `✓ أُضيف ${add} منتج${cache.made ? " وأُنشئ " + cache.made + " قسم" : ""}. اضغط «نشر الآن» لتطبيق التغيير على المتجر.`;
     toast(`تمت إضافة ${add} منتج. اضغط نشر للحفظ`);
     render();
+    if (cache.made || imgTargets().length) setTimeout(() => autoImages(), 400);
+  }
+
+  /* ------------------------------------------------------------------ automatic images ------------------------------------------------------------------
+     For every game / app category without a picture: search the public App Store catalogue (iTunes Search API, no key) by the game's name,
+     accept only a confident name match, and store the 512px icon as the category image (the hub cards, the home strip and the product rows use it).
+     Provider pictures (image / category_image) are always kept first. Apple allows about 20 searches a minute, so it runs one by one in the
+     background; hits AND misses are remembered in this browser so nothing is searched twice. */
+  const IMG = { busy: false, stop: false, done: 0, total: 0, found: 0, miss: 0, msg: "" };
+  const IMG_KEY = "amx_img_cache_v1";
+  const imgCache = (() => { try { return JSON.parse(localStorage.getItem(IMG_KEY)) || {}; } catch (e) { return {}; } })();
+  const imgSave = () => { try { localStorage.setItem(IMG_KEY, JSON.stringify(imgCache)); } catch (e) {} };
+  const imgTerm = (c) => {
+    const raw = String(c.en || c.ar || "").replace(/\s*\([^()]*\)\s*$/, "").replace(/\b(top[\s-]?up|recharge|global|mena|gift\s?cards?|subscriptions?)\b/gi, " ");
+    return raw.replace(/\s+/g, " ").trim();
+  };
+  const imgWords = (s) => norm(String(s).split(/\s[-–—:|]\s|:/)[0]).split(" ").filter(Boolean);
+  function imgPick(term, list) {
+    const a = imgWords(term);
+    if (!a.length) return "";
+    let best = null, bs = 0;
+    (list || []).forEach((r) => {
+      const b = imgWords(r.trackName || "");
+      if (!b.length) return;
+      const inter = a.filter((w) => b.includes(w)).length;
+      let sc = inter / Math.max(a.length, b.length);
+      if (a.join(" ") === b.join(" ")) sc = 1;
+      else if (b.join(" ").startsWith(a.join(" ")) && a.join(" ").length >= 4) sc = Math.max(sc, 0.75);
+      if (sc > bs) { bs = sc; best = r; }
+    });
+    if (!best || bs < 0.7) return "";
+    const u = best.artworkUrl512 || String(best.artworkUrl100 || "").replace(/\d+x\d+(bb|sr)/, "512x512bb");
+    return /^https:\/\//.test(u || "") ? u : "";
+  }
+  async function imgSearch(term) {
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000);
+    try {
+      const r = await fetch("https://itunes.apple.com/search?entity=software&limit=6&term=" + encodeURIComponent(term), { signal: ac.signal });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return imgPick(term, (await r.json()).results);
+    } finally { clearTimeout(tm); }
+  }
+  const imgTargets = () => D.categories.filter((c) => c.ty === "shop" && !c.image_url && ["games", "apps"].includes(hubOfCat(c)) && imgTerm(c).length > 1);
+  const imgStatus = (t) => { IMG.msg = t; const el = $("#ic-imgst"); if (el) el.textContent = t; };
+  async function autoImages() {
+    if (IMG.busy) return;
+    const list = imgTargets();
+    if (!list.length) { imgStatus("✓ كل الأقسام لديها صور."); return render(); }
+    IMG.busy = true; IMG.stop = false; IMG.done = 0; IMG.found = 0; IMG.miss = 0; IMG.total = list.length;
+    render();
+    let fails = 0;
+    for (const c of list) {
+      if (IMG.stop) break;
+      const term = imgTerm(c), key = norm(term);
+      try {
+        let url = imgCache[key];
+        if (url === undefined) {
+          url = await imgSearch(term);
+          imgCache[key] = url; imgSave();
+          await new Promise((ok) => setTimeout(ok, 3200)); // Apple: ~20 searches / minute
+        }
+        if (url) { c.image_url = url; IMG.found++; } else IMG.miss++;
+        fails = 0;
+      } catch (e) {
+        fails++;
+        if (fails >= 3) { imgStatus("✗ تعذّر الاتصال بمتجر التطبيقات (" + String(e.message || e).slice(0, 60) + ") — تحقق من الإنترنت أو أعد المحاولة لاحقاً."); break; }
+        await new Promise((ok) => setTimeout(ok, 5000));
+      }
+      IMG.done++;
+      imgStatus(`جارٍ جلب الصور… ${IMG.done}/${IMG.total} · وُجدت ${IMG.found} · بلا تطابق ${IMG.miss}`);
+      if (IMG.found && IMG.found % 5 === 0) save();
+    }
+    IMG.busy = false;
+    if (IMG.found) save();
+    if (!/^✗/.test(IMG.msg)) IMG.msg = `✓ ${IMG.stop ? "أُوقف" : "اكتمل"}: وُجدت ${IMG.found} صورة من ${IMG.done}${IMG.miss ? " (" + IMG.miss + " بلا تطابق واضح — يمكنك رفع صورتها يدوياً من «الأقسام»)" : ""}. اضغط «نشر الآن» لتظهر في المتجر.`;
+    render();
+  }
+  function imgCard() {
+    const n = imgTargets().length;
+    return `<div class="card"><h3>الصور التلقائية للألعاب والتطبيقات</h3>
+      <p class="hint">تُجلب أيقونة كل لعبة وتطبيق تلقائياً بالاسم (وتُحفظ على القسم فتظهر في بطاقات الألعاب وفي صفوف المنتجات). صور المزوّد تُستعمل أولاً إن وُجدت، ويُشغَّل الجلب تلقائياً بعد كل استيراد. بلا تطابق واضح = لا تُوضع صورة خاطئة.</p>
+      <div class="acts"><button class="b" type="button" data-ic="img-go"${IMG.busy || !n ? " disabled" : ""}>${IMG.busy ? "جارٍ الجلب…" : `جلب صور الأقسام الناقصة (${n})`}</button>${IMG.busy ? '<button class="b b2" type="button" data-ic="img-stop">إيقاف</button>' : ""}</div>
+      <p class="hint ${/^✗/.test(IMG.msg) ? "warn" : ""}" id="ic-imgst">${esc(IMG.msg)}</p></div>`;
   }
 
   /* ------------------------------------------------------------------ price sync ------------------------------------------------------------------ */
@@ -617,6 +700,8 @@
       case "bulk-mk": { const v = Math.max(0, num(($("#ic-bm") || {}).value, 0)); IC.rows.forEach((r) => { if (r.sel) r.mk = v; }); return refreshPrev(); }
       case "pg": IC.page = Math.max(0, IC.page + +b.dataset.d); return refreshPrev();
       case "save": return saveRows();
+      case "img-go": return autoImages();
+      case "img-stop": IMG.stop = true; return;
       case "sync-go": return syncGo();
       case "sync-apply": {
         const L = IC.sync.filter((r) => r.sel && r.state === "changed");

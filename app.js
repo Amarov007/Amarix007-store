@@ -1245,10 +1245,10 @@ function placeholder(p, c) {
   const letter = [...plain(p.en || p.ar || "?").trim()][0] || "?";
   return `<span class="ph" style="--h:${hue(p.id)}">${ic( (c && c.i) || "box", 36 )}<em>${ex(letter.toUpperCase())}</em></span>`;
 }
-const art = (p, c) =>
-  p.img
-    ? `<img class="pim" loading="lazy" src="${ex(p.img)}" alt="" data-ph="${ex( p.id )}">`
-    : placeholder(p, c);
+const art = (p, c) => {
+  const im = p.img || (c && /^https:\/\//.test(c.image_url || "") && c.ty != "boost" ? c.image_url : ""); // no own picture: use the game / app icon of its category
+  return im ? `<img class="pim" loading="lazy" src="${ex(im)}" alt="" data-ph="${ex( p.id )}">` : placeholder(p, c);
+};
 // If a product image fails to load, swap in the placeholder
 document.addEventListener(
   "error",
