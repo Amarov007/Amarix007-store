@@ -168,6 +168,7 @@ begin
 end $$;
 
 -- 2) إرفاق إثبات الدفع (صورة في حاوية payment-proofs داخل مجلد المستخدم)
+drop function if exists public.wallet_topup_set_proof(bigint, text);  -- توقيع قديم (بلا بصمة)
 create or replace function public.wallet_topup_set_proof(p_id bigint, p_path text, p_hash text default null) returns void
 language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid();
@@ -191,12 +192,13 @@ begin
 end $$;
 
 -- 3) «تم الدفع» -> مراجعة المدير
+drop function if exists public.wallet_topup_claim(bigint);  -- توقيع قديم (بلا رقم عملية)
 create or replace function public.wallet_topup_claim(p_id bigint, p_tx_ref text default null) returns void
 language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); r public.wallet_topups%rowtype; nm text; em text; ref text := nullif(btrim(coalesce(p_tx_ref, '')), '');
 begin
   if uid is null then raise exception 'not_allowed'; end if;
-  if ref is not null and (length(ref) < 6 or length(ref) > 100 or ref !~ '^[A-Za-z0-9_:.\\- ]+$') then
+  if ref is not null and (length(ref) < 6 or length(ref) > 100 or ref !~ '^[A-Za-z0-9_:.\- ]+$') then
     raise exception 'invalid_reference';
   end if;
   select * into r from public.wallet_topups where id = p_id and user_id = uid for update;
@@ -210,9 +212,9 @@ begin
     raise exception 'duplicate_reference';
   end;
   select full_name, email into nm, em from public.profiles where id = uid;
-  perform public.notify_telegram('💸 شحن محفظة يحتاج مراجعة #' || p_id || E'\\n👤 ' || coalesce(nm, '') || ' (' || coalesce(em, '') || ')'
-                                 || E'\\n💰 ' || r.amount || ' USD · ' || r.section || E'\\n💳 ' || coalesce(r.payment_method, '')
-                                 || E'\\n🧾 إثبات: مرفق' || case when coalesce(ref, r.tx_ref) is not null then E'\\n🔖 رقم العملية: ' || coalesce(ref, r.tx_ref) else '' end);
+  perform public.notify_telegram('💸 شحن محفظة يحتاج مراجعة #' || p_id || E'\n👤 ' || coalesce(nm, '') || ' (' || coalesce(em, '') || ')'
+                                 || E'\n💰 ' || r.amount || ' USD · ' || r.section || E'\n💳 ' || coalesce(r.payment_method, '')
+                                 || E'\n🧾 إثبات: مرفق' || case when coalesce(ref, r.tx_ref) is not null then E'\n🔖 رقم العملية: ' || coalesce(ref, r.tx_ref) else '' end);
 end $$;
 
 -- 4) الدفع من المحفظة لطلب موجود (يخص المستخدم وبانتظار الدفع)
@@ -299,7 +301,7 @@ begin
   if not (p_section = any (public.wallet_sections(cfg))) then raise exception 'invalid_section'; end if;
   if p_amount is null or p_amount = 0 or abs(p_amount) > 100000 then raise exception 'invalid_amount'; end if;
   if not exists (select 1 from public.profiles where id = p_user) then raise exception 'not_allowed'; end if;
-  return public.wallet_apply(p_user, p_section, round(p_amount, 2), 'adjust', null, p_note);
+  return public.wallet_apply(p_user, p_section, round(p_amount, 2), 'adjust', null, '[admin ' || auth.uid()::text || '] ' || coalesce(p_note, ''));
 end $$;
 
 -- ---------- استرجاع الرصيد عند إلغاء طلب دُفع من المحفظة ----------
