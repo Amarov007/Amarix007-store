@@ -765,6 +765,8 @@ let payMethod = ls.get("amx_pay", ""); // chosen payment method id
 let sndOn = ls.get("snd", "0") === "1"; // click sounds: opt-in
 let user = null; // Supabase user object when signed in
 let profileName = ""; // name from profiles table (best effort)
+let profileSince = ""; // profiles.created_at (member since)
+let accStats = { n: null, done: 0, at: 0, busy: false }; // order counts for the account page
 let profileUid = ""; // short numeric UID from profiles.uid (supabase-user-uid.sql)
 let q = ""; // search query
 let returnTo = ""; // where to go after login
@@ -1328,6 +1330,8 @@ function clearSession() {
   user = null;
   profileName = "";
   profileUid = "";
+  profileSince = "";
+  accStats = { n: null, done: 0, at: 0, busy: false };
   try {
     walletReset();
   } catch {}
@@ -2360,10 +2364,51 @@ function donePage(id) {
 }
 
 /* Account & favourites */
+/* order counts for the account page (best effort, refreshed at most every 30 s) */
+async function accStatsLoad() {
+  if (!user || accStats.busy || Date.now() - accStats.at < 30000) return;
+  accStats.busy = true;
+  try {
+    const r = await sb(`/rest/v1/orders?select=id,status&user_id=eq.${encodeURIComponent(user.id)}&limit=1000`);
+    if (r.ok) {
+      const rows = await r.json();
+      accStats.n = rows.length;
+      accStats.done = rows.filter((o) => o.status == "done").length;
+      accStats.at = Date.now();
+      if (/^#\/account/.test(location.hash)) {
+        const f = document.activeElement;
+        if (!(f && /^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName))) render();
+      }
+    }
+  } catch {}
+  accStats.busy = false;
+}
 function accPage() {
-  const name = nameOf(),
-    shown = name || user.email.split("@")[0];
-  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi>${profileUid ? `<div class="ref-l" style="margin-top:8px"><span>UID</span><bdi dir="ltr"><b class="n">${ex(profileUid)}</b></bdi><button type="button" class="b b2 sm" data-a="copy" data-v="${ex(profileUid)}">${ic("copy", 14)} ${t("copy")}</button></div>` : ""}</div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${walletRow()}${pushBox()}${partnerRow()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
+  accStatsLoad();
+  const A = lang == "ar",
+    meta = (user && user.user_metadata) || {},
+    name = nameOf(),
+    shown = name || user.email.split("@")[0],
+    pic = [meta.avatar_url, meta.picture].find((u) => typeof u == "string" && /^https:\/\//.test(u)),
+    since = profileSince ? new Date(profileSince).toLocaleDateString(A ? "ar-EG-u-nu-latn" : "en-GB", { year: "numeric", month: "long" }) : "",
+    row = (href, icon, title, sub = "", badge = "") =>
+      `<a class="pf-r" href="${href}"><span class="pf-i">${ic(icon, 20)}</span><span class="pf-t"><b>${title}</b>${sub ? `<small>${sub}</small>` : ""}</span>${badge}<i class="pf-ch">${ic("chev", 16)}</i></a>`,
+    st = refInfo && refInfo.loaded ? refInfo.status || "none" : "none",
+    pchip = { approved: [A ? "معتمد" : "Approved", "ok"], pending: [A ? "قيد المراجعة" : "Under review", "wt"] }[st],
+    earned = +(refInfo && refInfo.total_commission) || 0,
+    wOn = walletOn() && !wl.setup,
+    stat = (v, k) => `<div class="pf-s"><b class="n">${v}</b><small>${k}</small></div>`;
+  return `<section class="pf-hd">
+<div class="pf-av">${pic ? `<img src="${ex(pic)}" alt="" referrerpolicy="no-referrer">` : `<b>${ex([...shown][0].toUpperCase())}</b>`}</div>
+<div class="pf-id"><h1>${t("wel")}${name ? "، " + ex(name) : ""}</h1><bdi dir="ltr" class="pf-em">${ex(user.email)}</bdi>${since ? `<small class="pf-since">${A ? "عضو منذ" : "Member since"} ${ex(since)}</small>` : ""}</div>
+${profileUid ? `<div class="pf-uid"><span><small>${A ? "معرّف الحساب" : "Account ID"}</small><bdi dir="ltr" class="n">UID ${ex(profileUid)}</bdi></span><button type="button" class="b sm" data-a="copy" data-v="${ex(profileUid)}">${ic("copy", 14)} <span>${t("copy")}</span></button></div>` : ""}
+</section>
+<div class="pf-stats">${stat(accStats.n == null ? "…" : accStats.n, A ? "الطلبات" : "Orders")}${stat(accStats.n == null ? "…" : accStats.done, A ? "المكتملة" : "Completed")}${wOn ? stat(walletReady() ? money(walletBal()) : "—", A ? "الرصيد" : "Balance") : ""}</div>
+<h2 class="pf-h">${A ? "نشاطي" : "My activity"}</h2>
+<div class="pf-l">${row("#/orders", "box", A ? "طلباتي وفواتيري" : "My orders & invoices", A ? "تتبّع الطلبات وحمّل الفاتورة" : "Track orders and get invoices", accStats.n ? `<em class="pf-bd">${accStats.n}</em>` : "")}${wOn ? row("#/wallet", "wallet", A ? "محفظتي" : "My wallet", walletReady() ? `${A ? "الرصيد" : "Balance"}: ${money(walletBal())}` : A ? "شحن الرصيد والدفع به" : "Top up and pay with balance") : ""}${row("#/support", "hs", t("tk_acc"), A ? "تواصل مع الدعم الفني" : "Get help from support")}</div>
+${refInfo ? `<h2 class="pf-h">${A ? "الربح والشراكة" : "Earn"}</h2><div class="pf-l">${row("#/partner", "gift", A ? "برنامج الشركاء" : "Partner program", st == "approved" && earned > 0 ? `${A ? "عمولتك" : "Earned"}: ${money(earned)}` : A ? "اربح عمولة من كل عملية بيع" : "Earn commission on every sale", pchip ? `<small class="pst ${pchip[1]}">${pchip[0]}</small>` : "")}</div>` : ""}
+${pushBox()}
+<button class="b b2 block pf-out" data-a="out">${t("out")}</button>`;
 }
 /* ---------- Wallet: one balance per user per "section" (today only "smm" = boost services) ----------
    Server side: supabase-wallet.sql. The browser never writes balances; it only calls the RPC functions there.
@@ -3235,7 +3280,7 @@ function ordersHTML(rows) {
         const total = `<bdi dir="ltr">${( (o.total * R[cur][0]) / R[cur0][0] ).toFixed(2)} ${ex(R[cur][1])}</bdi>`;
         const m = o.payment_method ? pmOf(o.payment_method) : null;
         const canClaim = pay == "pending" && st != "cancelled";
-        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } ${apiBlock(o)}<details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
+        return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } ${apiBlock(o)}<a class="b b2 sm inv-lnk" href="#/invoice/${ex(o.id)}">${ic("card", 14)} ${lang == "ar" ? "الفاتورة" : "Invoice"}</a><details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
       })
       .join("")
   );
@@ -3435,6 +3480,50 @@ async function ordersPage(seq) {
   }
 }
 
+/* ---------- Invoices: one per order, created by the server (supabase-invoices.sql). Printable / save as PDF via the browser. ---------- */
+async function invoicePage(seq, id) {
+  const A = lang == "ar";
+  try {
+    const r = await sb("/rest/v1/rpc/get_invoice", { method: "POST", body: { p_order_id: String(id).toUpperCase().replace(/[^A-Z0-9-]/g, "") } });
+    if (r.status == 401) {
+      clearSession();
+      returnTo = location.hash;
+      location.hash = "#/login";
+      return;
+    }
+    if (!r.ok) throw new Error(await r.text());
+    const v = await r.json();
+    if (seq !== routeSeq) return;
+    const back = `<a class="b b2 block no-print" href="#/orders">${A ? "رجوع إلى طلباتي" : "Back to my orders"}</a>`;
+    if (!v) {
+      $("#m").innerHTML = `<div class="emp">${A ? "لا توجد فاتورة لهذا الطلب." : "No invoice for this order."}</div>${back}`;
+      return;
+    }
+    const cu = v.currency && R[v.currency] ? R[v.currency][1] : v.currency || "",
+      n2 = (x) => (+x || 0).toFixed(2),
+      items = (Array.isArray(v.items) ? v.items : []).map((i) => ({ name: i[lang] || i.name || i.ar || i.en || "", q: +i.q || 0, price: +i.price || 0, link: i.link || "" })),
+      site = CFG.site || {},
+      store = ((site.n1 || "") + (site.n2 || "")) || "AMARIX007",
+      st = v.status == "void" ? "void" : v.status == "paid" ? "paid" : "issued",
+      stL = { paid: A ? "مدفوعة" : "PAID", issued: A ? "غير مدفوعة" : "UNPAID", void: A ? "ملغاة" : "VOID" }[st],
+      m = v.payment_method ? pmOf(v.payment_method) : null,
+      pm = m ? pmName(m) : v.payment_method == "wallet" ? (A ? "المحفظة" : "Wallet") : v.payment_method || "—",
+      row = (k, val) => `<div class="inv-kv"><span>${k}</span><b dir="auto">${val == null || val === "" ? "—" : val}</b></div>`;
+    $("#m").innerHTML = `<div class="inv" id="inv">
+<div class="inv-top"><div><div class="inv-brand">${ex(store)}</div><small>${ex(typeof SEO_SITE == "string" ? SEO_SITE.replace(/^https?:\/\//, "") : "")}</small></div>
+<div class="inv-ttl"><h1>${A ? "فاتورة" : "INVOICE"}</h1><span class="inv-st ${st}">${stL}</span></div></div>
+<div class="inv-meta">${row(A ? "رقم الفاتورة" : "Invoice no.", `<bdi dir="ltr">${ex(v.invoice_no)}</bdi>`)}${row(A ? "رقم الطلب" : "Order no.", `<bdi dir="ltr">${ex(v.order_id)}</bdi>`)}${row(A ? "تاريخ الإصدار" : "Issued", fmtDate(v.issued_at))}${v.paid_at && st == "paid" ? row(A ? "تاريخ الدفع" : "Paid on", fmtDate(v.paid_at)) : ""}${row(A ? "وسيلة الدفع" : "Payment method", ex(pm))}</div>
+<div class="inv-bill"><small>${A ? "الفاتورة إلى" : "Billed to"}</small><b>${ex(v.customer_name || "—")}</b><bdi dir="ltr">${ex(v.customer_email || "")}</bdi>${v.customer_uid ? `<bdi dir="ltr">UID: ${ex(v.customer_uid)}</bdi>` : ""}</div>
+<div class="tw"><table class="inv-tb"><thead><tr><th>#</th><th>${A ? "البند" : "Item"}</th><th>${A ? "السعر" : "Price"}</th><th>${A ? "الكمية" : "Qty"}</th><th>${A ? "المجموع" : "Total"}</th></tr></thead><tbody>${items.map((i, k) => `<tr><td>${k + 1}</td><td>${ex(i.name)}${i.link ? `<small dir="ltr">${ex(i.link)}</small>` : ""}</td><td dir="ltr">${n2(i.price)}</td><td dir="ltr">${i.q}</td><td dir="ltr">${n2(i.price * i.q)}</td></tr>`).join("")}</tbody></table></div>
+<div class="inv-sum">${row(A ? "المجموع الفرعي" : "Subtotal", `<bdi dir="ltr">${n2(v.subtotal)} ${ex(cu)}</bdi>`)}${+v.discount > 0 ? row((A ? "الخصم" : "Discount") + (v.coupon ? ` (${ex(v.coupon)})` : ""), `<bdi dir="ltr">-${n2(v.discount)} ${ex(cu)}</bdi>`) : ""}<div class="inv-kv inv-tot"><span>${A ? "الإجمالي" : "Total"}</span><b dir="ltr">${n2(v.total)} ${ex(cu)}</b></div></div>
+<p class="inv-foot">${A ? "شكراً لتعاملكم مع " : "Thank you for shopping with "}${ex(store)}</p></div>
+<div class="acts no-print"><button type="button" class="b" data-a="inv-print">${ic("upload", 16)} ${A ? "طباعة / حفظ PDF" : "Print / Save PDF"}</button></div>${back}`;
+    document.title = v.invoice_no + " — " + store;
+  } catch (err) {
+    console.error("[AMARIX] invoice", err);
+    if (seq === routeSeq) $("#m").innerHTML = `<div class="emp">${t("loaderr")}<br><br><button class="b b2" data-a="reload">${t("retry")}</button></div>`;
+  }
+}
 /* ---------- 11. AI support chat (calls the `ai-support` Edge Function; the AI key stays on the server) ---------- */
 const AI = {
   open: false,
@@ -3950,6 +4039,8 @@ document.addEventListener("click", async (e) => {
       m.focus();
       m.scrollIntoView({ block: "start" });
     }
+  } else if (a == "inv-print") {
+    window.print();
   } else if (a == "copy") {
     const ok = await copyText(b.dataset.v);
     if (ok) {
@@ -4335,13 +4426,14 @@ async function syncProfile(again) {
   if (!user) return;
   try {
     const r = await sb(
-      `/rest/v1/profiles?id=eq.${encodeURIComponent( user.id )}&select=full_name,ref_code,uid`
+      `/rest/v1/profiles?id=eq.${encodeURIComponent( user.id )}&select=full_name,ref_code,uid,created_at`
     );
     if (!r.ok) throw new Error("profile " + r.status);
     const row = (await r.json())[0];
     if (row) {
       profileName = row.full_name || "";
       profileUid = row.uid || "";
+      profileSince = row.created_at || "";
       refInfo = {
         code: row.ref_code || "",
         status: "none",
@@ -5264,6 +5356,12 @@ function render0() {
     m.innerHTML = loadingBox();
     nav();
     ordersPage(seq);
+    return;
+  }
+  if (r == "invoice") {
+    m.innerHTML = loadingBox();
+    nav();
+    invoicePage(seq, dec(id || ""));
     return;
   }
   if (r == "support") {

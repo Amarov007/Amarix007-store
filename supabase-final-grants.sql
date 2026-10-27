@@ -32,7 +32,7 @@ declare
     'pay_order_with_wallet', 'wallet_reconcile', 'wallet_topup_create', 'wallet_topup_set_proof', 'wallet_topup_claim',
     'wallet_topup_approve', 'wallet_topup_reject', 'wallet_admin_adjust',
     'admin_stats', 'admin_product_stats', 'admin_push_stats', 'admin_send_broadcast',
-    'admin_affiliate_monthly', 'admin_affiliate_pay', 'admin_find_user',
+    'admin_affiliate_monthly', 'admin_affiliate_pay', 'admin_find_user', 'get_invoice', 'admin_invoices',
     -- موجودة في القاعدة الحية فقط (سجل التكاملات api_integrations + دالة api-hub) وكل منها يتحقق من is_admin() داخلياً
     'api_integrations_list', 'api_integration_save', 'api_integration_delete'
   ];

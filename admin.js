@@ -154,6 +154,7 @@ const TABS = [
   ["apis", "إعدادات APIs"],
   ["affiliates", "الشركاء (Affiliate)"],
   ["orders", "الطلبات"],
+  ["invoices", "الفواتير"],
   ["stats", "الإحصاءات"],
   ["tickets", "تذاكر الدعم"],
   ["push", "إشعار للجميع"],
@@ -176,20 +177,21 @@ const TI = {
   users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>',
   apis:'<path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/>',
   affiliates:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  invoices:'<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8M9 9h2"/>',
   orders:'<path d="M6 2l-2 4v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4z"/><path d="M4 6h16M9 11a3 3 0 0 0 6 0"/>',
   stats:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
   tickets:'<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   push:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'
 };
 const TG = [
-  ["المبيعات", ["orders","payments","wallets","coupons","affiliates","users"]],
+  ["المبيعات", ["orders","invoices","payments","wallets","coupons","affiliates","users"]],
   ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
   ["التواصل والدعم", ["tickets","push","social"]],
   ["النظام", ["apis","stats","staff","activity"]]
 ];
 const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
 /* ---------- الموظفون: ما يراه كل حساب ---------- */
-const TAB_PERM = { orders: "orders", tickets: "tickets", users: "users", products: "products" };
+const TAB_PERM = { orders: "orders", invoices: "orders", tickets: "tickets", users: "users", products: "products" };
 const isStaffOnly = () => IS_ADMIN === false && Array.isArray(STAFF);
 const canTab = (k) => !isStaffOnly() || (!!TAB_PERM[k] && STAFF.includes(TAB_PERM[k]));
 const sideNav = () => {
@@ -639,6 +641,10 @@ const VIEW = {
         })
         .join("")
     );
+  },
+  invoices() {
+    setTimeout(() => invLoad(""), 50);
+    return `<div class="card"><h2>الفواتير</h2><p class="hint">تُنشأ فاتورة تلقائياً لكل طلب. ابحث برقم الفاتورة أو الطلب أو البريد أو الاسم أو UID العميل.</p><div class="sw"><input class="inp" id="inv-q" dir="auto" placeholder="INV-001001 / AMX-1001 / UID / بريد" autocomplete="off"><button class="b" type="button" data-a="inv-find">🔍 بحث</button></div><div id="inv-view" style="margin-top:12px"></div><div id="inv-list" style="margin-top:12px">${loadingHTML}</div></div>`;
   },
   users() {
     setTimeout(loadUsers, 50);
@@ -1954,6 +1960,77 @@ document.addEventListener("keydown", (e) => {
   if (e.key == "Enter" && e.target && e.target.id == "uid-q") {
     e.preventDefault();
     uidFind(document.querySelector('button[data-a="uid-find"]'), null);
+  }
+});
+/* ---------- الفواتير (supabase-invoices.sql: admin_invoices / get_invoice) ---------- */
+const INV_ST = { paid: ["مدفوعة", "#13803a"], issued: ["غير مدفوعة", "#b7791f"], void: ["ملغاة", "#b42318"] };
+async function invLoad(q) {
+  const b = $("#inv-list");
+  if (!b) return;
+  b.innerHTML = loadingHTML;
+  try {
+    const rows = await wlRpc("admin_invoices", { p_q: q || "", p_limit: 100 });
+    b.innerHTML = rows && rows.length
+      ? `<div class="tw"><table class="tb"><tr><th>الفاتورة</th><th>الطلب</th><th>العميل</th><th>UID</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th><th></th></tr>${rows.map((x) => { const st = INV_ST[x.status] || INV_ST.issued; return `<tr><td dir="ltr">${esc(x.invoice_no)}</td><td dir="ltr">${esc(x.order_id)}</td><td>${esc(x.customer_name || "—")}<br><small dir="ltr">${esc(x.customer_email || "")}</small></td><td dir="ltr">${esc(x.customer_uid || "—")}</td><td dir="ltr">${(+x.total || 0).toFixed(2)} ${esc(x.currency || "")}</td><td><b style="color:${st[1]}">${st[0]}</b></td><td>${esc(wlDate(x.issued_at))}</td><td><button type="button" class="b b2 sm" data-a="inv-open" data-id="${esc(x.order_id)}">عرض</button></td></tr>`; }).join("")}</table></div>`
+      : '<p class="hint">لا توجد فواتير مطابقة.</p>';
+  } catch (e) {
+    b.textContent = "فشل التحميل — " + (/forbidden|42501/.test(e.message || "") ? "لا تملك صلاحية «الطلبات»" : /admin_invoices/.test(e.message || "") ? "شغّل supabase-invoices.sql ثم supabase-final-grants.sql" : e.message || "");
+  }
+}
+function invHtml(v) {
+  const n2 = (x) => (+x || 0).toFixed(2),
+    cu = esc(v.currency || ""),
+    st = INV_ST[v.status] || INV_ST.issued,
+    store = (D.site && ((D.site.n1 || "") + (D.site.n2 || ""))) || "AMARIX007",
+    items = Array.isArray(v.items) ? v.items : [];
+  const kv = (k, x) => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin:3px 0"><span style="color:#6b6d7a">${k}</span><b>${x == null || x === "" ? "—" : x}</b></div>`;
+  return `<div dir="rtl" style="background:#fff;color:#191a23;border:1px solid #e3e3ea;border-radius:14px;padding:18px;max-width:760px;font-family:Alexandria,Tahoma,sans-serif">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #191a23;padding-bottom:10px;margin-bottom:12px"><div style="font-weight:900;font-size:20px" dir="ltr">${esc(store)}</div><div style="text-align:end"><div style="font-weight:800;font-size:20px">فاتورة</div><span style="display:inline-block;margin-top:4px;padding:1px 10px;border-radius:99px;font-size:11px;font-weight:800;border:1.5px solid ${st[1]};color:${st[1]}">${st[0]}</span></div></div>
+${kv("رقم الفاتورة", `<bdi dir="ltr">${esc(v.invoice_no)}</bdi>`)}${kv("رقم الطلب", `<bdi dir="ltr">${esc(v.order_id)}</bdi>`)}${kv("تاريخ الإصدار", esc(wlDate(v.issued_at)))}${v.paid_at && v.status == "paid" ? kv("تاريخ الدفع", esc(wlDate(v.paid_at))) : ""}${kv("وسيلة الدفع", esc(v.payment_method || "—"))}
+<div style="background:#f5f5f8;border-radius:10px;padding:9px 12px;margin:12px 0;font-size:13px"><small style="color:#6b6d7a">الفاتورة إلى</small><br><b>${esc(v.customer_name || "—")}</b><br><bdi dir="ltr">${esc(v.customer_email || "")}</bdi>${v.customer_uid ? `<br><bdi dir="ltr">UID: ${esc(v.customer_uid)}</bdi>` : ""}</div>
+<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="background:#191a23;color:#fff"><th style="padding:7px;text-align:start">#</th><th style="padding:7px;text-align:start">البند</th><th style="padding:7px;text-align:start">السعر</th><th style="padding:7px;text-align:start">الكمية</th><th style="padding:7px;text-align:start">المجموع</th></tr>${items.map((i, k) => `<tr><td style="padding:7px;border-bottom:1px solid #e3e3ea">${k + 1}</td><td style="padding:7px;border-bottom:1px solid #e3e3ea">${esc(i.ar || i.name || i.en || "")}${i.link ? `<br><small dir="ltr" style="color:#6b6d7a;word-break:break-all">${esc(i.link)}</small>` : ""}</td><td dir="ltr" style="padding:7px;border-bottom:1px solid #e3e3ea">${n2(i.price)}</td><td dir="ltr" style="padding:7px;border-bottom:1px solid #e3e3ea">${+i.q || 0}</td><td dir="ltr" style="padding:7px;border-bottom:1px solid #e3e3ea">${n2((+i.price || 0) * (+i.q || 0))}</td></tr>`).join("")}</table>
+<div style="margin-top:12px;max-width:320px;margin-inline-start:auto">${kv("المجموع الفرعي", `<bdi dir="ltr">${n2(v.subtotal)} ${cu}</bdi>`)}${+v.discount > 0 ? kv("الخصم" + (v.coupon ? " (" + esc(v.coupon) + ")" : ""), `<bdi dir="ltr">-${n2(v.discount)} ${cu}</bdi>`) : ""}<div style="display:flex;justify-content:space-between;border-top:2px solid #191a23;padding-top:8px;margin-top:6px;font-size:16px;font-weight:900"><span>الإجمالي</span><span dir="ltr">${n2(v.total)} ${cu}</span></div></div>
+<p style="text-align:center;color:#6b6d7a;font-size:12px;margin:16px 0 0">شكراً لتعاملكم مع ${esc(store)}</p></div>`;
+}
+let INV_CUR = null;
+async function invOpen(btn, id) {
+  const box = $("#inv-view");
+  if (!box) return;
+  busy(btn, true);
+  try {
+    const v = await wlRpc("get_invoice", { p_order_id: id });
+    if (!v) return toast("الفاتورة غير موجودة", "e");
+    INV_CUR = v;
+    box.innerHTML = `<div class="acts" style="margin-bottom:8px"><button type="button" class="b" data-a="inv-print">🖨 طباعة / PDF</button><button type="button" class="b b2" data-a="inv-close">إغلاق</button></div>${invHtml(v)}`;
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    toast("فشل فتح الفاتورة — " + (e.message || ""), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
+function invPrint() {
+  if (!INV_CUR) return;
+  const w = window.open("", "_blank");
+  if (!w) return toast("اسمح بالنوافذ المنبثقة للطباعة", "e");
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(INV_CUR.invoice_no)}</title><style>body{margin:16px;background:#fff}@page{margin:12mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${invHtml(INV_CUR)}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest('button[data-a="inv-find"],button[data-a="inv-open"],button[data-a="inv-print"],button[data-a="inv-close"]');
+  if (!b) return;
+  const a = b.dataset.a;
+  if (a == "inv-find") invLoad((($("#inv-q") || {}).value || "").trim());
+  else if (a == "inv-open") invOpen(b, b.dataset.id);
+  else if (a == "inv-print") invPrint();
+  else if (a == "inv-close") { const v = $("#inv-view"); if (v) v.innerHTML = ""; INV_CUR = null; }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key == "Enter" && e.target && e.target.id == "inv-q") {
+    e.preventDefault();
+    invLoad(e.target.value.trim());
   }
 });
 const AFF_AUD = { lt1k: "< 1K", "1k-10k": "1K–10K", "10k-50k": "10K–50K", gt50k: "50K+" };

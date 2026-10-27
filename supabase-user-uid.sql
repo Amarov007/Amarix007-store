@@ -28,7 +28,7 @@ begin
   end loop;
 end $$;
 
-alter table public.profiles alter column uid set default public.gen_user_uid();
+alter table public.profiles alter column uid drop default;
 alter table public.profiles alter column uid set not null;
 create unique index if not exists profiles_uid_key on public.profiles (uid);
 alter table public.profiles drop constraint if exists profiles_uid_fmt;
@@ -38,12 +38,13 @@ alter table public.profiles add constraint profiles_uid_fmt check (uid ~ '^[0-9]
 create or replace function public.profiles_protect_uid() returns trigger
 language plpgsql security definer set search_path = public as $function$
 begin
-  if auth.uid() is not null and not public.is_admin() then
-    if tg_op = 'INSERT' then
+  if tg_op = 'INSERT' then
+    -- التوليد داخل التريغر (security definer) فلا يحتاج المستخدم صلاحية تنفيذ على gen_user_uid
+    if new.uid is null or (auth.uid() is not null and not public.is_admin()) then
       new.uid := public.gen_user_uid();
-    else
-      new.uid := old.uid;
     end if;
+  elsif auth.uid() is not null and not public.is_admin() then
+    new.uid := old.uid;
   end if;
   return new;
 end $function$;
@@ -88,3 +89,9 @@ begin
   );
   return res;
 end $function$;
+
+-- 5) صلاحيات: gen_user_uid وprofiles_protect_uid داخليتان؛ admin_find_user للمسجّلين فقط (يتحقق من has_perm داخلياً)
+revoke execute on function public.gen_user_uid()           from public, anon, authenticated;
+revoke execute on function public.profiles_protect_uid()   from public, anon, authenticated;
+revoke execute on function public.admin_find_user(text)    from public, anon;
+grant  execute on function public.admin_find_user(text)    to authenticated;
