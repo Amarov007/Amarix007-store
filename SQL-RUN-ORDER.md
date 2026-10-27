@@ -13,6 +13,7 @@
 | 5 | `supabase-boost-units.sql` | تعريف `orders_enforce_pricing` الوحيد (سعر الوحدة بـ 6 خانات، حد أعلى للكمية 10,000,000) **وتريغره**. |
 | 6 | `supabase-wallet.sql` | المحفظة (`wallets`, `wallet_transactions`, `wallet_topups` + الدوال). يتطلب `profiles` و`rl_hit` و`notify_telegram` من رقم 1. |
 | 7 | `supabase-live-sync.sql` | **جديد:** الجداول والسياسات والدوال التي كانت في القاعدة الحية فقط (التقييمات، الإشعارات، السلة، طلبات السحب، إحصاءات اللوحة…). يتطلب `profiles` و`orders` و`support_tickets` و`rl_hit` و`notify_telegram` و`notify_settings`. آمن لإعادة التشغيل. |
+| 7b | `supabase-user-uid.sql` | **جديد:** عمود `profiles.uid` (8 أرقام فريدة لكل مستخدم، ثابت لا يعدّله المستخدم) + دالة `admin_find_user(uid)` لبحث الإدارة. بعد 3 و6. |
 | 8 | `supabase-rls-audit.sql` | استعلامات قراءة فقط للتدقيق (لا تغيّر شيئاً). الاستعلام 1 يجب أن يعود فارغاً. |
 | 9 | `supabase-final-grants.sql` | **الأخير دائماً.** `revoke` شامل ثم كل صلاحيات `grant execute` (بالاسم لا بالتوقيع)، مطابقة لصلاحيات القاعدة الحية. آمن لإعادة التشغيل في أي وقت. |
 

@@ -765,6 +765,7 @@ let payMethod = ls.get("amx_pay", ""); // chosen payment method id
 let sndOn = ls.get("snd", "0") === "1"; // click sounds: opt-in
 let user = null; // Supabase user object when signed in
 let profileName = ""; // name from profiles table (best effort)
+let profileUid = ""; // short numeric UID from profiles.uid (supabase-user-uid.sql)
 let q = ""; // search query
 let returnTo = ""; // where to go after login
 let lastOrder = null; // info for the success page
@@ -1326,6 +1327,7 @@ function clearSession() {
   ["amx_token", "amx_refresh", "amx_user"].forEach(ls.del);
   user = null;
   profileName = "";
+  profileUid = "";
   try {
     walletReset();
   } catch {}
@@ -2269,7 +2271,7 @@ function prodPage(id) {
   if (needsLink(p)) bq = qClamp(p, bq);
   const c = cat(p.c),
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "",
-    imgs = [p.img, ...(p.images || [])].filter(Boolean);
+    imgs = [p.img || (c && /^https:\/\//.test(c.image_url || "") && c.ty != "boost" ? c.image_url : ""), ...(p.images || [])].filter(Boolean); // no own picture: show the category icon automatically (same rule as art())
   const gallery = imgs.length
     ? `<div class="main-img zoomable" data-a="zoom" role="button" tabindex="0" aria-label="${t("zoom")}"><img src="${ex(imgs[0])}" id="main-img" alt="${ex(p[lang] || "")}" fetchpriority="high" decoding="async" data-ph="${ex(p.id)}"><span class="zm" aria-hidden="true">${ic("search", 18)}</span></div>${imgs.length > 1 ? `<div class="thumbs">${imgs.map((u, i) => `<img src="${ex(u)}" alt="" class="${i ? "" : "on"}" data-a="thumb" loading="lazy" decoding="async">`).join("")}</div>` : ""}`
     : `<div class="main-img">${placeholder(p, c)}</div>`;
@@ -2361,7 +2363,7 @@ function donePage(id) {
 function accPage() {
   const name = nameOf(),
     shown = name || user.email.split("@")[0];
-  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi></div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${walletRow()}${pushBox()}${partnerRow()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
+  return `<div class="box row" style="justify-content:flex-start;gap:14px"><span class="tile big"><b class="n" style="font-size:26px">${ex( [...shown][0] || "U" )}</b></span> <div style="min-width:0"><h1>${t("wel")}${ name ? "، " + ex(name) : "" }</h1><bdi dir="ltr" class="sb">${ex(user.email)}</bdi>${profileUid ? `<div class="ref-l" style="margin-top:8px"><span>UID</span><bdi dir="ltr"><b class="n">${ex(profileUid)}</b></bdi><button type="button" class="b b2 sm" data-a="copy" data-v="${ex(profileUid)}">${ic("copy", 14)} ${t("copy")}</button></div>` : ""}</div></div> <a class="box row" href="#/orders" style="display:flex"><span>${t( "ord" )}</span>${ic("box", 18)}</a> <a class="box row" href="#/support" style="display:flex"><span>${t( "tk_acc" )}</span>${ic("hs", 18)}</a> ${walletRow()}${pushBox()}${partnerRow()} <button class="b b2 block" data-a="out">${t("out")}</button>`;
 }
 /* ---------- Wallet: one balance per user per "section" (today only "smm" = boost services) ----------
    Server side: supabase-wallet.sql. The browser never writes balances; it only calls the RPC functions there.
@@ -4333,12 +4335,13 @@ async function syncProfile(again) {
   if (!user) return;
   try {
     const r = await sb(
-      `/rest/v1/profiles?id=eq.${encodeURIComponent( user.id )}&select=full_name,ref_code`
+      `/rest/v1/profiles?id=eq.${encodeURIComponent( user.id )}&select=full_name,ref_code,uid`
     );
     if (!r.ok) throw new Error("profile " + r.status);
     const row = (await r.json())[0];
     if (row) {
       profileName = row.full_name || "";
+      profileUid = row.uid || "";
       refInfo = {
         code: row.ref_code || "",
         status: "none",

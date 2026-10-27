@@ -642,7 +642,7 @@ const VIEW = {
   },
   users() {
     setTimeout(loadUsers, 50);
-    return `<div class="card"><h2>المستخدمين المسجلين</h2><div id="users-list">${loadingHTML}</div></div>`;
+    return `<div class="card"><h2>البحث بالـ UID</h2><div class="sw"><input class="inp" id="uid-q" dir="ltr" inputmode="numeric" maxlength="12" placeholder="UID مثال: 12345678" autocomplete="off"><button class="b" type="button" data-a="uid-find">🔍 بحث</button></div><div id="uid-res" style="margin-top:12px"></div></div><div class="card"><h2>المستخدمين المسجلين</h2><div id="users-list">${loadingHTML}</div></div>`;
   },
   apis() {
     return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("SMM API URL (المزوّد الرئيسي)", "api.smm_url", { d: 1 })}${F( "SMM API Key (المزوّد الرئيسي)", "api.smm_key", { d: 1 } )}${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> ${provBox()}<div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase (المتصفح لا يستطيع الاتصال بموقع الرشق مباشرة، والمفتاح يبقى في الخادم). احفظ الإعدادات أولاً. اختر الموقع المطلوب ثم افحص الاتصال أو اعرض خدماته؛ ما تستورده يُربط بهذا الموقع.</p><label class="fld"><span>موقع الرشق</span><select class="inp" id="smm-prov">${provSel()}</select></label> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="acts" style="margin-top:8px"><button class="b bd2" data-a="smm-wipe" type="button">🗑 حذف كل منتجات الرشق</button><button class="b" data-a="smm-redo" type="button">♻ حذف وإعادة جلب من المزوّد</button><button class="b b2" data-a="smm-undo" type="button">↩ استرجاع المحذوف</button></div><p class="hint">«حذف وإعادة جلب» يجلب الخدمات من المزوّد أولاً، وإن فشل الجلب لا يُحذف شيء. يُحفظ نسخة احتياطية قبل الحذف ويمكن الاسترجاع منها. بعدها اضغط «نشر».</p> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
@@ -1894,11 +1894,68 @@ async function loadUsers() {
     orders.forEach((o) => {
       if (o.user_id) (by[o.user_id] = by[o.user_id] || []).push(o);
     });
-    b.innerHTML = `<div class="tw"><table class="tb"><tr><th>الاسم</th><th>البريد</th><th>الطلبات</th><th>الإجمالي</th><th>الحالة</th></tr>${users .map((x) => { const os = (by[x.id] || []).filter((o) => o.status != "cancelled"); return `<tr><td>${esc(x.full_name || "—")}</td><td dir="ltr">${esc( x.email )}</td><td>${os.length}</td><td>${os .reduce((s, o) => s + +o.total, 0) .toFixed(2)}</td><td>${ os.length ? '<span style="color:var(--lk)">أتم طلبات</span>' : '<span style="color:#FBBF24">لا يوجد طلب</span>' }</td></tr>`; }) .join("")}</table></div>`;
+    b.innerHTML = `<div class="tw"><table class="tb"><tr><th>UID</th><th>الاسم</th><th>البريد</th><th>الطلبات</th><th>الإجمالي</th><th>الحالة</th></tr>${users .map((x) => { const os = (by[x.id] || []).filter((o) => o.status != "cancelled"); return `<tr><td dir="ltr"><button type="button" class="b b2 sm" data-a="uid-find" data-uid="${esc(x.uid || "")}">${esc(x.uid || "—")}</button></td><td>${esc(x.full_name || "—")}</td><td dir="ltr">${esc( x.email )}</td><td>${os.length}</td><td>${os .reduce((s, o) => s + +o.total, 0) .toFixed(2)}</td><td>${ os.length ? '<span style="color:var(--lk)">أتم طلبات</span>' : '<span style="color:#FBBF24">لا يوجد طلب</span>' }</td></tr>`; }) .join("")}</table></div>`;
   } catch {
     b.textContent = "فشل التحميل";
   }
 }
+/* ---------- بحث المستخدم بالـ UID (يستدعي admin_find_user في supabase-user-uid.sql) ---------- */
+function uidRow(k, v) {
+  return `<div class="stat" style="text-align:start"><span>${k}</span><b dir="auto" style="font-size:15px;word-break:break-all">${v == null || v === "" ? "—" : v}</b></div>`;
+}
+function uidRender(d) {
+  const p = d.profile || {},
+    a = d.auth || {},
+    o = d.orders || {},
+    tk = d.tickets || {},
+    af = d.affiliate,
+    dt = (v) => (v ? esc(new Date(v).toLocaleString("ar")) : "—"),
+    money = (v) => (+v || 0).toFixed(2),
+    wl = (d.wallets || []).map((w) => esc(w.section) + ": " + money(w.balance)).join(" · ");
+  const av = a.avatar && /^https:\/\//.test(a.avatar) ? `<img src="${esc(a.avatar)}" alt="" referrerpolicy="no-referrer" style="width:56px;height:56px;border-radius:50%;object-fit:cover">` : `<span class="tile big"><b class="n" style="font-size:22px">${esc([...(p.full_name || p.email || "U")][0].toUpperCase())}</b></span>`;
+  const orders = (o.recent || []).length
+    ? `<div class="tw"><table class="tb"><tr><th>الطلب</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th>الدفع</th></tr>${o.recent.map((x) => `<tr><td dir="ltr">${esc(x.id)}</td><td>${dt(x.created_at)}</td><td dir="ltr">${money(x.total)} ${esc(x.currency || "")}</td><td>${esc(x.status)}</td><td>${esc(x.payment_status || "—")}</td></tr>`).join("")}</table></div>`
+    : '<p class="hint">لا توجد طلبات.</p>';
+  return `<div class="it" style="gap:12px;align-items:center">${av}<div class="im"><b>${esc(p.full_name || "—")}</b><small dir="ltr">${esc(p.email || "")}</small></div><button type="button" class="b b2 sm" data-a="copy-uid" data-v="${esc(p.uid)}">نسخ UID</button></div>
+<div class="stats" style="margin-top:10px">
+${uidRow("UID", `<bdi dir="ltr">${esc(p.uid)}</bdi>`)}${uidRow("معرّف الحساب (id)", `<bdi dir="ltr">${esc(p.id)}</bdi>`)}${uidRow("تاريخ التسجيل", dt(p.created_at))}${uidRow("آخر دخول", dt(a.last_sign_in_at))}${uidRow("تأكيد البريد", a.email_confirmed_at ? "مؤكَّد ✓" : "غير مؤكَّد")}${uidRow("طريقة الدخول", esc(a.provider || "—"))}${uidRow("الهاتف", `<bdi dir="ltr">${esc(a.phone || "")}</bdi>`)}${uidRow("كود الإحالة", `<bdi dir="ltr">${esc(p.ref_code || "")}</bdi>`)}${uidRow("أُحيل بواسطة", p.referred_by ? `<bdi dir="ltr">${esc(p.referred_by)}</bdi>${d.referred_by_uid ? " (UID " + esc(d.referred_by_uid) + ")" : ""}` : "")}${uidRow("عدد الطلبات", o.count || 0)}${uidRow("إجمالي الطلبات (بدون الملغاة)", money(o.paid_total))}${uidRow("رصيد المحفظة", wl || "0.00")}${uidRow("التذاكر", (tk.count || 0) + " (مفتوحة: " + (tk.open || 0) + ")")}${uidRow("الشريك", af ? esc(af.status || "none") + " · نقرات " + (af.clicks || 0) + " · تسجيلات " + (af.signups || 0) + " · مبيعات " + (af.sales || 0) + " · عمولة " + money(af.total_commission) : "")}</div>
+<h3 style="margin:14px 0 6px">آخر الطلبات</h3>${orders}`;
+}
+async function uidFind(btn, val) {
+  const box = $("#uid-res"),
+    inp = $("#uid-q"),
+    q = String(val != null ? val : inp ? inp.value : "").replace(/\D/g, "");
+  if (!box) return;
+  if (inp && val != null) inp.value = q;
+  if (!q) return toast("اكتب UID المستخدم", "e");
+  busy(btn, true);
+  box.innerHTML = loadingHTML;
+  try {
+    const d = await wlRpc("admin_find_user", { p_uid: q });
+    box.innerHTML = d && d.profile ? uidRender(d) : '<p class="hint">لا يوجد مستخدم بهذا الـ UID.</p>';
+    if (d && d.profile) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    box.innerHTML = "";
+    toast("فشل البحث — " + (/forbidden|42501/.test(e.message || "") ? "لا تملك صلاحية «المستخدمين»" : /admin_find_user/.test(e.message || "") ? "شغّل supabase-user-uid.sql ثم supabase-final-grants.sql" : e.message || ""), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest('button[data-a="uid-find"],button[data-a="copy-uid"]');
+  if (!b) return;
+  if (b.dataset.a == "copy-uid") {
+    try { navigator.clipboard.writeText(b.dataset.v || ""); toast("تم نسخ UID ✓"); } catch {}
+    return;
+  }
+  uidFind(b, b.dataset.uid != null ? b.dataset.uid : null);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key == "Enter" && e.target && e.target.id == "uid-q") {
+    e.preventDefault();
+    uidFind(document.querySelector('button[data-a="uid-find"]'), null);
+  }
+});
 const AFF_AUD = { lt1k: "< 1K", "1k-10k": "1K–10K", "10k-50k": "10K–50K", gt50k: "50K+" };
 const AFF_ST = { none: "لم يقدّم", pending: "بانتظار المراجعة", approved: "معتمد", rejected: "مرفوض" };
 async function loadAffiliates() {
