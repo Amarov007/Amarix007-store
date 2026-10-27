@@ -40,7 +40,7 @@ const json = (b: unknown, s = 200) =>
 const clean = (t: string) => t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 const PID = /^[a-z0-9_-]{1,30}$/;
 const MAIN = "main";
-const VERSION = 4;
+const VERSION = 5; // v5: قفل بوقت + فك صريح، حفظ كل بند، حالة partial لا تتحول إلى completed
 const KINDS = ["smm", "smsactivate", "custom"];
 const UA = "Mozilla/5.0 (compatible; AMARIX007/1.0)";
 const lower = (v: unknown) => String(v ?? "").trim().toLowerCase();
@@ -115,6 +115,15 @@ function selfOk(site: Site): boolean {
   if (site.kind === "smsactivate") return site.cfg?.self_service !== false;
   if (site.kind === "custom") return site.cfg?.self_service === true;
   return false;
+}
+
+// حالة قفل الإرسال في orders.smm_status: none = لا قفل | fresh = إرسال جارٍ الآن | stale = قفل عالق (أقدم من LOCK_TTL_MS أو بلا وقت)
+const LOCK_TTL_MS = 180_000;
+function lockState(s: unknown): "none" | "fresh" | "stale" {
+  const v = String(s ?? "");
+  if (!v.startsWith("sending")) return "none";
+  const t = Number(v.split("@")[1]);
+  return t > 0 && Date.now() - t < LOCK_TTL_MS ? "fresh" : "stale";
 }
 
 type Add = { order: string | null; error: string | null; status?: string; delivery?: Record<string, string> };
@@ -630,8 +639,16 @@ Deno.serve(async (req: Request) => {
       const existing: any[] = Array.isArray(order.smm) ? order.smm : [];
 
       if (action === "send") {
-        if (order.smm_status === "sent" || order.smm_status === "completed" || order.smm_status === "sending") {
+        if (order.smm_status === "sent" || order.smm_status === "completed") {
           return json({ error: "order already sent to provider" }, 409);
+        }
+        // القفل يُكتب كـ "sending@<وقت>" (النسخ القديمة تكتب "sending" فقط).
+        // قفل حديث = إرسال جارٍ فعلاً. قفل أقدم من LOCK_TTL_MS = الدالة انقطعت؛ لا يُفكّ تلقائياً (قد يكون المزوّد قبل بنداً لم يُحفظ)،
+        // بل يفكّه الأدمن/الموظف صراحةً بـ body.unlock = true بعد التأكد من لوحة المزوّد.
+        const lk = lockState(order.smm_status);
+        if (lk === "fresh") return json({ error: "order is being sent right now" }, 409);
+        if (lk === "stale" && !(role !== "owner" && body.unlock === true)) {
+          return json({ error: "order is stuck in sending state (unlock required)", stuck: true }, 409);
         }
         if (order.payment_status !== "paid" && (!force || role === "owner")) {
           return json({ error: "order is not paid (pass force:true to override)" }, 400);
@@ -691,16 +708,20 @@ Deno.serve(async (req: Request) => {
         if (multi.length) return json({ error: "number services allow quantity 1 per line", items: multi }, 400);
 
         // قفل: يمنع تكرار الإرسال إن ضغط الأدمن والزبون (أو تبويبان) معاً — الأول فقط يمرّ
+        // مقارنة وتبديل ذرّي: يمرّ طلب واحد فقط، ولا يُكتب فوق حالة تغيّرت بين القراءة والقفل
         const prevStatus = order.smm_status ?? null;
-        const { data: claimed } = await admin
-          .from("orders")
-          .update({ smm_status: "sending" })
-          .eq("id", order.id)
-          .or("smm_status.is.null,smm_status.not.in.(sent,completed,sending)")
-          .select("id");
+        let claimQ = admin.from("orders").update({ smm_status: `sending@${Date.now()}` }).eq("id", order.id);
+        claimQ = prevStatus === null ? claimQ.is("smm_status", null) : claimQ.eq("smm_status", prevStatus);
+        const { data: claimed } = await claimQ.select("id");
         if (!claimed || !claimed.length) return json({ error: "order is being sent right now" }, 409);
 
         const results: any[] = [];
+        // حفظ التقدّم بعد كل بند: إن انقطعت الدالة بعد قبول المزوّد لبند لا يضيع رقم طلبه (فلا يُرسل مرتين لاحقاً)
+        const persist = async () => {
+          try {
+            await admin.from("orders").update({ smm: [...results, ...existing.slice(results.length)] }).eq("id", order.id);
+          } catch (e) { console.error("smm persist failed", e); }
+        };
         try {
           for (let i = 0; i < items.length; i++) {
             if (existing[i]?.order) {
@@ -741,6 +762,7 @@ Deno.serve(async (req: Request) => {
               ...(r.status ? { provider: { status: r.status } } : {}),
               ...(r.delivery ? { delivery: r.delivery } : {}),
             });
+            await persist();
           }
         } catch (e) {
           await admin.from("orders").update({ smm_status: prevStatus }).eq("id", order.id);
@@ -772,6 +794,10 @@ Deno.serve(async (req: Request) => {
       }
 
       // refresh / poll — group the sent lines by site; results without `site` (older orders) belong to main
+      // أثناء الإرسال لا نكتب شيئاً: التحديث يحمل نسخة قديمة من smm وسيمحو تقدّم الإرسال ويفكّ القفل
+      if (lockState(order.smm_status) === "fresh") {
+        return json({ smm_status: order.smm_status, results: existing, busy: true });
+      }
       const sent = existing.filter((r) => r?.order);
       if (!sent.length) return json({ error: "nothing sent yet" }, 400);
 
@@ -818,9 +844,13 @@ Deno.serve(async (req: Request) => {
         updated.push(line);
       }
       const statuses = updated.filter((r) => r?.order).map((r: any) => r.provider?.status);
+      // بند بلا رقم طلب = فشل إرساله. لا يجوز أن يصير الطلب «completed» (فيُقفل ولا يمكن إعادة إرسال البند الفاشل)
+      const hasFailedLine = updated.some((r) => !r?.order);
       let smm_status = order.smm_status;
-      if (statuses.length && statuses.every((s) => s === "Completed")) smm_status = "completed";
+      if (hasFailedLine) smm_status = statuses.length ? "partial" : "failed";
+      else if (statuses.length && statuses.every((s) => s === "Completed")) smm_status = "completed";
       else if (statuses.some((s) => s === "Canceled")) smm_status = "canceled";
+      else if (lockState(smm_status) !== "none") smm_status = "sent"; // قفل منتهٍ عالق لكن كل البنود أُرسلت
       await admin.from("orders").update({ smm: updated, smm_status }).eq("id", order.id);
       return json({ smm_status, results: updated, ...(warnings.length ? { warnings } : {}) });
     }

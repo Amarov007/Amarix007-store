@@ -656,7 +656,7 @@ const VIEW = {
   },
   orders() {
     setTimeout(loadOrders, 50);
-    return `<div class="card"><h2>الطلبات <small class="od-m" id="oc"></small></h2> <div class="fl"><select class="inp" id="of"><option value="">كل الحالات</option>${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${ordFilter == k ? "selected" : ""}>${n}</option>` ).join("")}</select> <input class="inp" id="oq" placeholder="بحث: رقم الطلب / الاسم / البريد" value="${esc( ordQ )}"><button class="b b2 sm" data-a="reload-orders">تحديث</button></div> <div id="ob">${loadingHTML}</div></div>`;
+    return `<div class="card"><h2>الطلبات <small class="od-m" id="oc"></small></h2> <div class="fl"><select class="inp" id="of"><option value="">كل الحالات</option>${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${ordFilter == k ? "selected" : ""}>${n}</option>` ).join("")}</select> <select class="inp" id="opf" title="حالة الدفع"><option value="">كل حالات الدفع</option>${PAY_STATUSES.map( ([k, n]) => `<option value="${k}" ${ordPay == k ? "selected" : ""}>${n}</option>` ).join("")}</select> <select class="inp" id="osf" title="حالة المزود">${SMM_FILTERS.map( ([k, n]) => `<option value="${k}" ${ordSmm == k ? "selected" : ""}>${n}</option>` ).join("")}</select> <input class="inp" id="oq" placeholder="بحث: رقم الطلب / الاسم / البريد / رقم عند المزود" value="${esc( ordQ )}"><button class="b b2 sm" data-a="reload-orders">تحديث</button></div> <div id="ob">${loadingHTML}</div></div>`;
   },
   push() {
     setTimeout(loadPush, 50);
@@ -1014,6 +1014,7 @@ document.addEventListener("input", (e) => {
   }
   else if (t.id == "oq") {
     ordQ = t.value;
+    ordShow = 50;
     renderOrderList();
   }
 });
@@ -1047,8 +1048,11 @@ document.addEventListener("change", async (e) => {
     tkFilter = t.value;
     return renderTicketList();
   }
-  if (t.id == "of") {
-    ordFilter = t.value;
+  if (t.id == "of" || t.id == "opf" || t.id == "osf") {
+    if (t.id == "of") ordFilter = t.value;
+    else if (t.id == "opf") ordPay = t.value;
+    else ordSmm = t.value;
+    ordShow = 50;
     return renderOrderList();
   }
   if (d.cc != null) return renameCoupon(d.cc, t.value); // coupon code
@@ -1337,6 +1341,7 @@ document.addEventListener("click", (e) => {
   if (a == "pub") return publish(b);
   if (a == "exp") return exportBackup();
   if (a == "reload-orders") return loadOrders();
+  if (a == "more-orders") return moreOrders(b);
   if (a == "reload-tickets") return loadTickets();
   if (a == "wl-reload") return loadWallets();
   if (a == "wl-approve") return wlApprove(b);
@@ -2015,7 +2020,27 @@ document.addEventListener("change", (e) => {
 /* Orders: list, filter, and a status change that really updates the database */
 let ORDERS = null,
   ordFilter = "",
+  ordPay = "",
+  ordSmm = "",
+  ordShow = 50,
+  ORD_MORE = false,
   ordQ = "";
+const ORD_PAGE = 200;
+const SMM_FILTERS = [
+  ["", "كل حالات المزود"],
+  ["unsent", "مدفوع ولم يُرسل"],
+  ["problem", "مشاكل (جزئي / فاشل / عالق / ملغي)"],
+  ["sent", "أُرسل — قيد التنفيذ"],
+  ["completed", "مكتمل عند المزود"],
+];
+function smmMatch(o, f) {
+  const st = String(o.smm_status || ""), lk = smmLock(st);
+  if (f == "unsent") return o.payment_status == "paid" && hasSmmItems(o) && lk != "fresh" && !/^(sent|completed|canceled)$/.test(st);
+  if (f == "problem") return lk == "stale" || /^(partial|failed|canceled)$/.test(st);
+  if (f == "sent") return st == "sent";
+  if (f == "completed") return st == "completed";
+  return true;
+}
 const statusLabel = (k) =>
   (ORDER_STATUSES.find((s) => s[0] == k) || [k, k || "—"])[1];
 async function loadOrders() {
@@ -2024,15 +2049,53 @@ async function loadOrders() {
   b.innerHTML = loadingHTML;
   try {
     const r = await api(
-      "/rest/v1/orders?select=*&order=created_at.desc&limit=200"
+      "/rest/v1/orders?select=*&order=created_at.desc&limit=" + ORD_PAGE
     );
     if (!r.ok) throw new Error();
     ORDERS = await r.json();
+    ORD_MORE = ORDERS.length >= ORD_PAGE;
+    ordShow = 50;
     renderOrderList();
     autoSweep();
   } catch {
     b.textContent = "فشل التحميل";
   }
+}
+/* ---- حالة المزود: تسميات عربية + اكتشاف قفل الإرسال (يكتبه smm-order v5 كـ "sending@<وقت>") ---- */
+const SMM_LOCK_TTL = 180000;
+const smmLock = (s) => {
+  s = String(s || "");
+  if (!s.startsWith("sending")) return "none";
+  const t = +s.split("@")[1];
+  return t > 0 && Date.now() - t < SMM_LOCK_TTL ? "fresh" : "stale";
+};
+const SMM_ST = {
+  sent: ["أُرسل — بانتظار التنفيذ", "k"],
+  completed: ["مكتمل عند المزود", "k"],
+  partial: ["جزئي — بعض البنود فشلت", "d"],
+  failed: ["فشل الإرسال", "d"],
+  canceled: ["ملغي عند المزود", "d"],
+};
+function smmStatusText(s) {
+  const k = smmLock(s);
+  if (k == "fresh") return "جارٍ الإرسال…";
+  if (k == "stale") return "عالق أثناء الإرسال";
+  return (SMM_ST[s] && SMM_ST[s][0]) || (s ? String(s) : "لم يُرسل");
+}
+function smmStatusHtml(s) {
+  const k = smmLock(s);
+  const cls = k == "fresh" ? "" : k == "stale" ? "d" : (SMM_ST[s] && SMM_ST[s][1]) || "";
+  return `<span class="bdg ${cls}">${k == "fresh" ? "⏳ " : k == "stale" ? "⚠ " : ""}${esc(smmStatusText(s))}</span>`;
+}
+/* مبلغ مقروء: ≥1 بخانتين، وأقل من 1 حتى 4 خانات بلا أصفار زائدة (1.1804 → 1.18، 0.0039 تبقى كما هي) */
+function fmtAmt(v) {
+  const n = +v;
+  if (v === "" || v == null || !isFinite(n)) return String(v ?? "");
+  if (Math.abs(n) >= 1) return n.toFixed(2);
+  let t = n.toFixed(4).replace(/0+$/, "");
+  if (t.endsWith(".")) t += "00";
+  else if (/\.\d$/.test(t)) t += "0";
+  return t;
 }
 function smmBlock(o, items) {
   const has = items.some((i) => {
@@ -2048,7 +2111,16 @@ function smmBlock(o, items) {
         )
         .join("")
     : "";
-  return `<div class="od-m" style="margin:6px 0">رشق: <b>${esc( o.smm_status || "لم يُرسل" )}</b></div>${res}<div class="acts">${ has ? `<button class="b sm" data-a="smm-send" data-id="${esc( o.id )}">إرسال لموقع الرشق</button>` : "" }${ o.smm ? `<button class="b b2 sm" data-a="smm-status" data-id="${esc( o.id )}">تحديث الحالة</button>` : "" }</div>`;
+  const st = String(o.smm_status || ""),
+    lk = smmLock(st);
+  let send = "";
+  if (has) {
+    if (lk == "stale")
+      send = `<button class="b sm" data-a="smm-send" data-unlock="1" data-id="${esc( o.id )}">فكّ القفل وإعادة الإرسال</button>`;
+    else if (lk == "none" && (st == "" || st == "partial" || st == "failed"))
+      send = `<button class="b sm" data-a="smm-send" data-id="${esc( o.id )}">${st ? "إعادة إرسال البنود الفاشلة للمزود" : "إرسال للمزود"}</button>`;
+  }
+  return `<div class="od-m" style="margin:6px 0">المزود: ${smmStatusHtml(st)}</div>${res}<div class="acts">${send}${ Array.isArray(o.smm) && o.smm.some((r) => r && r.order) && lk != "fresh" ? `<button class="b b2 sm" data-a="smm-status" data-id="${esc( o.id )}">تحديث الحالة</button>` : "" }</div>`;
 }
 function orderRow(o) {
   let items = o.items;
@@ -2068,37 +2140,76 @@ function orderRow(o) {
         timeStyle: "short",
       })
     : "";
-  return `<div class="od"><div class="od-h"><div><span class="od-id">${esc( o.id )}</span><div class="od-m">${esc( o.customer_name || "—" )} · <span dir="ltr">${esc( o.customer_email || "" )}</span></div><div class="od-m">${esc(date)} · <b>${(+o.total).toFixed( 2 )} ${esc(curName(o.currency || baseCur()))}</b>${ o.coupon ? ' · كوبون: <span dir="ltr">' + esc(o.coupon) + "</span>" : "" }${o.affiliate_ref ? " · Ref: " + esc(o.affiliate_ref) : ""}</div></div> <div class="od-s"><select class="inp s-${st0}" data-ost="${esc( o.id )}" data-prev="${esc(st0)}">${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${st0 == k ? "selected" : ""}>${n}</option>` ).join("")}</select>${(() => { const ps = PAY_STATUSES.some((x) => x[0] == o.payment_status) ? o.payment_status : "pending"; return `<select class="inp" style="margin-top:6px" data-pst="${esc( o.id )}" data-prev="${esc(ps)}" title="حالة الدفع">${PAY_STATUSES.map( ([k, n]) => `<option value="${k}" ${ps == k ? "selected" : ""}>💳 ${n}</option>` ).join("")}</select>`; })()}</div></div> ${ o.payment_method ? `<div class="od-m">وسيلة الدفع: <b>${esc( o.payment_method == "wallet" ? "المحفظة" : (D.payments.find((m) => m.id == o.payment_method) || {}).ar || o.payment_method )}</b></div>` : "" } ${proofBlock(o)}${smmBlock(o, items)} <details><summary>المنتجات (${ items.length })</summary><div class="od-items">${items .map( (i) => `<div><span>${esc(i.ar || i.name || i.id)} × ${esc(i.q)}${ i.link ? '<br><small dir="ltr">' + esc(i.link) + "</small>" : "" }</span><b>${esc(i.price)}</b></div>` ) .join("")}</div></details></div>`;
+  return `<div class="od"><div class="od-h"><div><span class="od-id">${esc( o.id )}</span><div class="od-m">${esc( o.customer_name || "—" )} · <span dir="ltr">${esc( o.customer_email || "" )}</span></div><div class="od-m">${esc(date)} · <b>${(+o.total).toFixed( 2 )} ${esc(curName(o.currency || baseCur()))}</b>${ o.coupon ? ' · كوبون: <span dir="ltr">' + esc(o.coupon) + "</span>" : "" }${o.affiliate_ref ? " · Ref: " + esc(o.affiliate_ref) : ""}</div></div> <div class="od-s"><select class="inp s-${st0}" data-ost="${esc( o.id )}" data-prev="${esc(st0)}">${ORDER_STATUSES.map( ([k, n]) => `<option value="${k}" ${st0 == k ? "selected" : ""}>${n}</option>` ).join("")}</select>${(() => { const ps = PAY_STATUSES.some((x) => x[0] == o.payment_status) ? o.payment_status : "pending"; return `<select class="inp" style="margin-top:6px" data-pst="${esc( o.id )}" data-prev="${esc(ps)}" title="حالة الدفع">${PAY_STATUSES.map( ([k, n]) => `<option value="${k}" ${ps == k ? "selected" : ""}>💳 ${n}</option>` ).join("")}</select>`; })()}</div></div> ${ o.payment_method ? `<div class="od-m">وسيلة الدفع: <b>${esc( o.payment_method == "wallet" ? "المحفظة" : (D.payments.find((m) => m.id == o.payment_method) || {}).ar || o.payment_method )}</b></div>` : "" } ${proofBlock(o)}${smmBlock(o, items)} <details><summary>المنتجات (${ items.length })</summary><div class="od-items">${items .map( (i) => `<div><span>${esc(i.ar || i.name || i.id)} × ${esc(i.q)}${ i.link ? '<br><small dir="ltr">' + esc(i.link) + "</small>" : "" }</span><b>${esc(fmtAmt(i.price))} ${esc(curName(o.currency || baseCur()))}</b></div>` ) .join("")}</div></details></div>`;
 }
-function renderOrderList() {
-  const b = $("#ob");
-  if (!b || !ORDERS) return;
+function filteredOrders() {
   const q = ordQ.trim().toLowerCase();
-  const list = ORDERS.filter(
+  return (ORDERS || []).filter(
     (o) =>
       (!ordFilter || (o.status || "new") == ordFilter) &&
+      (!ordPay || (o.payment_status || "pending") == ordPay) &&
+      smmMatch(o, ordSmm) &&
       (!q ||
         (
           (o.id || "") +
           " " +
           (o.customer_name || "") +
           " " +
-          (o.customer_email || "")
+          (o.customer_email || "") +
+          " " +
+          (Array.isArray(o.smm) ? o.smm.map((r) => (r && r.order) || "").join(" ") : "")
         )
           .toLowerCase()
           .includes(q))
   );
+}
+function renderOrderList() {
+  const b = $("#ob");
+  if (!b || !ORDERS) return;
+  const list = filteredOrders();
+  const more = list.length > ordShow
+    ? `<div class="acts"><button class="b b2 sm" data-a="more-orders">عرض المزيد (${list.length - ordShow} متبقٍ)</button></div>`
+    : ORD_MORE
+      ? `<div class="acts"><button class="b b2 sm" data-a="more-orders">تحميل طلبات أقدم من الخادم</button></div>`
+      : "";
   b.innerHTML = list.length
-    ? list.map(orderRow).join("")
-    : '<p class="hint">لا توجد طلبات مطابقة</p>';
+    ? list.slice(0, ordShow).map(orderRow).join("") + more
+    : '<p class="hint">لا توجد طلبات مطابقة</p>' + more;
   const c = $("#oc");
   if (c)
-    c.textContent = `(${list.length} من ${ORDERS.length} · جديد: ${ ORDERS.filter((o) => (o.status || "new") == "new").length })`;
+    c.textContent = `(${Math.min(ordShow, list.length)} من ${list.length} مطابق · المحمّل ${ORDERS.length}${ORD_MORE ? "+" : ""} · جديد: ${ ORDERS.filter((o) => (o.status || "new") == "new").length })`;
+}
+async function moreOrders(btn) {
+  if (!ORDERS) return;
+  if (filteredOrders().length > ordShow) { ordShow += 50; return renderOrderList(); } // ما زال هناك ما لم يُعرض من المحمّل
+  busy(btn, true);
+  try {
+    const r = await api("/rest/v1/orders?select=*&order=created_at.desc&limit=" + ORD_PAGE + "&offset=" + ORDERS.length);
+    if (!r.ok) throw new Error();
+    const rows = await r.json();
+    const have = new Set(ORDERS.map((o) => o.id));
+    rows.forEach((o) => { if (!have.has(o.id)) ORDERS.push(o); });
+    ORD_MORE = rows.length >= ORD_PAGE;
+    ordShow += 50;
+    renderOrderList();
+  } catch (e) {
+    toast("تعذّر تحميل المزيد من الطلبات", "e");
+    busy(btn, false);
+  }
 }
 async function setOrderStatus(sel) {
   const id = sel.dataset.ost,
     prev = sel.dataset.prev,
     status = sel.value;
+  if (status == "done") {
+    const o0 = (ORDERS || []).find((x) => x.id == id);
+    if (o0 && hasSmmItems(o0) && !/^(sent|completed)$/.test(String(o0.smm_status || ""))) {
+      if (!confirm("هذا الطلب يحوي خدمات مزود ولم يُرسل بالكامل (الحالة: " + smmStatusText(o0.smm_status) + ").\nهل تريد تعليمه «مكتمل» رغم ذلك؟")) {
+        sel.value = prev;
+        return;
+      }
+    }
+  }
   sel.disabled = true;
   try {
     // return=representation lets us detect a silent RLS block (0 rows updated)
@@ -2890,20 +3001,31 @@ const autoOn = () => localStorage.getItem("amx_autosend") !== "0";
 const orderItems = (o) => { let it = o.items; if (typeof it == "string") { try { it = JSON.parse(it); } catch (e) { it = []; } } return Array.isArray(it) ? it : []; };
 const hasSmmItems = (o) => orderItems(o).some((i) => { const p = D.products.find((x) => x.id == i.id); return p && p.smm_service && p.auto !== false; }); // auto:false = manual fulfilment
 const smmDone = (o) => /complete|cancel|refund|fail|partial/i.test(String(o.smm_status || ""));
+/* الطلبات التي فشل إرسالها تلقائياً: لا نكرر المحاولة قبل 10 دقائق ولا أكثر من 3 مرات في الجلسة، ولا نكرر رسالة الخطأ */
+const AUTO_FAIL = (() => { try { return JSON.parse(sessionStorage.getItem("amx_autofail") || "{}"); } catch (e) { return {}; } })();
+const autoFailSave = () => { try { sessionStorage.setItem("amx_autofail", JSON.stringify(AUTO_FAIL)); } catch (e) {} };
+const autoBlocked = (id) => { const f = AUTO_FAIL[id]; return !!f && (f.n >= 3 || Date.now() - f.t < 600000); };
+const isSending = (o) => /^sending/.test(String(o.smm_status || ""));
 async function autoSend(o, quiet) {
-  if (!autoOn() || !o || o.smm || o.payment_status != "paid" || !hasSmmItems(o)) return;
+  if (!autoOn() || !o || o.smm || isSending(o) || o.payment_status != "paid" || !hasSmmItems(o) || autoBlocked(o.id)) return;
   try {
     await siteGuard(o);
     const j = await fn("smm-order", { action: "send", order_id: o.id });
     o.smm = j.results; o.smm_status = j.smm_status;
+    delete AUTO_FAIL[o.id]; autoFailSave();
     if (!quiet) toast("أُرسل الطلب تلقائياً إلى المزوّد");
     if ($("#ob")) renderOrderList();
-  } catch (e) { toast("فشل الإرسال التلقائي: " + String(e.message).slice(0, 70), "e"); }
+  } catch (e) {
+    const f = AUTO_FAIL[o.id] || { n: 0 };
+    AUTO_FAIL[o.id] = { n: f.n + 1, t: Date.now() };
+    autoFailSave();
+    if (f.n == 0) toast("فشل الإرسال التلقائي (" + o.id + "): " + smmErrAr(e.message).slice(0, 70), "e");
+  }
 }
 async function autoSweep() {
   if (!autoOn() || !ORDERS) return;
-  for (const o of ORDERS.filter((x) => x.payment_status == "paid" && !x.smm && hasSmmItems(x)).slice(0, 5)) await autoSend(o, true);
-  for (const o of ORDERS.filter((x) => x.smm && !smmDone(x)).slice(0, 8)) {
+  for (const o of ORDERS.filter((x) => x.payment_status == "paid" && !x.smm && !isSending(x) && hasSmmItems(x) && !autoBlocked(x.id)).slice(0, 5)) await autoSend(o, true);
+  for (const o of ORDERS.filter((x) => x.smm && !isSending(x) && !smmDone(x)).slice(0, 8)) {
     try { await siteGuard(o); const j = await fn("smm-order", { action: "refresh", order_id: o.id }); o.smm = j.results; o.smm_status = j.smm_status; } catch (e) {}
   }
   if ($("#ob")) renderOrderList();
@@ -3017,33 +3139,55 @@ async function setPayment(sel) {
     sel.disabled = false;
   }
 }
+/* رسائل أخطاء smm-order بالعربية */
+function smmErrAr(m) {
+  m = String(m || "");
+  const T = [
+    [/already sent/, "أُرسل هذا الطلب مسبقاً"],
+    [/being sent right now/, "الطلب قيد الإرسال الآن — انتظر دقيقة ثم اضغط «تحديث الحالة»"],
+    [/stuck in sending/, "الطلب عالق في الإرسال — استخدم «فكّ القفل وإعادة الإرسال» بعد التأكد من لوحة المزود"],
+    [/not paid/, "الطلب غير مدفوع — غيّر حالة الدفع إلى «تم الدفع» أولاً"],
+    [/missing link/, "بند بلا رابط / مدخل من الزبون"],
+    [/missing service mapping/, "منتج بلا رقم خدمة عند المزود"],
+    [/is disabled/, "المزود معطّل في الإعدادات"],
+    [/nothing sent yet/, "لم يُرسل شيء بعد لهذا الطلب"],
+    [/quantity 1 per line/, "خدمات الأرقام تسمح بكمية 1 لكل بند"],
+  ];
+  const t = T.find((x) => x[0].test(m));
+  return t ? t[1] : "فشل: " + m.slice(0, 90);
+}
 async function smmOrder(btn) {
   const id = btn.dataset.id,
-    act = btn.dataset.a == "smm-send" ? "send" : "refresh";
-  if (
-    act == "send" &&
-    !confirm("إرسال هذا الطلب إلى موقع الرشق الآن؟ سيُخصم الرصيد.")
-  )
-    return;
+    act = btn.dataset.a == "smm-send" ? "send" : "refresh",
+    unlock = btn.dataset.unlock == "1";
+  if (act == "send") {
+    const msg = unlock
+      ? "هذا الطلب عالق في حالة «جارٍ الإرسال».\nافتح لوحة المزود وتأكد أن الطلب لم يُنشأ هناك قبل المتابعة، وإلا سيُرسل مرتين ويُخصم الرصيد مرتين.\n\nفكّ القفل وإعادة الإرسال؟"
+      : "إرسال هذا الطلب إلى المزود الآن؟ سيُخصم الرصيد.";
+    if (!confirm(msg)) return;
+  }
   busy(btn, true);
   try {
     const o0 = (ORDERS || []).find((x) => x.id == id);
     if (o0) await siteGuard(o0);
-    const j = await fn("smm-order", { action: act, order_id: id });
+    const j = await fn("smm-order", { action: act, order_id: id, ...(unlock ? { unlock: true } : {}) });
     const o = (ORDERS || []).find((x) => x.id == id);
     if (o) {
       o.smm = j.results;
       o.smm_status = j.smm_status;
     }
-    toast(act == "send" ? "تم الإرسال إلى موقع الرشق" : "تم تحديث حالة الرشق");
+    if (act == "send") { delete AUTO_FAIL[id]; autoFailSave(); }
+    toast(
+      j.busy
+        ? "الطلب قيد الإرسال الآن"
+        : act == "send"
+          ? "تم الإرسال إلى المزود"
+          : "تم تحديث حالة الطلب عند المزود"
+    );
     renderOrderList();
   } catch (e) {
-    toast(
-      /not paid/.test(e.message)
-        ? "الطلب غير مدفوع — غيّر حالة الدفع إلى «تم الدفع» أولاً"
-        : "فشل: " + e.message.slice(0, 90),
-      "e"
-    );
+    toast(smmErrAr(e.message), "e");
+    if (/being sent|stuck in sending|already sent/.test(e.message)) loadOrders(); // اجلب الحالة الفعلية من القاعدة
   } finally {
     busy(btn, false);
   }
