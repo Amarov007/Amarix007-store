@@ -4062,3 +4062,50 @@ body.xm-open{overflow:hidden}
 [dir="ltr"] .pf-ch svg{transform:rotate(180deg)}
 .pf-out{margin-top:18px;color:#b42318;border-color:#e7b4ae}
 @media (prefers-color-scheme:dark){.pf-out{color:#ff8a80;border-color:#5a2a2a}}
+
+/* ---------- Partner hub v2: level ladder, application form, monthly report ---------- */
+.pa-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pa-rate { display: flex; flex-direction: column; gap: 2px; text-align: end; padding: 8px 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--bd); }
+.pa-rate small { color: var(--mu); font-size: 11.5px; }
+.pa-rate b { font-size: 22px; font-weight: 900; line-height: 1.2; color: var(--lk); }
+.pa-lead { margin: 0; font-size: 21px; font-weight: 900; line-height: 1.5; }
+.pa-lead b { color: var(--lk); }
+.pa-ladder { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
+.pa-tier { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border-radius: 14px; background: var(--bg); border: 1px solid var(--bd); text-align: center; }
+.pa-tier small { color: var(--mu); font-size: 11px; line-height: 1.4; }
+.pa-tier b.r { font-size: 20px; font-weight: 900; line-height: 1.3; }
+.pa-tier.done { opacity: 0.7; }
+.pa-tier.cur { border-color: var(--ac-line); background: color-mix(in srgb, var(--ac) 18%, var(--bg)); box-shadow: 0 0 0 1px var(--ac-line) inset; }
+.pa-tier.cur small { color: var(--tx); }
+.pa-tier em { margin-top: 2px; font-style: normal; font-size: 10.5px; font-weight: 800; color: var(--lk); }
+.pa-note { margin: 0; font-size: 13px; line-height: 1.8; color: var(--mu); }
+.pa-note b, .pa-note span { color: var(--tx); font-weight: 800; }
+.pa-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pa-stats div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--bg); }
+.pa-stats small { color: var(--mu); font-size: 11.5px; }
+.pa-stats b { font-size: 18px; font-weight: 900; }
+.pa-mo { display: flex; flex-direction: column; gap: 14px; }
+.pa-mr { display: flex; flex-direction: column; gap: 5px; }
+.pa-mh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.pa-mh b { font-size: 15px; }
+.pa-mr small { color: var(--mu); font-size: 11.5px; }
+.pa-flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; counter-reset: pa; }
+.pa-flow li { display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; align-items: start; counter-increment: pa; }
+.pa-flow li::before { content: counter(pa); grid-row: span 2; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--ac); color: var(--on-ac); font-size: 12px; font-weight: 800; }
+.pa-flow b { font-size: 13.5px; }
+.pa-flow span { color: var(--mu); font-size: 12.5px; line-height: 1.7; }
+.pa-grp { display: flex; flex-direction: column; gap: 8px; }
+.pa-lb { font-size: 13px; font-weight: 700; }
+.pa-lb small, .fld > span small { color: var(--mu); font-weight: 400; }
+.pa-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pa-chip { position: relative; cursor: pointer; }
+.pa-chip input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.pa-chip span { display: inline-flex; align-items: center; min-height: 40px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--bd); background: var(--bg); font-size: 13px; transition: background 0.15s, border-color 0.15s; }
+.pa-chip input:checked + span { background: color-mix(in srgb, var(--ac) 22%, var(--bg)); border-color: var(--ac-line); font-weight: 800; }
+.pa-chip input:focus-visible + span { outline: 2px solid var(--ac-line); outline-offset: 2px; }
+textarea.pa-ta { display: block; width: 100%; min-height: 84px; resize: vertical; font: inherit; line-height: 1.7; }
+.pa-sum { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.pa-sum div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.pa-sum dt { color: var(--mu); flex: none; }
+.pa-sum dd { margin: 0; min-width: 0; text-align: end; word-break: break-all; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .pa-chip span, .pt-bar i { transition: none; } }
