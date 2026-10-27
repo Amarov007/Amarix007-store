@@ -797,7 +797,6 @@ if (!T[lang]) lang = "ar";
 
 /* Config: embedded store-data.js, overridden by a newer remote copy */
 function setCfg(cfg) {
-  if (window.AMXExt) cfg = AMXExt.merge(cfg); // ext-store.js: PUBG / live apps / AI sections
   CFG = cfg;
   SOC = cfg.social || {};
   C = (CFG.categories || []).map((c) => ({
@@ -1751,7 +1750,7 @@ function snSync() {
     tr = box && box.firstElementChild;
   if (!tr || !tr.classList.contains("sn-track")) return;
   const [, r, id] = (location.hash || "#/").split("?")[0].split("/"),
-    cur = r == "g" ? "hub_" + dec(id || "") : r == "c" || r == "x" ? (window.AMXHub && AMXHub.hubKey(dec(id || ""))) || dec(id || "") : r == "boost" ? (boostCat() || {}).id ?? null : r ? null : "";
+    cur = r == "g" ? "hub_" + dec(id || "") : r == "c" ? (window.AMXHub && AMXHub.hubKey(dec(id || ""))) || dec(id || "") : r == "boost" ? (boostCat() || {}).id ?? null : r ? null : "";
   let on = null;
   tr.querySelectorAll(".sn").forEach((a) => {
     const is = cur !== null && a.dataset.s == cur;
@@ -1892,7 +1891,7 @@ function footer() {
 
 function nav() {
   const r = (location.hash || "#/").split("?")[0].split("/")[1] || "",
-    active = r == "c" || r == "p" || r == "x" ? "" : r == "done" ? "orders" : r == "partner" ? "account" : r;
+    active = r == "c" || r == "p" ? "" : r == "done" ? "orders" : r == "partner" ? "account" : r;
   const n = cartCount(),
     v = $("#nv");
   const items = [
@@ -4820,7 +4819,7 @@ async function handleAuthRedirect() {
    Platform and service type are detected from the product text (tag / spec / names), so no data has to be changed. */
 const isBoost = (p) => !!p && !isVisit(p) && needsLink(p) && isSmmType(p); // strict: only products of type smm appear on the boosting page
 const boostCat = () => C.find((c) => c.ty == "boost") || null;
-const catHref = (c) => (c && c.ty == "hub" ? "#/g/" + ex(String(c.id).replace(/^hub_/, "")) : c && c.ty == "boost" ? "#/boost" : c && window.AMXExt && AMXExt.has(c.id) ? "#/x/" + ex(c.id) : "#/c/" + ex(c && c.id));
+const catHref = (c) => (c && c.ty == "hub" ? "#/g/" + ex(String(c.id).replace(/^hub_/, "")) : c && c.ty == "boost" ? "#/boost" : "#/c/" + ex(c && c.id));
 const sbT = (ar, en) => (lang == "ar" ? ar : en);
 
 /* [id, Arabic, English, detection regex (runs on normalised text), glyph (BR code or letters), background, text colour] */
@@ -5473,9 +5472,7 @@ function render0() {
   m.innerHTML =
     r == "g" && window.AMXHub
     ? AMXHub.page(dec(id || ""), dec(sub || ""))
-    : (r == "x" || r == "c") && window.AMXExt && AMXExt.has(dec(id || ""))
-      ? AMXExt.page(dec(id || ""))
-      : r == "c"
+    : r == "c"
       ? catPage(dec(id || ""))
       : r == "p"
       ? prodPage(dec(id || ""))

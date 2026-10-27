@@ -12,7 +12,6 @@
 - Extended `svc-parse.js` with deterministic product classification, brand/hub mapping, required fields, provider/delivery/availability filters, denomination parsing, and stable sorting.
 - Improved provider response normalization in `admin-import.js`, preserving raw provider fields and normalizing common ID/name/category/rate/image/amount/availability aliases.
 - Kept SMM pricing per 1,000 while treating game/app provider rates as package prices.
-- Improved `ext-store.js` package safety, price normalization, explicit product types, and image/denomination preservation.
 - Improved `hubs.js` to prioritize explicit `ptype` and avoid cross-contaminating SMM products into game/app hubs.
 - Added styling for the import center and product-management controls.
 - No SQL migration was added: the inspected schema stores the store catalog in `store_config.data` JSONB, and these changes use existing JSON product/category fields. Deploy/publish through the existing authenticated admin flow and verify RLS policies remain enabled.

@@ -3253,32 +3253,69 @@ async function setPayment(sel) {
     prev = sel.dataset.prev,
     payment_status = sel.value,
     order = (ORDERS || []).find((x) => String(x.id) === String(id));
+  let confirmation = "";
   if (payment_status === "paid" && prev !== "paid") {
     const hasProof = !!(order && order.payment_proof);
-    const msg = hasProof
-      ? `تأكيد يدوي نهائي للطلب ${id}: هل تحققت من وصول المبلغ فعلياً إلى حسابك/محفظتك ومطابقة العملة والشبكة والمبلغ؟ لا تعتمد على صورة الإيصال وحدها.`
-      : `لا يوجد إثبات دفع مرفق للطلب ${id}. لا تعتمد الدفع إلا إذا تحققت بنفسك من وصول المبلغ فعلياً من مصدر موثوق. هل تريد المتابعة؟`;
+    if (!hasProof) {
+      sel.value = prev;
+      toast("لا يمكن اعتماد الدفع قبل إرفاق إثبات الدفع بالطلب", "e");
+      return;
+    }
+    const msg = `تأكيد يدوي نهائي للطلب ${id}: هل تحققت من وصول المبلغ فعلياً إلى حسابك/محفظتك ومطابقة العملة والشبكة والمبلغ؟ لا تعتمد على صورة الإيصال وحدها.`;
     if (!confirm(msg)) { sel.value = prev; return; }
-    const typed = prompt(`للتأكيد اليدوي اكتب VERIFY-${String(id).slice(-8)} بعد مراجعة التحويل الفعلي:`);
-    if (typed !== `VERIFY-${String(id).slice(-8)}`) { sel.value = prev; toast("أُلغي اعتماد الدفع: لم يتطابق رمز التأكيد", "e"); return; }
+    confirmation = prompt(`للتأكيد اليدوي اكتب VERIFY-${String(id).slice(-8)} بعد مراجعة التحويل الفعلي:`) || "";
+    if (confirmation !== `VERIFY-${String(id).slice(-8)}`) { sel.value = prev; toast("أُلغي اعتماد الدفع: لم يتطابق رمز التأكيد", "e"); return; }
   }
   sel.disabled = true;
   try {
-    const r = await api("/rest/v1/orders?id=eq." + encodeURIComponent(id), {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({ payment_status }),
-    });
-    if (!r.ok) throw new Error((await r.text()).slice(0, 120));
-    const rows = await r.json();
-    if (!rows.length) throw new Error("RLS: لا صلاحية للتعديل");
+    let r;
+    if (payment_status === "paid" && prev !== "paid") {
+      // اعتماد الدفع يتم حصراً عبر RPC محمي من جهة قاعدة البيانات؛ لا نحدّث payment_status مباشرة.
+      const txRef = prompt("مرجع المعاملة / TxID (اختياري، اتركه فارغاً إن لم يتوفر):", "");
+      if (txRef === null) throw new Error("أُلغي اعتماد الدفع بناءً على طلبك");
+      const note = prompt("ملاحظة المراجعة (اختيارية):", "");
+      if (note === null) throw new Error("أُلغي اعتماد الدفع بناءً على طلبك");
+      r = await api("/rest/v1/rpc/approve_manual_payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_order_id: String(id),
+          p_confirmation: confirmation,
+          p_tx_ref: txRef.trim() || null,
+          p_note: note.trim() || null,
+        }),
+      });
+      if (!r.ok) {
+        let detail = await r.text();
+        try { const j = JSON.parse(detail); detail = j.message || j.details || j.hint || j.error || detail; } catch {}
+        const friendly = {
+          not_allowed: "ليست لديك صلاحية اعتماد الدفع.",
+          confirmation_failed: "رمز التأكيد غير صحيح.",
+          order_not_found: "لم يتم العثور على الطلب.",
+          payment_not_reviewable: "حالة الدفع الحالية لا تسمح بالاعتماد.",
+          payment_proof_required: "لا يمكن اعتماد الدفع قبل إرفاق إثبات الدفع.",
+        };
+        const code = String(detail).match(/not_allowed|confirmation_failed|order_not_found|payment_not_reviewable|payment_proof_required/);
+        throw new Error((code && friendly[code[0]]) || String(detail).slice(0, 180));
+      }
+      await r.json();
+    } else {
+      r = await api("/rest/v1/orders?id=eq." + encodeURIComponent(id), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ payment_status }),
+      });
+      if (!r.ok) throw new Error((await r.text()).slice(0, 120));
+      const rows = await r.json();
+      if (!rows.length) throw new Error("RLS: لا صلاحية للتعديل");
+    }
     const o = (ORDERS || []).find((x) => x.id == id);
     if (o) o.payment_status = payment_status;
     sel.dataset.prev = payment_status;
-    toast("تم تحديث حالة الدفع");
+    toast(payment_status === "paid" && prev !== "paid" ? "تم اعتماد الدفع وتسجيله في سجل المراجعة" : "تم تحديث حالة الدفع");
     if (o && payment_status == "paid") autoSend(o);
   } catch (e) {
     sel.value = prev;
