@@ -5,7 +5,7 @@ The CSP in the `<meta http-equiv="Content-Security-Policy">` of `index.html` and
 ## The policy (must match the meta tag in both HTML files)
 
 ```text
-default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'
+default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co https://challenges.cloudflare.com https://oauth.telegram.org; frame-src https://challenges.cloudflare.com https://oauth.telegram.org; object-src 'none'; base-uri 'self'; form-action 'self'
 ```
 
 What each external origin is for:
@@ -14,6 +14,8 @@ What each external origin is for:
 | --- | --- | --- |
 | `https://pvuobngrybygohendwaz.supabase.co` | `connect-src` | Supabase Auth, REST/RPC, Storage, Edge Functions |
 | `https://challenges.cloudflare.com` | `script-src`, `connect-src`, `frame-src` | Cloudflare Turnstile (loads `api.js`, talks to the challenge API, renders its widget in an iframe) |
+| `https://telegram.org` | `script-src` | Telegram Login popup (`telegram-widget.js`, loaded only for visitors who are not signed in) |
+| `https://oauth.telegram.org` | `connect-src`, `frame-src` | Telegram Login popup / fallback frame |
 | `https://fonts.googleapis.com` / `https://fonts.gstatic.com` | `style-src` / `font-src` | Alexandria + Urbanist |
 | any `https:` host | `img-src` only | product/banner/payment images uploaded in the admin panel |
 
@@ -48,7 +50,7 @@ HSTS notes: send it only after HTTPS works on every subdomain (`includeSubDomain
 - Set static → `Content-Security-Policy`:
 
 ```text
-default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co https://challenges.cloudflare.com https://oauth.telegram.org; frame-src https://challenges.cloudflare.com https://oauth.telegram.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
 ```
 
 ### Rule 3 — the admin panel (CSP with `frame-ancestors 'none'`)
@@ -57,7 +59,7 @@ default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-s
 - Set static → `Content-Security-Policy`:
 
 ```text
-default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co https://challenges.cloudflare.com https://oauth.telegram.org; frame-src https://challenges.cloudflare.com https://oauth.telegram.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
 Also set `X-Frame-Options: DENY` on this rule for very old browsers (optional; `frame-ancestors` already covers modern ones). The page keeps its JavaScript anti-framing check (`admin-boot.js`) as a second layer.

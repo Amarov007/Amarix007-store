@@ -2581,6 +2581,22 @@ details.ref > :not(summary) {
   box-shadow: none;
 }
 
+/* Telegram sign-in button (same shape as the Google one, Telegram blue) */
+.gbtn + .tgbtn {
+  margin-top: 10px;
+}
+.tgbtn,
+:root[data-theme="dark"] .tgbtn {
+  background: #229ed9;
+  border-color: #229ed9;
+  color: #fff;
+}
+.tgbtn:hover,
+:root[data-theme="dark"] .tgbtn:hover {
+  background: #1c8ec6;
+  box-shadow: 0 1px 3px rgba(34, 158, 217, 0.45);
+}
+
 /* ---------- 11. v17: guards, filters, boost quantity, static pages, payment proof ---------- */
 .rt-n { color: var(--mu); font-size: 10px; margin-top: 1px; }
 .smm-q { color: var(--mu); font-size: 11px; margin-top: 2px; }

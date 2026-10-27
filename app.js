@@ -239,6 +239,10 @@ const T = {
     gbtn: "المتابعة عبر Google",
     gor: "أو",
     gerr: "تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.",
+    tbtn: "المتابعة عبر تيليغرام",
+    terr: "تعذّر تسجيل الدخول عبر تيليغرام. حاول مرة أخرى.",
+    tcfg: "تسجيل الدخول عبر تيليغرام غير مفعّل بعد.",
+    tretry: "جارٍ تجهيز تيليغرام… اضغط الزر مرة أخرى.",
     mailfail: "تعذّر إرسال البريد. حاول لاحقاً.",
     fill: "أدخل البريد الإلكتروني وكلمة المرور",
     fillm: "أدخل بريدك الإلكتروني",
@@ -530,6 +534,10 @@ const T = {
     gbtn: "Continue with Google",
     gor: "or",
     gerr: "Google sign-in failed. Please try again.",
+    tbtn: "Continue with Telegram",
+    terr: "Telegram sign-in failed. Please try again.",
+    tcfg: "Telegram sign-in is not enabled yet.",
+    tretry: "Getting Telegram ready… tap the button again.",
     mailfail: "Could not send the email. Try again later.",
     fill: "Enter your email and password",
     fillm: "Enter your email",
@@ -4099,6 +4107,9 @@ document.addEventListener("click", async (e) => {
     b.disabled = true;
     location.href =
       SB_URL + "/auth/v1/authorize?provider=google&redirect_to=" + siteBack();
+  } else if (a == "tg-login") {
+    e.preventDefault();
+    tgLogin(b);
   } else if (a == "toggle-mode") {
     e.preventDefault();
     authMode = authMode == "login" ? "signup" : "login";
@@ -4353,16 +4364,22 @@ function authPage() {
   if (m == "reset")
     return `<form class="box au" id="af" novalidate>${head2(t("newpw"))} <label class="fld"><span>${t( "newpw" )}</span><div class="pw"><input class="inp" name="p" type="password" id="pw-input" autocomplete="new-password" required>${eye}</div> <div class="strength-bar"><div id="pw-fill"></div></div><small id="pw-text" style="font-size:11px"></small></label> <label class="fld"><span>${t( "confpw" )}</span><input class="inp" name="p2" type="password" autocomplete="new-password" required></label> <p class="err" id="er" role="alert"></p><button class="b block" type="submit">${t( "resetbtn" )}</button></form>`;
   const up = m == "signup";
-  return `<form class="box au" id="af" novalidate>${head2( up ? t("reg") : t("login") )} ${ up ? `<label class="fld"><span>${t( "nl" )}</span><input class="inp" name="n" autocomplete="name" required></label>` : "" } <label class="fld"><span>${t( "em" )}</span><input class="inp" name="e" type="email" dir="ltr" autocomplete="email" required></label> <label class="fld"><span>${t( "pw" )}</span><div class="pw"><input class="inp" name="p" type="password" id="pw-input" autocomplete="${ up ? "new-password" : "current-password" }" required>${eye}</div> ${ up ? `<div class="strength-bar"><div id="pw-fill"></div></div><small id="pw-text" style="font-size:11px"></small>` : `<a href="#" class="forgot" data-a="auth-forgot">${t("forgot")}</a>` }</label> ${humanBox()}<p class="err" id="er" role="alert"></p> <button class="b block" type="submit">${ up ? t("reg") : t("login") }</button>${googleBtn()}${link( "toggle-mode", up ? t("has") : t("no") )}</form>`;
+  return `<form class="box au" id="af" novalidate>${head2( up ? t("reg") : t("login") )} ${ up ? `<label class="fld"><span>${t( "nl" )}</span><input class="inp" name="n" autocomplete="name" required></label>` : "" } <label class="fld"><span>${t( "em" )}</span><input class="inp" name="e" type="email" dir="ltr" autocomplete="email" required></label> <label class="fld"><span>${t( "pw" )}</span><div class="pw"><input class="inp" name="p" type="password" id="pw-input" autocomplete="${ up ? "new-password" : "current-password" }" required>${eye}</div> ${ up ? `<div class="strength-bar"><div id="pw-fill"></div></div><small id="pw-text" style="font-size:11px"></small>` : `<a href="#" class="forgot" data-a="auth-forgot">${t("forgot")}</a>` }</label> ${humanBox()}<p class="err" id="er" role="alert"></p> <button class="b block" type="submit">${ up ? t("reg") : t("login") }</button>${socialBtns()}${link( "toggle-mode", up ? t("has") : t("no") )}</form>`;
 }
 
 /* Official multicolour Google "G" (Google branding guidelines) */
 const GICON =
   '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
-const googleBtn = () =>
-  googleOn
-    ? `<div class="or"><span>${t( "gor" )}</span></div><button type="button" class="gbtn" data-a="google">${GICON}<span>${t( "gbtn" )}</span></button>`
-    : "";
+/* Telegram plane (white on the Telegram-blue button) */
+const TGICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>';
+/* Social sign-in buttons under the e-mail form: Google (only when the provider is enabled in Supabase) + Telegram (always shown) */
+const socialBtns = () =>
+  `<div class="or"><span>${t( "gor" )}</span></div>` +
+  (googleOn
+    ? `<button type="button" class="gbtn" data-a="google">${GICON}<span>${t( "gbtn" )}</span></button>`
+    : "") +
+  `<button type="button" class="gbtn tgbtn" data-a="tg-login">${TGICON}<span>${t( "tbtn" )}</span></button>`;
 
 const authMsg = (m) => {
   const l = String(m || "").toLowerCase();
@@ -4642,6 +4659,83 @@ function attachRef(tk, u) {
       body: JSON.stringify({ data: { ref: c } }),
     }).catch(() => {});
   } catch {}
+}
+
+/* ---------- Telegram sign-in ----------
+   The official Telegram Login popup returns a signed payload; the Edge Function `telegram-auth` checks the signature with the bot token
+   and answers with a one-time token that Supabase turns into a normal session (/auth/v1/verify).
+   Needs: the function deployed (supabase functions deploy telegram-auth --no-verify-jwt), the secret TELEGRAM_BOT_TOKEN,
+   and the domain registered in @BotFather (/setdomain -> amarix007.store). */
+const TG_BOT_ID = ""; // optional: the digits before ":" in the bot token. When empty, it is read from the function (GET).
+const TG_FN = SB_URL + "/functions/v1/telegram-auth";
+let tgBotId = TG_BOT_ID,
+  tgScript = null;
+function tgPrep() {
+  if (!tgScript)
+    tgScript = new Promise((res) => {
+      const sc = document.createElement("script");
+      sc.src = "https://telegram.org/js/telegram-widget.js?22";
+      sc.async = true;
+      sc.onload = () => res(true);
+      sc.onerror = () => {
+        tgScript = null;
+        res(false);
+      };
+      document.head.appendChild(sc);
+    });
+  if (!tgBotId)
+    fetch(TG_FN, { headers: { apikey: SB_KEY } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j && /^\d{5,16}$/.test(String(j.bot_id || ""))) tgBotId = String(j.bot_id);
+      })
+      .catch(() => {});
+  return tgScript;
+}
+async function tgLogin(btn) {
+  if (!btn || btn.disabled) return;
+  if (!tgBotId || !(window.Telegram && Telegram.Login)) {
+    /* not ready yet: prepare it, and ask for a second tap (a popup opened after a wait is blocked by browsers) */
+    tgPrep();
+    toast(t("tretry"), "wn");
+    return;
+  }
+  setBusy(btn, true);
+  try {
+    const u = await new Promise((res) =>
+      Telegram.Login.auth({ bot_id: tgBotId, lang: lang == "ar" ? "ar" : "en" }, res)
+    );
+    if (!u) return; // the person closed the popup
+    const r = await fetch(TG_FN, {
+      method: "POST",
+      headers: { apikey: SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(u),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.token_hash) throw new Error(j.error || "tg_" + r.status);
+    const v = await fetch(SB_URL + "/auth/v1/verify", {
+      method: "POST",
+      headers: { apikey: SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ type: j.type || "magiclink", token_hash: j.token_hash }),
+    });
+    if (!v.ok) await authFail(v);
+    const sess = await v.json();
+    if (!sess.access_token) throw new Error("tg_session");
+    storeSession(sess);
+    attachRef(sess.access_token, sess.user || {});
+    toast(t("loggedin"));
+    beep("ok");
+    syncProfile();
+    pushSync();
+    const to = returnTo && !/login/.test(returnTo) ? returnTo : "#/";
+    returnTo = "";
+    location.hash = to;
+    if (location.hash == to) render();
+  } catch (err) {
+    toast(t(/not_configured|tg_503/.test(err.message) ? "tcfg" : "terr"), "er");
+  } finally {
+    setBusy(btn, false);
+  }
 }
 
 /* Show the Google button only when the provider is enabled in Supabase (otherwise the button would lead to an error page) */
@@ -5670,6 +5764,7 @@ async function boot() {
   user = ls.json("amx_user", null);
   if (user && !ls.get("amx_token")) user = null;
   checkGoogle();
+  if (!user) tgPrep();
   await handleAuthRedirect();
   /* Stale-while-revalidate: the last published config is cached in localStorage ('amx_remote') and used for the first paint, so returning visitors never see the embedded placeholder store. With no cache yet (first visit) we show a skeleton instead of the placeholders, and fall back to the embedded copy only if the request fails or is too slow. */
   const cached =
