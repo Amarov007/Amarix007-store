@@ -64,3 +64,23 @@ select jobname, schedule, active from cron.job order by jobname;
 ```
 
 إن كان الناتج فارغاً (امتداد pg_cron غير مفعّل): فعّله من Database › Extensions ثم أعد تشغيل مقطع «pg_cron» الأخير من `supabase-schema.sql` (الأسطر التي تحوي `cron.schedule`). احذر: المقطع يحذف الوظيفتين القديمتين بالاسم نفسه ثم ينشئهما، فلا يتكرر.
+
+## تحديث 2026-10-27: دخول تيليغرام، CORS، الفحوص
+
+1. **انشر الدالتين من مكانهما الجديد** (`supabase/functions/<name>/index.ts`):
+   ```
+   supabase functions deploy telegram-auth --no-verify-jwt
+   supabase functions deploy smm-order
+   ```
+   `smm-order` يقبل الآن الطلبات من `amarix007.store` و`www.amarix007.store` فقط. لإضافة نطاق آخر (تجريبي مثلاً):
+   `supabase secrets set ALLOWED_ORIGINS=https://staging.example.com`
+2. **نفّذ `supabase-telegram-login.sql` من جديد** (آمن لإعادة التشغيل). القسم 2 يغطي الآن بريد `@telegram.amarix007.store`.
+   قبل تنفيذ القسم 3 (وسم الحسابات القديمة) شغّل استعلام الفحص (أ) المعلَّق داخله وراجع أي حساب `has_password = true`.
+3. أي حساب تيليغرام قديم بلا وسم `tg_id` سيُرفض (`account_conflict`) حتى يُوسَم؛ هذا مقصود.
+4. الفحوص الآلية (تعمل تلقائياً في workflow الاستبدال، ويمكن تشغيلها محلياً):
+   ```
+   for f in *.js; do node --check "$f"; done
+   python3 tests/verify-project.py
+   node tools/lint-html-escape.mjs
+   ```
+
