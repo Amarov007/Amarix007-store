@@ -633,11 +633,11 @@ const VIEW = {
   payments() {
     return (
       ratesCard() +
-      `<div class="card"><h2>وسائل الدفع (${D.payments.length})</h2><p class="hint">تظهر في الصفحة الرئيسية وفي السلة. رقم المحفظة/العنوان يظهر للعميل بعد الطلب مع زر نسخ. ارفع الشعار الرسمي لكل وسيلة (سيرياتيل كاش / شام كاش) وإلا تظهر بالحروف واللون.</p><button class="b" data-a="add" data-k="payments">+ وسيلة دفع</button></div>` +
+      `<div class="card"><h2>وسائل الدفع اليدوي (${D.payments.length})</h2><p class="hint" style="border-inline-start:3px solid var(--m);padding:10px;background:var(--bg)">🔒 وضع الدفع: <b>يدوي فقط</b>. لا توجد بوابة دفع آلية في مسار المتجر. العميل يحوّل إلى بياناتك، ويرفع الإثبات، ثم يراجع الموظف وصول الأموال فعلياً قبل اعتماد الطلب. لا تضع مفاتيح سرية أو بيانات دخول داخل تعليمات الدفع.</p><p class="hint">تظهر الوسائل المفعّلة في المتجر والسلة. العنوان أو رقم الحساب يظهر بعد إنشاء الطلب مع زر نسخ. ارفع الشعار الرسمي عند الحاجة، وحدد الشبكة والحدود والتعليمات لتقليل أخطاء التحويل.</p><button class="b" data-a="add" data-k="payments">+ وسيلة دفع يدوية</button></div>` +
       D.payments
         .map((m, i) => {
           const k = "payments." + i + ".";
-          return `<div class="card">${F("مفعّلة", k + "on", { t: "chk", })}<div class="g2">${F("الاسم (عربي)", k + "ar")}${F( "الاسم (إنجليزي)", k + "en", { d: 1 } )}${F("أيقونة مدمجة", k + "icon", { t: "sel", o: PAY_ICONS, re: 1, })}${F("اللون", k + "color", { t: "col" })}${F("عملة الوسيلة (اختياري)", k + "currency", { t: "sel", o: curOpts(m.currency) })}${F( "الشعار (رفع)", k + "logo", { t: "img", w: 1 } )}${F("رقم المحفظة / العنوان / المعرّف", k + "acc", { d: 1, w: 1, })}${F("التعليمات (عربي)", k + "da", { t: "area", w: 1 })}${F( "التعليمات (إنجليزي)", k + "de", { t: "area", w: 1, d: 1 } )}</div>${mv("payments", i)}</div>`;
+          return `<div class="card"><div class="fl" style="justify-content:space-between;align-items:center"><h3 style="margin:0">${esc(m.ar || m.en || `وسيلة ${i + 1}`)}</h3><span class="bdg ${m.on ? 'k' : 'd'}">${m.on ? 'مفعّلة يدوياً' : 'متوقفة'}</span></div>${F("مفعّلة", k + "on", { t: "chk", })}<div class="g2">${F("الاسم (عربي)", k + "ar")}${F( "الاسم (إنجليزي)", k + "en", { d: 1 } )}${F("أيقونة مدمجة", k + "icon", { t: "sel", o: PAY_ICONS, re: 1, })}${F("اللون", k + "color", { t: "col" })}${F("عملة الوسيلة (اختياري)", k + "currency", { t: "sel", o: curOpts(m.currency) })}${F( "الشعار (رفع)", k + "logo", { t: "img", w: 1 } )}${F("رقم المحفظة / العنوان / المعرّف", k + "acc", { d: 1, w: 1, })}${F("الشبكة / نوع التحويل (مثال: TRC20)", k + "network", { d: 1 })}${F("أقل مبلغ تحويل (اختياري)", k + "min", { t: "num", n: 0, d: 1 })}${F("أعلى مبلغ تحويل (0 = بلا حد)", k + "max", { t: "num", n: 0, d: 1 })}${F("مرجع مطلوب من العميل (اختياري)", k + "memo", { d: 1, w: 1 })}${F("التعليمات (عربي)", k + "da", { t: "area", w: 1 })}${F( "التعليمات (إنجليزي)", k + "de", { t: "area", w: 1, d: 1 } )}</div>${mv("payments", i)}</div>`;
         })
         .join("")
     );
@@ -1417,6 +1417,10 @@ const NEW = {
     logo: "",
     color: "#191A23",
     acc: "",
+    network: "",
+    min: 0,
+    max: 0,
+    memo: "",
     da: "",
     de: "",
   }),
@@ -3247,7 +3251,17 @@ async function smmAction(btn, kind) {
 async function setPayment(sel) {
   const id = sel.dataset.pst,
     prev = sel.dataset.prev,
-    payment_status = sel.value;
+    payment_status = sel.value,
+    order = (ORDERS || []).find((x) => String(x.id) === String(id));
+  if (payment_status === "paid" && prev !== "paid") {
+    const hasProof = !!(order && order.payment_proof);
+    const msg = hasProof
+      ? `تأكيد يدوي نهائي للطلب ${id}: هل تحققت من وصول المبلغ فعلياً إلى حسابك/محفظتك ومطابقة العملة والشبكة والمبلغ؟ لا تعتمد على صورة الإيصال وحدها.`
+      : `لا يوجد إثبات دفع مرفق للطلب ${id}. لا تعتمد الدفع إلا إذا تحققت بنفسك من وصول المبلغ فعلياً من مصدر موثوق. هل تريد المتابعة؟`;
+    if (!confirm(msg)) { sel.value = prev; return; }
+    const typed = prompt(`للتأكيد اليدوي اكتب VERIFY-${String(id).slice(-8)} بعد مراجعة التحويل الفعلي:`);
+    if (typed !== `VERIFY-${String(id).slice(-8)}`) { sel.value = prev; toast("أُلغي اعتماد الدفع: لم يتطابق رمز التأكيد", "e"); return; }
+  }
   sel.disabled = true;
   try {
     const r = await api("/rest/v1/orders?id=eq." + encodeURIComponent(id), {

@@ -2356,11 +2356,17 @@ function cartPage() {
 function payInstructions(m) {
   if (!m) return "";
   const note = lang == "ar" ? m.da : m.de;
-  return `<div class="box payi"><div class="payi-h">${payLogo(m, 46)}<div><small>${t("payhow")}</small><b>${pmName(m)}</b></div></div>${
+  const network = String(m.network || "").trim();
+  const min = Number(m.min || 0), max = Number(m.max || 0);
+  const limits = (min > 0 || max > 0) ? `<p class="pd"><b>${lang == "ar" ? "حدود التحويل:" : "Transfer limits:"}</b> ${min > 0 ? (lang == "ar" ? "من " : "Min ") + ex(min) : ""}${min > 0 && max > 0 ? " — " : ""}${max > 0 ? (lang == "ar" ? "حتى " : "Max ") + ex(max) : (min > 0 ? (lang == "ar" ? " (لا حد أعلى)" : " (no upper limit)") : "")}</p>` : "";
+  const memo = String(m.memo || "").trim();
+  return `<div class="box payi"><div class="payi-h">${payLogo(m, 46)}<div><small>${t("payhow")}</small><b>${pmName(m)}</b><small>${lang == "ar" ? "دفع يدوي — تتم مراجعة التحويل قبل اعتماد الطلب" : "Manual payment — transfer is reviewed before order approval"}</small></div></div>${
+    network ? `<div class="payi-acc"><small>${lang == "ar" ? "الشبكة / نوع التحويل" : "Network / transfer type"}</small><div><bdi dir="ltr">${ex(network)}</bdi></div></div>` : ""
+  }${
     m.acc
       ? `<div class="payi-acc"><small>${t("payto")}</small><div class="acc"><bdi dir="ltr" class="acc-v">${ex(m.acc)}</bdi><button type="button" class="b b2 sm acc-b" data-a="copy" data-v="${ex(m.acc)}">${ic("copy", 14)}<span>${t("copy")}</span></button></div></div>`
       : ""
-  }${note ? `<p class="pd">${ex(note)}</p>` : ""}</div>`;
+  }${memo ? `<div class="payi-acc"><small>${lang == "ar" ? "ملاحظة / مرجع مطلوب" : "Required note / reference"}</small><p class="pd">${ex(memo)}</p></div>` : ""}${limits}${note ? `<p class="pd">${ex(note)}</p>` : ""}<p class="pd">${lang == "ar" ? "لا ترفع صورة فقط وتفترض أن الدفع تم؛ سيُعتمد الطلب بعد التحقق الفعلي من وصول الأموال." : "Uploading a receipt does not complete payment; the order is approved only after the funds are independently verified."}</p></div>`;
 }
 /* Success page after an order */
 function donePage(id) {
@@ -2736,35 +2742,12 @@ let partnerAt = 0,
   partnerBusy = false,
   partnerErr = false,
   partnerOk = 0,
-  partnerSig = "",
-  partnerTiers = null, // commission tiers (public table); null until read
-  partnerMonthly = null; // my_affiliate_monthly() rows, approved partners only
-/* what the visitor typed in the application form: kept so a refresh or a failed send never wipes it */
-const affDraft = { pay: "", ch: "", url: "", aud: "", pitch: "" };
-const AFF_CH = [
-  ["telegram", "تيليغرام", "Telegram"],
-  ["youtube", "يوتيوب", "YouTube"],
-  ["tiktok", "تيك توك", "TikTok"],
-  ["instagram", "إنستغرام", "Instagram"],
-  ["x", "إكس (تويتر)", "X (Twitter)"],
-  ["website", "موقع أو مدونة", "Website or blog"],
-  ["other", "أخرى", "Other"],
-];
-const AFF_AUD = [
-  ["lt1k", "أقل من 1,000", "Under 1,000"],
-  ["1k-10k", "1,000 – 10,000", "1K – 10K"],
-  ["10k-50k", "10,000 – 50,000", "10K – 50K"],
-  ["gt50k", "أكثر من 50,000", "Over 50K"],
-];
-const affLabel = (list, v) => {
-  const x = list.find((r) => r[0] == v);
-  return x ? x[lang == "ar" ? 1 : 2] : v || "";
-};
+  partnerSig = "";
 function partnerRerender(force) {
   if (!/^#\/partner/.test(location.hash)) return;
-  const a = document.activeElement,
-    sig = JSON.stringify([refInfo, partnerBusy, partnerErr, partnerOk, partnerTiers, partnerMonthly]);
-  if (a && a.closest && a.closest("#aff-form")) return; // never wipe what the visitor is typing
+  const i = $("#aff-pay"),
+    sig = JSON.stringify([refInfo, partnerBusy, partnerErr, partnerOk]);
+  if (i && i.value) return; // never wipe what the visitor is typing
   if (!force && sig === partnerSig) return;
   partnerSig = sig;
   render();
@@ -2776,26 +2759,13 @@ async function loadPartner(force) {
   partnerBusy = true;
   if (force) partnerRerender(true);
   try {
-    const base = "status,rate,clicks,signups,sales,total_commission,coupon",
-      uid = encodeURIComponent(user.id);
-    /* the application columns exist once supabase-affiliate-tiers.sql has run; fall back to the base columns if not */
-    let r = await sb(`/rest/v1/affiliates?user_id=eq.${uid}&select=${base},channel_type,channel_url,audience,applied_at`);
-    if (!r.ok) r = await sb(`/rest/v1/affiliates?user_id=eq.${uid}&select=${base}`);
+    const r = await sb(`/rest/v1/affiliates?user_id=eq.${encodeURIComponent(user.id)}&select=status,rate,clicks,signups,sales,total_commission,coupon`);
     if (!r.ok) throw new Error("http " + r.status);
     const row = (await r.json())[0];
     if (row) Object.assign(refInfo, row);
     refInfo.loaded = true;
     partnerErr = false;
     partnerOk = Date.now();
-    /* extras never block the page: if they fail the matching cards are simply left out */
-    try {
-      const [tr, mr] = await Promise.all([
-        sb("/rest/v1/affiliate_tiers?select=label,min_sales,rate&order=min_sales.asc", { auth: false }).catch(() => null),
-        refInfo.status == "approved" ? sb("/rest/v1/rpc/my_affiliate_monthly", { method: "POST", body: {} }).catch(() => null) : null,
-      ]);
-      if (tr && tr.ok) partnerTiers = await tr.json();
-      if (mr && mr.ok) partnerMonthly = await mr.json();
-    } catch {}
   } catch {
     partnerErr = true;
   }
@@ -2803,47 +2773,6 @@ async function loadPartner(force) {
   partnerRerender(!!force);
 }
 const partnerSkeleton = () => `<div class="sk sm" style="margin-bottom:12px"></div><div class="sk" style="min-height:150px;margin-bottom:12px"></div><div class="sk" style="min-height:190px"></div>`;
-/* ---- partner hub helpers ---- */
-const TIER_AR = { bronze: "برونزي", silver: "فضي", gold: "ذهبي", platinum: "بلاتيني", diamond: "ماسي" };
-const tierName = (l) => (lang == "ar" ? TIER_AR[String(l || "").trim().toLowerCase()] || l : l) || "";
-const arCount = (n) => (n == 1 ? "طلب واحد" : n == 2 ? "طلبان" : n <= 10 ? `${n} طلبات` : `${n} طلباً`);
-const partnerTierList = () =>
-  (Array.isArray(partnerTiers) ? partnerTiers : [])
-    .filter((x) => x && isFinite(+x.min_sales) && isFinite(+x.rate))
-    .map((x) => ({ l: x.label || "", m: +x.min_sales, r: +x.rate }))
-    .sort((a, b) => a.m - b.m);
-/* the tier that pays the NEXT paid order of this month (orders are counted per month, same rule as the database) */
-function partnerLevel(count) {
-  const T = partnerTierList();
-  if (!T.length) return null;
-  const idx = count + 1;
-  let cur = 0;
-  T.forEach((x, i) => {
-    if (x.m <= idx) cur = i;
-  });
-  const next = T[cur + 1] || null;
-  return { T, cur, next, need: next ? next.m - count : 0, pct: next ? Math.max(0, Math.min(100, Math.round(((count - T[cur].m) / (next.m - T[cur].m)) * 100))) : 100 };
-}
-const partnerMonthLabel = (m) => {
-  const d = new Date(m + "-01T00:00:00Z");
-  return isNaN(d) ? m : d.toLocaleDateString(lang == "ar" ? "ar-EG-u-nu-latn" : "en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-};
-function partnerLadder(lv, plain) {
-  const A = lang == "ar";
-  return `<ol class="pa-ladder">${lv.T.map((x, i) => {
-    const st = plain ? "" : i == lv.cur ? " cur" : i < lv.cur ? " done" : "";
-    return `<li class="pa-tier${st}"><small>${ex(tierName(x.l))}</small><b class="r n">${ex(String(x.r))}%</b><small>${x.m > 0 ? `${A ? "من الطلب" : "from order"} ${ex(String(x.m))}` : A ? "من أول طلب" : "from order 1"}</small>${!plain && i == lv.cur ? `<em>${A ? "مستواك الآن" : "You are here"}</em>` : ""}</li>`;
-  }).join("")}</ol>`;
-}
-const partnerSteps = (A) => [
-  [A ? "قدّم طلبك" : "Apply", A ? "عرّفنا بقناتك وجمهورك وأين تريد استلام الأرباح." : "Tell us about your channel, your audience and where to send payouts."],
-  [A ? "نراجع الطلب" : "We review it", A ? "يراجع الفريق الطلب، وتظهر حالته هنا في هذه الصفحة." : "The team reviews it and the status shows on this page."],
-  [A ? "شارك رابطك" : "Share your link", A ? "بعد الموافقة تحصل على رابط وكوبون خاصين بك." : "Once approved you get your own link and coupon."],
-  [A ? "اكسب عمولة" : "Earn commission", A ? "تُحتسب على كل طلب يتأكد دفعه من عملائك." : "Counted on every confirmed-paid order from your customers."],
-];
-function affChips(name, list, val, A) {
-  return `<div class="pa-chips" role="radiogroup">${list.map(([k, ar, en]) => `<label class="pa-chip"><input type="radio" name="${name}" value="${k}"${val == k ? " checked" : ""}><span>${A ? ar : en}</span></label>`).join("")}</div>`;
-}
 function partnerPage() {
   const A = lang == "ar";
   if (!refInfo || !refInfo.loaded) {
@@ -2853,16 +2782,21 @@ function partnerPage() {
   }
   const st = refInfo.status || "none",
     back = `<a class="b b2 block" href="#/account">${A ? "رجوع إلى حسابي" : "Back to my account"}</a>`,
+    how = [
+      A ? "شارك رابطك الخاص مع أصدقائك أو جمهورك." : "Share your personal link with friends or your audience.",
+      A ? "يُنشئ العميل حساباً جديداً عبر رابطك." : "The customer creates a new account through your link.",
+      A ? "تُحتسب لك عمولة على كل طلب يتأكد دفعه." : "You earn a commission on every order whose payment is confirmed.",
+    ],
     rules = [
       A ? "تُحتسب العمولة بعد تأكيد الدفع فقط، وتُخصم إن أُلغي تأكيد الدفع لاحقاً." : "Commission is counted once payment is confirmed, and removed if the confirmation is later reversed.",
       A ? "لا تُحتسب الإحالة على حسابك أنت." : "Your own account never counts as a referral.",
       A ? "تُسجَّل الإحالة عند إنشاء الحساب الجديد عبر رابطك." : "The referral is recorded when the new account is created through your link.",
-      A ? "يُحسب المستوى حسب عدد الطلبات المدفوعة في الشهر، ويبدأ العدّ من جديد مع بداية كل شهر." : "Your level follows the number of paid orders in the month and restarts at the start of each month.",
     ],
-    howBox = (open) => `<details class="box ref"${open ? " open" : ""}><summary>${A ? "الشروط وطريقة الاحتساب" : "Terms and how it's counted"}</summary><ul class="ref-how ref-rules">${rules.map((x) => `<li>${x}</li>`).join("")}</ul></details>`,
-    title = (chip) => `<h3>${A ? "مركز الشركاء" : "Partner hub"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</h3>`,
+    howBody = `<ol class="ref-how">${how.map((x) => `<li>${x}</li>`).join("")}</ol><ul class="ref-how ref-rules">${rules.map((x) => `<li>${x}</li>`).join("")}</ul>`,
+    howBox = (open) => `<details class="box ref"${open ? " open" : ""}><summary>${A ? "كيف يعمل البرنامج؟" : "How the program works"}</summary>${howBody}</details>`,
+    title = (chip) => `<h3>${A ? "برنامج الشركاء (Affiliate)" : "Partner (Affiliate) program"}${chip ? ` <small class="pst ${chip[1]}">${chip[0]}</small>` : ""}</h3>`,
     refreshBtn = `<button type="button" class="pt-rf${partnerBusy ? " busy" : ""}" data-a="aff-refresh" aria-label="${A ? "تحديث الأرقام" : "Refresh numbers"}"${partnerBusy ? " disabled" : ""}>${ic("refresh", 18)}</button>`;
-  /* ----- approved: earnings, level, link, month, funnel, report ----- */
+  /* ----- approved: link, earnings, funnel, coupon, tips ----- */
   if (st == "approved") {
     const link = partnerLink(),
       rate = refInfo.rate != null && refInfo.rate !== "" && !isNaN(+refInfo.rate) ? +refInfo.rate : null,
@@ -2874,12 +2808,6 @@ function partnerPage() {
       top = Math.max(clicks, signups, sales, 1),
       width = (v) => (v > 0 ? Math.max(3, Math.round((v / top) * 100)) : 0),
       time = partnerOk ? new Date(partnerOk).toLocaleTimeString(A ? "ar-EG-u-nu-latn" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
-      mk = new Date().toISOString().slice(0, 7),
-      months = Array.isArray(partnerMonthly) ? partnerMonthly : null,
-      cm = months ? months.find((x) => x.month == mk) : null,
-      mSales = cm ? +cm.sales || 0 : 0,
-      mComm = cm ? +cm.commission || 0 : 0,
-      lv = rate == null ? partnerLevel(mSales) : null,
       steps = [
         [A ? "نقرات على رابطك" : "Link clicks", clicks, ""],
         [A ? "تسجيلات جديدة" : "New sign-ups", signups, clicks > 0 ? `${pct(signups, clicks)}% ${A ? "من النقرات" : "of clicks"}` : ""],
@@ -2895,144 +2823,73 @@ function partnerPage() {
       ];
     if (!link)
       return `<div class="box ref">${title([A ? "معتمد" : "Approved", "ok"])}<p class="sb">${A ? "أنت شريك معتمد، لكن رابطك لم يُنشأ بعد. تواصل مع الدعم." : "You are an approved partner, but your link has not been created yet. Please contact support."}</p><a class="b block" href="#/support">${A ? "تواصل مع الدعم" : "Contact support"}</a></div>${back}`;
-    const rateNow = rate != null ? rate : lv ? lv.T[lv.cur].r : null;
     return (
-      /* hero: total earnings + current rate */
+      /* earnings */
       `<section class="box ref pt-hero"><div class="pt-top">${title([A ? "معتمد" : "Approved", "ok"])}${refreshBtn}</div>` +
-      `<div class="pa-hero"><div class="pt-earn"><small>${A ? "إجمالي عمولتك" : "Your total commission"}</small><b class="n">${money(earned)}</b></div>${rateNow != null ? `<div class="pa-rate"><small>${rate != null ? (A ? "نسبتك الخاصة" : "Your custom rate") : A ? "نسبة طلبك القادم" : "Rate on your next order"}</small><b class="n">${ex(String(rateNow))}%</b></div>` : ""}</div>` +
-      `<div class="pt-meta">${sales > 0 ? `<span>${A ? "متوسط العمولة لكل طلب" : "Avg. per order"}: <b>${money(earned / sales)}</b></span>` : ""}${time ? `<span>${A ? "آخر تحديث" : "Updated"}: ${time}</span>` : ""}</div>` +
+      `<div class="pt-earn"><small>${A ? "إجمالي عمولتك" : "Your total commission"}</small><b class="n">${money(earned)}</b></div>` +
+      `<div class="pt-meta"><span>${A ? "نسبة العمولة" : "Commission rate"}: <b>${rate != null ? ex(String(rate)) + "%" : A ? "النسبة الافتراضية للمتجر" : "the store's default rate"}</b></span>${sales > 0 ? `<span>${A ? "متوسط العمولة لكل طلب" : "Avg. per order"}: <b>${money(earned / sales)}</b></span>` : ""}${time ? `<span>${A ? "آخر تحديث" : "Updated"}: ${time}</span>` : ""}</div>` +
       (partnerErr ? `<div class="pt-warn" role="status">${ic("warn", 14)}<span>${A ? "تعذّر تحديث الأرقام الآن، والمعروض قد لا يكون الأحدث." : "Couldn't refresh the numbers; what you see may be out of date."}</span><button type="button" data-a="aff-refresh">${A ? "إعادة المحاولة" : "Retry"}</button></div>` : "") +
       `</section>` +
-      /* level ladder */
-      (lv
-        ? `<section class="box ref"><h3>${A ? "مستواك هذا الشهر" : "Your level this month"}</h3>${partnerLadder(lv)}<div class="pt-bar" aria-hidden="true"><i style="width:${lv.pct}%"></i></div><p class="pa-note">${
-            lv.next
-              ? A
-                ? `أكملت <b class="n">${ex(String(mSales))}</b> طلباً مدفوعاً هذا الشهر. متبقٍ ${arCount(lv.need)} ليبدأ احتسابك بمستوى ${ex(tierName(lv.next.l))} (<span class="n">${ex(String(lv.next.r))}%</span>).`
-                : `<b class="n">${ex(String(mSales))}</b> paid orders this month. ${lv.need} more to reach ${ex(tierName(lv.next.l))} (<span class="n">${ex(String(lv.next.r))}%</span>).`
-              : A
-                ? "وصلت إلى أعلى مستوى هذا الشهر. يبدأ العدّ من جديد مع بداية الشهر القادم."
-                : "You're at the top level this month. Counting restarts next month."
-          }</p></section>`
-        : rate != null
-          ? `<section class="box ref"><h3>${A ? "نسبتك الخاصة" : "Your custom rate"}</h3><p class="pa-note">${A ? `حدّد لك الفريق نسبة ثابتة <b class="n">${ex(String(rate))}%</b> على كل طلب، وهي تتقدّم على مستويات الشهر.` : `The team set a fixed <b class="n">${ex(String(rate))}%</b> on every order; it overrides the monthly levels.`}</p></section>`
-          : "") +
       /* link + share */
       `<section class="box ref"><h3>${A ? "رابطك الخاص" : "Your personal link"}</h3><div class="ref-l"><bdi dir="ltr">${ex(link)}</bdi><button class="b" data-a="copy" data-v="${ex(link)}">${A ? "نسخ" : "Copy"}</button></div>` +
       `<div class="ref-sh"><a class="b b2" href="${ex(wa)}" target="_blank" rel="noopener">${A ? "واتساب" : "WhatsApp"}</a><a class="b b2" href="${ex(tg)}" target="_blank" rel="noopener">${A ? "تيليغرام" : "Telegram"}</a>${navigator.share ? `<button type="button" class="b b2" data-a="aff-share">${A ? "مشاركة…" : "Share…"}</button>` : ""}<button type="button" class="b b2" data-a="copy" data-v="${ex(msg + "\n" + link)}">${A ? "نسخ رسالة جاهزة" : "Copy ready message"}</button></div></section>` +
-      (refInfo.coupon ? `<section class="box ref"><h3>${A ? "كوبونك الخاص" : "Your coupon"}</h3><div class="ref-l"><bdi dir="ltr">${ex(refInfo.coupon)}</bdi><button class="b" data-a="copy" data-v="${ex(refInfo.coupon)}">${A ? "نسخ" : "Copy"}</button></div></section>` : "") +
-      /* this month + funnel */
+      /* funnel */
       `<section class="box ref"><h3>${A ? "أداؤك" : "Your performance"}</h3>${
-        months ? `<div class="pa-stats"><div><small>${A ? "طلبات هذا الشهر" : "Orders this month"}</small><b class="n">${ex(String(mSales))}</b></div><div><small>${A ? "عمولة هذا الشهر" : "Commission this month"}</small><b class="n">${money(mComm)}</b></div></div>` : ""
-      }${
         clicks + signups + sales == 0
           ? `<p class="pt-empty">${A ? "لا نقرات بعد. انسخ رابطك وشاركه، وستظهر الأرقام هنا فور وصول أول زائر." : "No clicks yet. Copy your link and share it; the numbers appear here as soon as the first visitor arrives."}</p>`
           : `<div class="pt-fn">${steps.map(([k, v, n]) => `<div class="pt-st"><div class="pt-st-h"><span>${k}</span><b class="n">${v}</b></div><div class="pt-bar" aria-hidden="true"><i style="width:${width(v)}%"></i></div>${n ? `<small>${n}</small>` : ""}</div>`).join("")}</div>`
       }</section>` +
-      /* monthly report */
-      (months && months.length
-        ? (() => {
-            const rows = months.slice(0, 6),
-              mx = Math.max(...rows.map((x) => +x.commission || 0), 1);
-            return `<section class="box ref"><h3>${A ? "التقرير الشهري" : "Monthly report"}</h3><div class="pa-mo">${rows.map((x) => `<div class="pa-mr"><div class="pa-mh"><span>${ex(partnerMonthLabel(x.month))}</span><b class="n">${money(+x.commission || 0)}</b></div><div class="pt-bar" aria-hidden="true"><i style="width:${Math.max(3, Math.round(((+x.commission || 0) / mx) * 100))}%"></i></div><small>${ex(String(+x.sales || 0))} ${A ? "طلب" : "orders"} · ${A ? "بقيمة" : "worth"} ${money(+x.volume || 0)}</small></div>`).join("")}</div></section>`;
-          })()
-        : "") +
-      `<details class="box ref"><summary>${A ? "نصائح لزيادة أرباحك" : "Tips to earn more"}</summary><ul class="ref-how">${tips.map((x) => `<li>${x}</li>`).join("")}</ul></details>` +
+      (refInfo.coupon ? `<section class="box ref"><h3>${A ? "كوبونك الخاص" : "Your coupon"}</h3><div class="ref-l"><bdi dir="ltr">${ex(refInfo.coupon)}</bdi><button class="b" data-a="copy" data-v="${ex(refInfo.coupon)}">${A ? "نسخ" : "Copy"}</button></div></section>` : "") +
+      `<details class="box ref"><summary>${A ? "نصائح" : "Tips"}</summary><ul class="ref-how">${tips.map((x) => `<li>${x}</li>`).join("")}</ul></details>` +
       howBox(false) +
       back
     );
   }
-  /* ----- pending: status timeline + what was submitted ----- */
-  if (st == "pending") {
-    const sub = [
-      [A ? "القناة" : "Channel", refInfo.channel_type ? affLabel(AFF_CH, refInfo.channel_type) : ""],
-      [A ? "الرابط" : "Link", refInfo.channel_url || ""],
-      [A ? "حجم الجمهور" : "Audience", refInfo.audience ? affLabel(AFF_AUD, refInfo.audience) : ""],
-    ].filter((x) => x[1]);
+  /* ----- pending: a clear 3-step status ----- */
+  if (st == "pending")
     return (
       `<section class="box ref"><div class="pt-top">${title([A ? "قيد المراجعة" : "Under review", "wt"])}${refreshBtn}</div><ol class="pt-steps">` +
       `<li class="ok"><i>✓</i><span>${A ? "استلمنا طلبك" : "We received your application"}</span></li>` +
       `<li class="now"><i>2</i><span>${A ? "الفريق يراجع الطلب" : "The team is reviewing it"}</span></li>` +
-      `<li><i>3</i><span>${A ? "يظهر رابطك ولوحتك هنا فور الموافقة" : "Your link and dashboard appear here once approved"}</span></li></ol>` +
+      `<li><i>3</i><span>${A ? "يظهر رابطك هنا فور الموافقة" : "Your link appears here once approved"}</span></li></ol>` +
       (partnerErr ? `<div class="pt-warn" role="status">${ic("warn", 14)}<span>${A ? "تعذّر التحقق من الحالة الآن." : "Couldn't check the status right now."}</span></div>` : "") +
-      `</section>` +
-      (sub.length ? `<section class="box ref"><h3>${A ? "ما أرسلته" : "What you sent"}</h3><dl class="pa-sum">${sub.map(([k, v]) => `<div><dt>${k}</dt><dd dir="auto">${ex(v)}</dd></div>`).join("")}</dl></section>` : "") +
-      `${howBox(false)}${back}`
+      `</section>${howBox(true)}${back}`
     );
-  }
-  /* ----- not applied / rejected: pitch + levels + application form ----- */
-  const lv0 = partnerLevel(0),
-    maxRate = lv0 ? Math.max(...lv0.T.map((x) => x.r)) : null,
-    d = affDraft;
-  if (!d.ch && !d.url && !d.aud && refInfo.channel_url) {
-    d.ch = refInfo.channel_type || "";
-    d.url = refInfo.channel_url || "";
-    d.aud = refInfo.audience || "";
-  }
+  /* ----- not applied / rejected: application form ----- */
   return (
-    `<section class="box ref pt-hero">${title()}<p class="pa-lead">${maxRate != null ? (A ? `اربح حتى <b class="n">${ex(String(maxRate))}%</b> عمولة على كل طلب يدفعه عملاؤك` : `Earn up to <b class="n">${ex(String(maxRate))}%</b> commission on every order your customers pay`) : A ? "اربح عمولة على كل طلب يدفعه عملاؤك" : "Earn a commission on every order your customers pay"}</p><p class="sb">${A ? "كلما زادت طلباتك المدفوعة خلال الشهر ارتفع مستواك وارتفعت نسبة عمولتك." : "The more paid orders you bring in a month, the higher your level and your rate."}</p>${lv0 ? partnerLadder(lv0, true) : ""}</section>` +
-    `<section class="box ref"><h3>${A ? "كيف تبدأ" : "How to start"}</h3><ol class="pa-flow">${partnerSteps(A).map(([k, v]) => `<li><b>${k}</b><span>${v}</span></li>`).join("")}</ol></section>` +
-    `<form class="box ref" id="aff-form" novalidate><h3>${A ? "طلب الانضمام" : "Join request"}</h3>` +
-    (st == "rejected" ? `<p class="pt-warn" role="status"><span>${A ? "لم يتم قبول طلبك السابق، يمكنك تحديث بياناتك والتقديم مرة أخرى." : "Your previous application wasn't approved. Update your details and apply again."}</span></p>` : "") +
-    `<div class="pa-grp" role="group" aria-labelledby="aff-l1"><span class="pa-lb" id="aff-l1">${A ? "أين ستروّج لرابطك؟" : "Where will you promote your link?"}</span>${affChips("ch", AFF_CH, d.ch, A)}</div>` +
-    `<label class="fld"><span>${A ? "رابط قناتك أو حسابك أو موقعك" : "Link to your channel, account or site"}</span><input class="inp" id="aff-url" name="url" dir="ltr" maxlength="200" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" value="${ex(d.url)}" placeholder="https://t.me/yourchannel"></label>` +
-    `<div class="pa-grp" role="group" aria-labelledby="aff-l2"><span class="pa-lb" id="aff-l2">${A ? "حجم جمهورك التقريبي" : "Approximate audience size"} <small>${A ? "(اختياري)" : "(optional)"}</small></span>${affChips("aud", AFF_AUD, d.aud, A)}</div>` +
-    `<label class="fld"><span>${A ? "كيف ستروّج للمتجر؟" : "How will you promote the store?"} <small>${A ? "(اختياري)" : "(optional)"}</small></span><textarea class="inp pa-ta" id="aff-pitch" name="pitch" maxlength="400" rows="3" placeholder="${A ? "مثال: أنشر مراجعات وعروضاً أسبوعية لجمهوري" : "e.g. I post weekly reviews and deals for my audience"}">${ex(d.pitch)}</textarea></label>` +
-    `<label class="fld"><span>${A ? "معرّف الدفع لاستلام الأرباح" : "Payout ID"}</span><input class="inp" id="aff-pay" name="pay" dir="ltr" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" aria-describedby="aff-er" value="${ex(d.pay)}" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"><small class="pt-h">${A ? "تحقق منه جيداً؛ سنرسل الأرباح إليه." : "Double-check it; payouts are sent to it."}</small></label>` +
-    `<p class="err" id="aff-er" role="alert"></p><button class="b block" type="submit">${A ? "إرسال طلب الانضمام" : "Send join request"}</button></form>${howBox(false)}${back}`
+    `${howBox(true)}<form class="box ref" id="aff-form" novalidate>${title()}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>` +
+    (st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : "") +
+    `<label class="fld"><span>${A ? "معرّف الدفع لاستلام الأرباح" : "Payout ID"}</span><input class="inp" id="aff-pay" name="pay" dir="ltr" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" aria-describedby="aff-er" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"><small class="pt-h">${A ? "تحقق منه جيداً؛ سنرسل الأرباح إليه." : "Double-check it; payouts are sent to it."}</small></label>` +
+    `<p class="err" id="aff-er" role="alert"></p><button class="b block" type="submit">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></form>${back}`
   );
 }
 async function applyAffiliate(b) {
   const A = lang == "ar",
-    form = $("#aff-form"),
+    inp = $("#aff-pay"),
     er = $("#aff-er"),
-    fd = new FormData(form),
-    val = (k) => String(fd.get(k) || "").trim().replace(/\s+/g, " "),
-    pay = val("pay"),
-    ch = val("ch"),
-    url = val("url"),
-    aud = val("aud"),
-    pitch = String(fd.get("pitch") || "").trim(),
-    fail = (m, id) => {
+    v = ((inp && inp.value) || "").trim().replace(/\s+/g, " "),
+    fail = (m) => {
       if (er) er.textContent = m;
       else toast(m, "er");
-      const f = id && $("#" + id);
-      if (f) f.focus();
+      if (inp) inp.focus();
     };
-  Object.assign(affDraft, { pay, ch, url, aud, pitch });
   if (er) er.textContent = "";
-  if (!ch) return fail(A ? "اختر المنصة التي ستروّج عليها." : "Pick the platform you'll promote on.");
-  if (url.length < 3) return fail(A ? "أدخل رابط قناتك أو حسابك أو موقعك." : "Enter the link to your channel, account or site.", "aff-url");
-  if (pay.length < 6) return fail(A ? "المعرّف أو العنوان قصير جداً (6 أحرف على الأقل)." : "That payout ID looks too short (at least 6 characters).", "aff-pay");
+  if (v.length < 6) return fail(A ? "المعرّف أو العنوان قصير جداً (6 أحرف على الأقل)." : "That looks too short (at least 6 characters).");
   if (!refInfo || !refInfo.loaded || (refInfo.status && refInfo.status != "none" && refInfo.status != "rejected")) return loadPartner(true);
   setBusy(b, true);
   try {
-    const r = await sb("/rest/v1/rpc/apply_affiliate", {
-      method: "POST",
-      body: { p_payout: pay, p_channel_type: ch, p_channel_url: url, p_audience: aud || null, p_pitch: pitch || null },
-    });
+    const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v } });
     if (!r.ok) {
-      const j = await r.json().catch(() => ({})),
-        m = String(j.message || "") + " " + String(j.code || "");
+      const j = await r.json().catch(() => ({}));
       /* an application already exists (double tap, another device): just show the real status */
-      if (j.code == "23505" || /already|exist|pending|approved/i.test(m)) {
+      if (j.code == "23505" || /already|exist|pending|approved/i.test(String(j.message || ""))) {
         setBusy(b, false);
         toast(A ? "لديك طلب سابق، حدّثنا حالته" : "You already have an application; status refreshed", "wn");
         return loadPartner(true);
       }
-      setBusy(b, false);
-      if (/rate_limited/.test(m)) return fail(A ? "محاولات كثيرة. حاول مجدداً بعد ساعة." : "Too many attempts. Try again in an hour.");
-      if (/channel_required/.test(m)) return fail(A ? "أدخل رابط قناتك أو حسابك أو موقعك." : "Enter the link to your channel, account or site.", "aff-url");
-      if (/payout_required/.test(m)) return fail(A ? "أدخل معرّف الدفع لاستلام الأرباح." : "Enter your payout ID.", "aff-pay");
-      if (/PGRST202|42883|find the function/i.test(m)) return fail(A ? "نموذج الانضمام قيد التحديث حالياً. تواصل مع الدعم أو حاول لاحقاً." : "The join form is being updated. Contact support or try later.");
       throw new Error("http " + r.status);
     }
-    const res = await r.json().catch(() => "pending");
-    refInfo.status = res == "approved" ? "approved" : "pending";
-    refInfo.channel_type = ch;
-    refInfo.channel_url = url;
-    refInfo.audience = aud || null;
-    Object.assign(affDraft, { pay: "", ch: "", url: "", aud: "", pitch: "" });
+    refInfo.status = "pending";
     partnerAt = 0;
     toast(A ? "تم إرسال طلبك ✓" : "Application sent ✓");
     render();
@@ -3047,13 +2904,6 @@ document.addEventListener("submit", (e) => {
   e.preventDefault();
   applyAffiliate(e.target.querySelector("[type=submit]"));
 });
-["input", "change"].forEach((ev) =>
-  document.addEventListener(ev, (e) => {
-    const f = e.target;
-    if (!f || !f.form || f.form.id != "aff-form" || !(f.name in affDraft)) return;
-    affDraft[f.name] = f.value;
-  })
-);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && /^#\/partner/.test(location.hash)) loadPartner();
 });
