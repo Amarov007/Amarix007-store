@@ -615,7 +615,7 @@ begin
       if rem>0 and not exists(select 1 from public.refunds where payment_id=p.id and reason='order cancelled' and status='approved') then
         insert into public.refunds(payment_id,amount,target,reason,status,requested_by,approved_by,decided_at,idempotency_key)
         values(p.id,rem,'wallet','order cancelled','requested',auth.uid(),null,null,ik)
-        on conflict(idempotency_key) do nothing returning id into rid;
+        on conflict(idempotency_key) where idempotency_key is not null do nothing returning id into rid;
         if rid is not null then
           perform public.wallet_apply(p.user_id,'main',rem,'refund','REF-'||rid::text,'order cancelled');
           update public.refunds set status='approved',approved_by=auth.uid(),decided_at=now() where id=rid;

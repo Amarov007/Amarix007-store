@@ -28,14 +28,20 @@ async function rpc(name, args = {}, auth = true) {
   try { return JSON.parse(text); } catch { return text; }
 }
 function user() { return T()?.user?.() || null; }
+const IDEM_TTL = 10 * 60 * 1000;
 function idem(scope) {
   const key = `amx.pay.v2.idem.${String(scope).slice(0,120)}`;
   try {
-    let val = localStorage.getItem(key);
-    if (!val) { val = uuid(); localStorage.setItem(key, val); }
-    return val;
+    let rec = null;
+    try { rec = JSON.parse(localStorage.getItem(key) || "null"); } catch {}
+    if (!rec || typeof rec.v !== "string" || Date.now() - Number(rec.t || 0) > IDEM_TTL) {
+      rec = { v: uuid(), t: Date.now() };
+      localStorage.setItem(key, JSON.stringify(rec));
+    }
+    return rec.v;
   } catch { return uuid(); }
 }
+function idemClear(scope) { try { localStorage.removeItem(`amx.pay.v2.idem.${String(scope).slice(0,120)}`); } catch {} }
 async function getConfig(force = false) {
   if (cfgCache && !force) return cfgCache;
   cfgCache = await rpc("payment_methods_public", {}, false);
@@ -69,13 +75,17 @@ async function createOrder(orderId, methodId, key = idem(`order:${orderId}`)) {
   const c = await getConfig();
   if (c?.on !== true) throw new Error("payments_v2_disabled");
   if (!Array.isArray(c.methods) || !c.methods.some(m => m.id === methodId && m.kind === "manual")) throw new Error("payment_method_unavailable");
-  return rpc("payment_create", { p_order_id: String(orderId), p_method: String(methodId), p_key: key });
+  const r = await rpc("payment_create", { p_order_id: String(orderId), p_method: String(methodId), p_key: key });
+  idemClear(`order:${orderId}`);
+  return r;
 }
 async function payWithWallet(orderId, key = idem(`wallet-order:${orderId}`)) {
   if (!user()) throw new Error("auth_required");
   const c = await getConfig();
   if (c?.on !== true) throw new Error("payments_v2_disabled");
-  return rpc("payment_create_wallet_pay", { p_order_id: String(orderId), p_key: key });
+  const r = await rpc("payment_create_wallet_pay", { p_order_id: String(orderId), p_key: key });
+  idemClear(`wallet-order:${orderId}`);
+  return r;
 }
 async function createTopup(amountBase, methodId, section = "main") {
   if (!user()) throw new Error("auth_required");
@@ -85,7 +95,10 @@ async function createTopup(amountBase, methodId, section = "main") {
   if (!Number.isFinite(n) || n <= 0) throw new Error("invalid_amount");
   const m = (c.methods || []).find(x => x.id === methodId && x.kind === "manual");
   if (!m) throw new Error("payment_method_unavailable");
-  return rpc("payment_create_topup", { p_amount: n, p_method: String(methodId), p_key: idem(`topup:${section}:${methodId}:${n}`) });
+  const scope = `topup:${section}:${methodId}:${n}`;
+  const r = await rpc("payment_create_topup", { p_amount: n, p_method: String(methodId), p_key: idem(scope) });
+  idemClear(scope);
+  return r;
 }
 async function instructions(paymentId) { return rpc("payment_instructions", { p_id: paymentId }); }
 async function status(paymentId) { return rpc("payments_status", { p_id: paymentId }); }
@@ -96,6 +109,7 @@ async function uploadProof(paymentId, file) {
   if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type)) throw new Error("proof_image_only");
   if (file.size > 12 * 1024 * 1024) throw new Error("proof_file_too_large");
   const blob = await T().proofBlob(file);
+  if (!blob || blob.size > 5 * 1024 * 1024) throw new Error("proof_file_too_large");
   const token = await T().token();
   if (!token) throw new Error("session_expired");
   const ext = file.type.toLowerCase() === "image/png" ? "png" : file.type.toLowerCase() === "image/webp" ? "webp" : "jpg";
@@ -113,7 +127,7 @@ async function submit(paymentId, txRef) {
   return rpc("payment_submit", { p_id: paymentId, p_tx_ref: txRef?.trim() || null });
 }
 async function askRefund(paymentId, reason) {
-  return rpc("refund_request", { p_payment_id: paymentId, p_amount: null, p_reason: String(reason || "customer request").slice(0,300) });
+  return rpc("refund_request_customer", { p_payment_id: paymentId, p_reason: String(reason || "customer request").slice(0,300) });
 }
 async function cancel(paymentId) { return rpc("payment_cancel", { p_id: paymentId }); }
 async function renderPayment(paymentId) {
