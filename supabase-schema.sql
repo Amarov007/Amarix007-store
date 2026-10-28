@@ -155,16 +155,31 @@ begin
 end $function$;
 
 create or replace function public.public_config() returns jsonb
-language sql stable security definer set search_path = public as $function$
-  select (coalesce(data, '{}'::jsonb) - 'coupons')
-         || jsonb_build_object('coupons', coalesce((
-              select jsonb_object_agg(e.key, jsonb_build_array(e.value->0, e.value->1, 1))
-                from jsonb_each(case when jsonb_typeof(data->'coupons') = 'object' then data->'coupons' else '{}'::jsonb end) e
-               where jsonb_typeof(e.value) = 'array' and coalesce(e.value->>2, '0') = '1'
-                 and public.coupon_usable(e.value, e.key)
-            ), '{}'::jsonb))
-    from public.store_config where id = 1;
-$function$;
+language plpgsql stable security definer set search_path = public as $function$
+declare cfg jsonb; public_methods jsonb := '[]'::jsonb; public_coupons jsonb := '{}'::jsonb;
+begin
+  select coalesce(data, '{}'::jsonb) into cfg from public.store_config where id = 1;
+  -- Never expose payment destinations/secrets in the public config, including before v2 tables are deployed.
+  if to_regclass('public.payment_methods') is not null then
+    execute $sql$
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id',id,'on',enabled,'currency',currency,'ar',coalesce(config->>'ar',''),'en',coalesce(config->>'en',''),
+        'icon',coalesce(config->>'icon',''),'logo',coalesce(config->>'logo',''),'color',coalesce(config->>'color',''),
+        'network',coalesce(config->>'network',''),
+        'memo',coalesce(config->>'memo',''),'min',min_amount,'max',max_amount
+      ) order by sort,id), '[]'::jsonb) from public.payment_methods where enabled
+    $sql$ into public_methods;
+  else
+    select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object('id',m->'id','key',m->'key','on',m->'on','currency',m->'currency','ar',m->'ar','en',m->'en','icon',m->'icon','logo',m->'logo','color',m->'color','network',m->'network','memo',m->'memo','min',m->'min','max',m->'max')) order by ord), '[]'::jsonb)
+      into public_methods
+      from jsonb_array_elements(case when jsonb_typeof(cfg->'payments')='array' then cfg->'payments' else '[]'::jsonb end) with ordinality as x(m,ord);
+  end if;
+  select coalesce(jsonb_object_agg(e.key, jsonb_build_array(e.value->0,e.value->1,1)), '{}'::jsonb)
+    into public_coupons
+    from jsonb_each(case when jsonb_typeof(cfg->'coupons')='object' then cfg->'coupons' else '{}'::jsonb end) e
+   where jsonb_typeof(e.value)='array' and coalesce(e.value->>2,'0')='1' and public.coupon_usable(e.value,e.key);
+  return (cfg - 'coupons' - 'payments') || jsonb_build_object('payments',public_methods,'coupons',public_coupons);
+end $function$;
 
 create or replace function public.check_coupon(p_code text) returns jsonb
 language plpgsql security definer set search_path = public as $function$
@@ -199,42 +214,11 @@ $$;
 
 -- [moved] public.track_ref_click() is defined only in supabase-affiliate-program.sql (one definition per function; see tests/verify-project.py check 5).
 
-create or replace function public.set_payment_proof(p_order_id text, p_path text) returns void
-language plpgsql security definer set search_path = public as $function$
-declare uid uuid := auth.uid();
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if p_path is null or length(p_path) > 300
-     or p_path !~ ('^' || uid::text || '/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$') then
-    raise exception 'invalid_path';
-  end if;
-  if not exists (select 1 from storage.objects where bucket_id = 'payment-proofs' and name = p_path) then
-    raise exception 'proof_missing';
-  end if;
-  update public.orders set payment_proof = p_path
-   where id = p_order_id and user_id = uid
-     and coalesce(payment_status, 'pending') = 'pending' and status <> 'cancelled';
-  if not found then raise exception 'not_allowed'; end if;
-end $function$;
+-- [moved] public.set_payment_proof is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
 
-create or replace function public.claim_payment(p_order_id text) returns void
-language plpgsql security definer set search_path = public as $function$
-begin
-  update public.orders
-     set payment_status = 'review'
-   where id = p_order_id and user_id = auth.uid()
-     and coalesce(payment_status, 'pending') = 'pending' and status <> 'cancelled'
-     and payment_proof is not null and payment_proof <> '';
-  if not found then
-    if exists (select 1 from public.orders where id = p_order_id and user_id = auth.uid() and payment_status in ('review', 'paid')) then return; end if;
-    -- الطلب للمستخدم وبانتظار الدفع لكن بلا إثبات -> رسالة واضحة
-    if exists (select 1 from public.orders where id = p_order_id and user_id = auth.uid()
-                and coalesce(payment_status, 'pending') = 'pending' and status <> 'cancelled') then
-      raise exception 'proof_required';
-    end if;
-    raise exception 'not_allowed';
-  end if;
-end $function$;
+
+-- [moved] public.claim_payment is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 create or replace function public.orders_clear_proof_on_insert() returns trigger
 language plpgsql set search_path = public as $function$

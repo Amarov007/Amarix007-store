@@ -1,6 +1,6 @@
 # ترتيب تشغيل ملفات SQL (Supabase › SQL Editor)
 
-> مبني على قراءة الملفات الموجودة في المستودع، وقورنت صلاحيات التنفيذ مع القاعدة الحية بتاريخ 2026-10-25. **كل دالة معرَّفة الآن في ملف واحد فقط** (يفرضه `tests/verify-project.py` فحص 5)، وكل `revoke/grant execute` على الدوال مجمّع في `supabase-final-grants.sql` (فحص 6) ويُشغَّل **أخيراً دائماً**.
+> ترتيب مقترح مبني على ملفات المستودع، وليس تأكيداً بأن قاعدة الإنتاج مطابقة لها. لم تُسحب لقطة SQL حية كاملة في جلسة العمل هذه؛ راجع `docs/LIVE-ONLY.md` قبل التشغيل. يفحص `tests/verify-project.py` تكرار تعريفات الدوال محلياً، وكل `revoke/grant execute` الجديدة مجمّعة في `supabase-final-grants.sql` الذي يُشغَّل **أخيراً دائماً**.
 
 ## قاعدة جديدة (مشروع Supabase فارغ)
 
@@ -54,7 +54,13 @@ on conflict (email) do update set user_id = excluded.user_id;
 supabase login
 supabase link --project-ref pvuobngrybygohendwaz
 supabase db pull                                   # يحفظ المخطط الحي (يشمل الكائنات الموجودة في docs/LIVE-ONLY.md)
-supabase functions download ai-support smm-order media-seed img-shrink send-push telegram-auth
+supabase functions download ai-support
+supabase functions download smm-order
+supabase functions download media-seed
+supabase functions download img-shrink
+supabase functions download send-push
+supabase functions download telegram-auth
+supabase functions download api-hub # ظهر في بيانات التعريف الحية
 supabase functions deploy send-push                # بعد تعديل supabase/functions/send-push
 ```
 
@@ -90,9 +96,21 @@ select jobname, schedule, active from cron.job order by jobname;
 
 ## تفعيل نظام الدفع الموحّد (payments_v2)
 
-```sql
-update public.store_config
-   set data = jsonb_set(data, '{payments_v2}', '{"on": true, "dual_threshold": 200, "expiry_minutes": 1440}'::jsonb)
- where id = 1;
-```
-**إيقاف/تراجع:** `update public.store_config set data = jsonb_set(data, '{payments_v2,on}', 'false') where id = 1;` — دوال العميل الجديدة تعطي `payments_disabled` والمسارات القديمة تبقى كما هي.
+يبقى العلم `payments_v2.on=false` بعد تطبيق migration. **لا تنفّذ تفعيل SQL مباشراً ولا تفعّل على الإنتاج لمجرد أن migration نجحت.** فعّله من لوحة الإدارة عبر `payments_v2_flag_set` فقط بعد اكتمال لقطة القاعدة الحية، والهجرة ومطابقة المجاميع واختبارات مستخدمين اثنين والتأكد من نشر الدوال والواجهة المتوافقتين. فوق ذلك يجب تقرير نافذة التبديل: أغلفة v1 في هذا الفرع ترفض المسارات القديمة بـ `use_payments_v2`، لذا لا توجد هنا فترة توافق خلفي كاملة مضمونة.
+
+لإيقاف النظام طارئاً استخدم واجهة الإدارة أو سكربت التوقف المحافظ `supabase/rollbacks/20261028070000_payments_restructure.sql`. هذا يوقف العلم والجدولة مع حفظ الدفتر المالي؛ **ليس عكساً كاملاً لتعريفات SQL**.
+
+
+## إعادة هيكلة الدفع (migration مؤرَّخة — لا تشغّل على الإنتاج بلا بيئة اختبار)
+
+للترقية على قاعدة تتضمن المخطط الأساسي والملفات السابقة:
+
+1. اسحب المخطط الحي أولاً (`supabase db pull`) وراجع `docs/LIVE-ONLY.md` و`CHANGELOG-PAYMENTS.md`. لا تنفّذ migration من ZIP على أساس افتراض أن القاعدة مطابقة.
+2. شغّل `supabase-payments.sql` فقط إذا كانت التعريفات والجداول التي ينشئها غير موجودة بعد؛ لا تعِد إنشاء بيانات متطابقة من دون مراجعة.
+3. بعد تهيئة `store_config`, `orders`, `profiles`, `wallets`, `wallet_transactions`, `wallet_topups`, `payment_methods`, `payments` والدوال الأساسية، راجع diff ثم نفّذ `supabase/migrations/20261028070000_payments_restructure.sql` على قاعدة اختبار. الملف مضاف وآمن لإعادة التشغيل في تصميمه، لكنه يتعمد إيقاف التنفيذ عند تضارب بيانات الدفتر أو تكرار الإثبات/مرجع التحويل.
+4. تحقق من `supabase/tests/payments_v2_contract.sql`، ثم نفّذ استيراد البيانات عبر `supabase-payments-migrate.sql` داخل معاملة. هو قابل لإعادة التشغيل ويوقف عند فرق المجاميع. لا تدخل الطلبات التاريخية الملتقطة تلقائياً إلى طابور التنفيذ؛ راجع حالات التسليم القديمة يدوياً قبل إعادة أي طلب. راجع counts/money totals و`wallet_reconcile()` و`payments_reconcile()` قبل/بعد.
+5. انشر `smm-order`, `payment-proof-hash`, و`fulfillment-worker` في بيئة اختبار، ثم اختبر تدفق دفع يدوي، مستخدمين اثنين، صرف/اعتماد/استرداد متزامن وحالات المزوّد. لا تنشر الواجهة حتى تنجح.
+6. شغّل `supabase-final-grants.sql` **أخيراً دائماً**. لا تضف دالة جديدة تُستدعى من المتصفح من دون إدراجها في `anon_and_auth` أو `auth_only`.
+7. يبقى `payments_v2.on=false` و`payment_methods.confirm_mode='manual'` افتراضياً. لا تفعّل العلم قبل إكمال إعداد الأسرار والـ cron والواجهة المطابقة. التفعيل يتم من لوحة الإدارة (صلاحية `payments.settings`) وليس من خلال واجهة المتجر.
+
+يُحفظ السيناريو المحافظ للتوقف في `supabase/rollbacks/20261028070000_payments_restructure.sql`. هذا الملف يوقف العلم والجدولة مع حفظ دفتر المال؛ لا يستعيد تلقائياً أجسام RPC القديمة. العودة إلى UI قديمة تتطلب استعادة أجسامها من نسخة موثوقة أولاً، كما هو موضح في `docs/manual-owner-steps.md`.

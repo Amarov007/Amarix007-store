@@ -247,3 +247,6 @@ h2{font-size:18px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
 .ic-prev .card{margin-top:12px}
 .ic-th + b{vertical-align:middle}
 @media(max-width:700px){.ic-tb{min-width:760px}.ic-nm{min-width:180px}.ic-modes .b{flex-basis:125px}.ic-bulkbar>*{flex:1 1 100%}}
+
+/* Payments v2 admin panels */
+.p2-method{margin:12px 0;padding:14px}.p2-method .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.p2-review{margin:10px 0;padding:14px}.p2-report{white-space:pre-wrap;overflow:auto;max-height:420px;direction:ltr;text-align:left;background:rgba(0,0,0,.15);padding:12px;border-radius:10px}.p2-review .acts{display:flex;gap:8px;flex-wrap:wrap}

@@ -548,7 +548,7 @@ async function numSync(b) {
     const fill = (g, set) => { const keep = (g.o || []).filter((x) => D.products.some((p) => p.c == c.id && !p.ns && String(p.tg || "").toLowerCase().includes(String(x).toLowerCase()))); g.o = [...new Set([...keep, ...[...set].sort((a, b2) => a.localeCompare(b2, "ar"))])]; };
     fill(c.f[0], svcOpts); fill(c.f[1], ctyOpts);
     save();
-    nsOut(`✓ تم: أُضيف <b>${add}</b> · تحدّث سعر <b>${upd}</b> · أُخفي <b>${gone}</b> · الإجمالي المعروض <b>${offers.length}</b> من ${j.total} عرضاً (${svcOpts.size} خدمة، ${ctyOpts.size} دولة).<br><b>اضغط «نشر» لتطبيق ذلك على المتجر.</b>`);
+    nsOut(`✓ تم: أُضيف <b>${add}</b> · تحدّث سعر <b>${upd}</b> · أُخفي <b>${gone}</b> · الإجمالي المعروض <b>${offers.length}</b> من ${esc(Number(j.total) || 0)} عرضاً (${svcOpts.size} خدمة، ${ctyOpts.size} دولة).<br><b>اضغط «نشر» لتطبيق ذلك على المتجر.</b>`);
     toast(`أُضيف ${add} · حُدّث ${upd} · أُخفي ${gone}. اضغط نشر للحفظ`);
     render();
   } catch (e) { nsOut("✗ " + esc(e.message)); toast("فشل: " + String(e.message).slice(0, 80), "e"); }
@@ -636,8 +636,14 @@ const VIEW = {
     return `<div class="card"><h2>روابط التواصل</h2><p class="hint">تظهر في أسفل المتجر بشعاراتها. رابط واتساب يُستخدم أيضاً في زر «اطلب عبر واتساب» (الرقم الدولي بدون +). اترك الرابط فارغاً لإخفاء الأيقونة. يمكنك رفع الشعار الرسمي ليحل محل الرسم المدمج.</p> ${SOCIAL.map( ([k, icon, label, ph]) => `<div class="card" style="background:var(--bg)"><label class="fld"><span>${label}</span><input class="inp" dir="ltr" data-sc="${k}" data-si="${icon}" value="${esc( (D.social[k] || [])[1] || "" )}" placeholder="${esc(ph)}"></label>${F( "شعار مخصص (اختياري)", "social." + k + ".2", { t: "img", w: 1 } )}</div>` ).join("")}</div>`;
   },
   payments() {
-    return (
-      ratesCard() +
+    setTimeout(loadPaymentV2Admin, 50);
+    return (`<div class="card"><h2>الدفع الموحّد v2</h2><p class="hint">المصدر الوحيد للحقيقة: payments + payment_methods. رموز الاعتماد قصيرة العمر وصلاحية المراجعة مستقلة عن صلاحية الطلبات. تأكيد USDT/Binance Pay الآلي معطّل حتى تكتمل مراجعة adapters الرسمية.</p><div class="acts"><label class="chk"><input id="p2-flag" type="checkbox" data-payv2-flag> تفعيل payments_v2.on</label><button type="button" class="b b2" data-a="p2-refresh">تحديث الطابور والتقارير</button></div><div id="p2-state" class="hint">${loadingHTML}</div></div>
+    <div class="card"><h2>طابور مراجعة الدفعات</h2><div class="acts"><select class="inp" id="p2-status"><option value="under_review">قيد المراجعة</option><option value="proof_submitted">وصل الإثبات</option><option value="captured">معتمد</option><option value="refunded">مسترد</option></select><button class="b b2" data-a="p2-queue">تحميل</button></div><div id="p2-queue-box">${loadingHTML}</div></div>
+    <div class="card"><h2>طلبات الاسترداد</h2><div class="acts"><button class="b b2" data-a="p2-refunds">تحميل الطلبات</button></div><div id="p2-refunds-box"></div></div>
+    <div class="card"><h2>وسائل الدفع (مصدر v2)</h2><p class="hint">العنوان/الحساب لا يظهر للعميل إلا داخل payment_instructions لدفعة مملوكة له. حذف وسيلة مرتبطة بدفعات سابقة يعطّلها ولا يحذف تاريخها.</p><div class="acts"><button class="b" data-a="p2-add-method">+ وسيلة</button><button class="b b2" data-a="p2-save-methods">حفظ وسائل الدفع</button></div><div id="p2-methods">${loadingHTML}</div></div>
+    <div class="card"><h2>سعر الصرف المجمّد للدفعات الجديدة</h2><label class="fld"><span>سعر SYP لكل 1 USDT</span><input class="inp" type="number" min="0.000001" step="0.000001" id="p2-fx" dir="ltr"></label><button class="b" data-a="p2-save-fx">حفظ السعر</button><p class="hint">تغيير السعر لا يعدّل الدفعات القديمة؛ كل دفعة تحفظ fx_rate لحظة إنشائها.</p></div>
+    <div class="card"><h2>المطابقة والتدقيق</h2><div class="acts"><button class="b b2" data-a="p2-reconcile">مطابقة المدفوعات</button><button class="b b2" data-a="p2-wallet-reconcile">مطابقة المحفظة</button></div><pre id="p2-reconcile" class="p2-report"></pre></div>` + ratesCard() +
+      `<div class="card"><h2>الوسائل القديمة (مرجع توافق فقط — لا تنشرها كمصدر v2)</h2><p class="hint">هذه الحقول تظل للترحيل/التوافق، لكن الدفع v2 يقرأ payment_methods. عدّل وسائل v2 في القسم أعلاه.</p>` +
       `<div class="card"><h2>وسائل الدفع اليدوي (${D.payments.length})</h2><p class="hint" style="border-inline-start:3px solid var(--m);padding:10px;background:var(--bg)">🔒 وضع الدفع: <b>يدوي فقط</b>. لا توجد بوابة دفع آلية في مسار المتجر. العميل يحوّل إلى بياناتك، ويرفع الإثبات، ثم يراجع الموظف وصول الأموال فعلياً قبل اعتماد الطلب. لا تضع مفاتيح سرية أو بيانات دخول داخل تعليمات الدفع.</p><p class="hint">تظهر الوسائل المفعّلة في المتجر والسلة. العنوان أو رقم الحساب يظهر بعد إنشاء الطلب مع زر نسخ. ارفع الشعار الرسمي عند الحاجة، وحدد الشبكة والحدود والتعليمات لتقليل أخطاء التحويل.</p><button class="b" data-a="add" data-k="payments">+ وسيلة دفع يدوية</button></div>` +
       D.payments
         .map((m, i) => {
@@ -656,7 +662,7 @@ const VIEW = {
     return `<div class="card"><h2>البحث بالـ UID</h2><div class="sw"><input class="inp" id="uid-q" dir="ltr" inputmode="numeric" maxlength="12" placeholder="UID مثال: 12345678" autocomplete="off"><button class="b" type="button" data-a="uid-find">🔍 بحث</button></div><div id="uid-res" style="margin-top:12px"></div></div><div class="card"><h2>المستخدمين المسجلين</h2><div id="users-list">${loadingHTML}</div></div>`;
   },
   apis() {
-    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2> <p class="hint">⚠ تُحفظ في جدول api_settings فقط (يجب أن يكون RLS للمدراء فقط) ولا تُنشر مع إعدادات المتجر. الأفضل نقل المفاتيح السرية إلى Supabase Edge Function secrets.</p> <form id="api-form" autocomplete="off"> <div class="g2">${F("SMM API URL (المزوّد الرئيسي)", "api.smm_url", { d: 1 })}${F( "SMM API Key (المزوّد الرئيسي)", "api.smm_key", { d: 1 } )}${F("Payment Gateway (اسم البوابة)", "api.payment_gateway", { d: 1 })}${F( "Payment Public Key", "api.payment_public_key", { d: 1 } )}${F("Payment Secret Key", "api.payment_secret_key", { d: 1 })}${F( "AI Support API Key (مثال: OpenAI)", "api.ai_api_key", { d: 1 } )}</div> ${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1, })} <button class="b" data-a="save-api" type="button">حفظ الإعدادات</button></form></div> ${provBox()}<div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase (المتصفح لا يستطيع الاتصال بموقع الرشق مباشرة، والمفتاح يبقى في الخادم). احفظ الإعدادات أولاً. اختر الموقع المطلوب ثم افحص الاتصال أو اعرض خدماته؛ ما تستورده يُربط بهذا الموقع.</p><label class="fld"><span>موقع الرشق</span><select class="inp" id="smm-prov">${provSel()}</select></label> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="acts" style="margin-top:8px"><button class="b bd2" data-a="smm-wipe" type="button">🗑 حذف كل منتجات الرشق</button><button class="b" data-a="smm-redo" type="button">♻ حذف وإعادة جلب من المزوّد</button><button class="b b2" data-a="smm-undo" type="button">↩ استرجاع المحذوف</button></div><p class="hint">«حذف وإعادة جلب» يجلب الخدمات من المزوّد أولاً، وإن فشل الجلب لا يُحذف شيء. يُحفظ نسخة احتياطية قبل الحذف ويمكن الاسترجاع منها. بعدها اضغط «نشر».</p> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
+    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2><p class="hint">قيمة مفتاح SMM لا تُقرأ إلى المتصفح ولا تُحفظ من هذه الشاشة. أضف القيمة في Supabase → Edge Function Secrets، ثم أدخل اسم السر فقط هنا. حقول بوابة الدفع القديمة مخفية لأنها غير موصولة في واجهة المتجر الجديدة؛ ولا تحذف قيم AI القديمة قبل تحديث/اختبار دالة ai-support.</p><form id="api-form" autocomplete="off"><div class="g2">${F("SMM API URL (المزوّد الرئيسي)", "api.smm_url", { d: 1 })}${F("اسم Edge Secret للمفتاح (مثلاً SMM_API_KEY)", "api.smm_secret_name", { d: 1 })}${F("مسار API اختياري (مثلاً /api/v1 أو /custom.php)", "api.smm_path", { d: 1 })}</div>${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1 })}<div class="acts"><button class="b" data-a="save-api" type="button">حفظ الإعدادات</button><button class="b bd2" data-a="smm-clear-legacy-keys" type="button">حذف مفاتيح SMM القديمة من قاعدة البيانات</button></div><p class="hint warn">لا تضغط الحذف إلا بعد إضافة Edge Secrets واختبار اتصال كل موقع أدناه بنجاح. الإجراء نهائي بالنسبة لمفاتيح SMM المخزنة في الجداول.</p></form></div> ${provBox()}<div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase؛ قيمة المفتاح تبقى في Edge Secret باسم السر الذي أدخلته. احفظ الإعدادات أولاً ثم افحص الاتصال أو اعرض الخدمات.</p><label class="fld"><span>موقع الرشق</span><select class="inp" id="smm-prov">${provSel()}</select></label> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="acts" style="margin-top:8px"><button class="b bd2" data-a="smm-wipe" type="button">🗑 حذف كل منتجات الرشق</button><button class="b" data-a="smm-redo" type="button">♻ حذف وإعادة جلب من المزوّد</button><button class="b b2" data-a="smm-undo" type="button">↩ استرجاع المحذوف</button></div><p class="hint">«حذف وإعادة جلب» يجلب الخدمات من المزوّد أولاً، وإن فشل الجلب لا يُحذف شيء. يُحفظ نسخة احتياطية قبل الحذف ويمكن الاسترجاع منها. بعدها اضغط «نشر».</p> <input class="inp" id="smm-q" placeholder="فلترة الخدمات بالاسم أو الرقم" style="margin-top:8px"><div id="smm-out" class="hint" style="margin-top:8px;max-height:320px;overflow:auto"></div></div>`;
   },
   affiliates() {
     setTimeout(() => { loadAffiliates(); loadAffReport(); loadAffTiers(); }, 50);
@@ -821,6 +827,73 @@ const STF_PERMS = [
   ["users", "المستخدمين (عرض فقط)"],
   ["products", "المنتجات (تعديل ونشر)"],
 ];
+
+/* Payments v2 console: data is always fetched from v2 tables/RPCs; never write payment_status or wallet balances directly. */
+let P2_METHODS = [];
+async function p2Rpc(name, body = {}) {
+  const r = await api("/rest/v1/rpc/" + encodeURIComponent(name), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const raw = await r.text(); let result = null;
+  try { result = raw ? JSON.parse(raw) : null; } catch { result = raw; }
+  if (!r.ok) throw new Error(String(result?.message || result?.error || raw || `http_${r.status}`).slice(0, 180));
+  return result;
+}
+const p2Money = (n, c = "USD") => `${Number(n || 0).toFixed(2)} ${c}`;
+async function loadPaymentV2Admin() {
+  const state = $("#p2-state"); if (!state) return;
+  try {
+    const [cfg, methods] = await Promise.all([p2Rpc("payment_methods_public", {}), api("/rest/v1/payment_methods?select=id,kind,currency,enabled,sort,min_base,max_base,min_amount,max_amount,fee_pct,fee_fixed,requires_proof,expiry_minutes,confirm_mode,config&order=sort,id")]);
+    const rows = methods.ok ? await methods.json() : [];
+    if (!methods.ok) throw new Error("لا يمكن قراءة وسائل الدفع v2؛ تحقق من payments.settings وRLS.");
+    P2_METHODS = Array.isArray(rows) ? rows : [];
+    const flag = $("#p2-flag"); if (flag) flag.checked = !!cfg?.on;
+    state.textContent = `payments_v2.on = ${cfg?.on ? "true" : "false"} · fx = ${cfg?.fx ?? "—"} · methods = ${P2_METHODS.length}`;
+    const fx = $("#p2-fx"); if (fx) fx.value = cfg?.fx ?? "";
+    const box = $("#p2-methods"); if (box) box.innerHTML = P2_METHODS.map((m,i) => `<div class="card p2-method" data-p2-method="${i}"><div class="g2"><label class="fld"><span>ID</span><input class="inp" data-p2-field="id" value="${esc(m.id)}" ${m.id === "wallet" ? "readonly" : ""}></label><label class="fld"><span>Kind</span><select class="inp" data-p2-field="kind">${[["manual","manual"],["wallet","wallet"],["crypto_auto","crypto_auto"],["gateway","gateway"]].map(([v,l])=>`<option value="${v}"${m.kind===v?" selected":""}>${l}</option>`).join("")}</select></label><label class="fld"><span>Currency</span><input class="inp" data-p2-field="currency" value="${esc(m.currency)}" maxlength="10"></label><label class="fld"><span>Min base</span><input class="inp" type="number" data-p2-field="min_base" value="${m.min_base ?? ""}"></label><label class="fld"><span>Max base (0 = none)</span><input class="inp" type="number" data-p2-field="max_base" value="${m.max_base ?? ""}"></label><label class="fld"><span>Min in currency</span><input class="inp" type="number" data-p2-field="min_amount" value="${m.min_amount ?? ""}"></label><label class="fld"><span>Max in currency</span><input class="inp" type="number" data-p2-field="max_amount" value="${m.max_amount ?? ""}"></label><label class="fld"><span>Fee %</span><input class="inp" type="number" data-p2-field="fee_pct" value="${m.fee_pct ?? 0}"></label><label class="fld"><span>Fixed fee (base)</span><input class="inp" type="number" data-p2-field="fee_fixed" value="${m.fee_fixed ?? 0}"></label><label class="fld"><span>Sort</span><input class="inp" type="number" data-p2-field="sort" value="${m.sort ?? 50}"></label><label class="chk"><input type="checkbox" data-p2-field="enabled" ${m.enabled?"checked":""}> Enabled</label><label class="chk"><input type="checkbox" data-p2-field="requires_proof" ${m.requires_proof?"checked":""}> Requires proof</label><label class="fld"><span>Expiry minutes</span><input class="inp" type="number" min="5" max="20160" data-p2-field="expiry_minutes" value="${m.expiry_minutes ?? 1440}"></label><label class="fld"><span>Account/address (private)</span><input class="inp" data-p2-field="acc" value="${esc(m.config?.acc || "")}" autocomplete="off"></label><label class="fld"><span>Name AR</span><input class="inp" data-p2-field="ar" value="${esc(m.config?.ar || "")}"></label><label class="fld"><span>Name EN</span><input class="inp" data-p2-field="en" value="${esc(m.config?.en || "")}"></label><label class="fld"><span>Network</span><input class="inp" data-p2-field="network" value="${esc(m.config?.network || "")}"></label><label class="fld"><span>Instructions AR</span><textarea class="inp" data-p2-field="da">${esc(m.config?.da || "")}</textarea></label><label class="fld"><span>Instructions EN</span><textarea class="inp" data-p2-field="de">${esc(m.config?.de || "")}</textarea></label></div><button class="b bd2 sm" data-a="p2-delete-method" data-id="${esc(m.id)}">تعطيل/حذف الوسيلة</button></div>`).join("");
+    await loadP2Queue();
+  } catch (e) { state.textContent = "فشل تحميل إعدادات v2: " + String(e.message || e); }
+}
+async function loadP2Queue() {
+  const box = $("#p2-queue-box"); if (!box) return;
+  box.innerHTML = loadingHTML;
+  try {
+    const status = $("#p2-status")?.value || "under_review";
+    const rows = await p2Rpc("payment_review_queue", { p_status: status, p_method: null, p_search: null, p_limit: 100, p_offset: 0 });
+    box.innerHTML = Array.isArray(rows) && rows.length ? rows.map((x) => `<div class="card p2-review"><div class="g2"><div><b dir="ltr">${esc(x.id)}</b><p>${esc(x.name || "—")} · <bdi dir="ltr">${esc(x.email || "")}</bdi> · UID ${esc(x.uid || "—")}</p><small>${esc(x.created_at || "")}</small></div><div><b>${esc(p2Money(x.pay_amount,x.pay_currency))}</b><p>Base: ${esc(p2Money(x.amount_base))} · FX ${esc(x.fx_rate)}</p><p>Order: ${esc(x.order_id || "wallet top-up")} · ${esc(x.method_id)} · ${esc(x.status)}</p><p>TX: <bdi dir="ltr">${esc(x.tx_ref || "—")}</bdi></p></div></div>${x.proof_path ? `<button class="b b2 sm" data-a="p2-proof" data-path="${esc(x.proof_path)}">فتح الإثبات (رابط مؤقت)</button>` : `<span class="hint">لا يوجد إثبات</span>`}${x.status === "under_review" ? `<button class="b sm" data-a="p2-approve" data-id="${esc(x.id)}" data-amount="${esc(x.pay_amount)}" data-currency="${esc(x.pay_currency)}">مراجعة واعتماد</button><button class="b bd2 sm" data-a="p2-reject" data-id="${esc(x.id)}">رفض</button>` : ""}</div>`).join("") : '<p class="hint">لا توجد دفعات في هذه الحالة.</p>';
+  } catch (e) { box.innerHTML = `<p class="hint">فشل التحميل: ${esc(e.message)}</p>`; }
+}
+async function loadP2Refunds() {
+  const box = $("#p2-refunds-box"); if (!box) return;
+  box.innerHTML = loadingHTML;
+  try {
+    const r = await api("/rest/v1/refunds?select=id,payment_id,amount,target,reason,status,requested_by,created_at&status=eq.requested&order=created_at.asc&limit=100");
+    if (!r.ok) throw new Error(await r.text()); const rows = await r.json();
+    box.innerHTML = rows.length ? rows.map((x) => `<div class="it"><div class="im"><b>#${x.id} · ${esc(p2Money(x.amount))}</b><small><bdi dir="ltr">${esc(x.payment_id)}</bdi> · ${esc(x.reason || "")}</small></div><button class="b sm" data-a="p2-refund-approve" data-id="${x.id}">اعتماد</button><button class="b bd2 sm" data-a="p2-refund-reject" data-id="${x.id}">رفض</button></div>`).join("") : '<p class="hint">لا توجد طلبات استرداد معلّقة.</p>';
+  } catch (e) { box.innerHTML = `<p class="hint">فشل التحميل: ${esc(e.message)}</p>`; }
+}
+function collectP2Methods() {
+  return [...document.querySelectorAll("[data-p2-method]")].map((card) => {
+    const v = {}; card.querySelectorAll("[data-p2-field]").forEach((el) => { const k=el.dataset.p2Field; v[k]=el.type === "checkbox" ? el.checked : el.value; });
+    for (const k of ["sort","min_base","max_base","min_amount","max_amount","fee_pct","fee_fixed","expiry_minutes"]) v[k]=v[k] === "" ? null : Number(v[k]);
+    v.config={ ar:v.ar, en:v.en, acc:v.acc, network:v.network, da:v.da, de:v.de }; v.confirm_mode="manual"; return v;
+  });
+}
+async function p2Approve(btn) {
+  const id=btn.dataset.id; if (!confirm(`هل تحققت من وصول ${btn.dataset.amount} ${btn.dataset.currency} فعلياً؟`)) return;
+  busy(btn,true);
+  try {
+    const token=await p2Rpc("payment_confirmation_issue",{p_id:id});
+    const amount=prompt("المبلغ الذي وصل فعلياً:",btn.dataset.amount); if (amount===null) return;
+    const currency=prompt("العملة المستلمة:",btn.dataset.currency); if (currency===null) return;
+    const note=prompt("ملاحظة (إلزامية إذا كان هناك فرق في المبلغ/العملة):",""); if(note===null) return;
+    const code=prompt(`رمز تأكيد صادر من الخادم صالح لعشر دقائق:
+${token}
+انسخه وأعد إدخاله للمتابعة:` , token); if(code===null) return;
+    const result=await p2Rpc("payment_approve_received",{p_id:id,p_confirmation:code,p_received_amount:Number(amount),p_received_currency:currency,p_note:note});
+    toast(result === "first_approved" ? "تم تسجيل الموافقة الأولى؛ يلزم مراجع آخر." : "تم اعتماد الدفعة ✓");
+    await loadP2Queue();
+  } catch(e) { toast("تعذّر الاعتماد: "+String(e.message||e).slice(0,140),"e"); } finally { busy(btn,false); }
+}
+
 VIEW.none = () =>
   '<div class="card"><h2>لا توجد صلاحيات</h2><p class="hint">حسابك مسجّل كموظف لكن لا توجد صلاحيات مفعّلة له. اطلب من المدير تفعيلها.</p></div>';
 VIEW.staff = () => {
@@ -1042,6 +1115,7 @@ document.addEventListener("change", async (e) => {
   if (t.id == "smm-fcat") { SMM_FCAT = t.value; return; }
   if (t.id == "smm-lim") return smmList(); // refresh the "import N results" button
   if (t.id == "smm-prov") { SMM_PROV = t.value || "main"; SMM_SVC = []; SMM_SVC_PROV = null; SMM_FCATS = []; SMM_FCATS_PROV = null; SMM_FCAT = ""; return smmOut("اضغط «عرض الخدمات» لجلب خدمات «" + esc(provName(SMM_PROV)) + "»."); } // never keep another site's list on screen
+  if (d.payv2Flag != null) { (async()=>{try{await p2Rpc("payments_v2_flag_set",{p_on:!!t.checked});toast(t.checked?"تم تفعيل payments_v2.on":"تم إيقاف payments_v2.on");await loadPaymentV2Admin();}catch(err){t.checked=!t.checked;toast("تعذّر تغيير علم الدفع: "+err.message,"e");}})(); return; }
   if (d.fmap != null) { smmFmap()[d.fmap] = t.value; smmFmapSave(); return; }
   if (t.id == "smm-fmap-all") {
     const v = t.value, gs = smmGroupsOf(smmFiltered());
@@ -1109,6 +1183,20 @@ document.addEventListener("click", (e) => {
   }
   const a = d.a;
   if (!a) return;
+  if (a === "p2-refresh") return loadPaymentV2Admin();
+  if (a === "p2-queue") return loadP2Queue();
+  if (a === "p2-refunds") return loadP2Refunds();
+  if (a === "p2-approve") return p2Approve(b);
+  if (a === "p2-reject") return (async()=>{ const reason=prompt("سبب الرفض:",""); if(reason===null)return; try{await p2Rpc("payment_reject",{p_id:d.id,p_reason:reason});toast("تم رفض الدفعة");await loadP2Queue();}catch(err){toast("فشل الرفض: "+err.message,"e");} })();
+  if (a === "p2-refund-approve") return (async()=>{try{await p2Rpc("refund_approve",{p_id:Number(d.id)});toast("تم اعتماد الاسترداد وإضافته إلى المحفظة");await loadP2Refunds();}catch(err){toast("فشل الاسترداد: "+err.message,"e");}})();
+  if (a === "p2-refund-reject") return (async()=>{const note=prompt("سبب الرفض:","");if(note===null)return;try{await p2Rpc("refund_reject",{p_id:Number(d.id),p_note:note});toast("تم رفض الاسترداد");await loadP2Refunds();}catch(err){toast("فشل الرفض: "+err.message,"e");}})();
+  if (a === "p2-save-methods") return (async()=>{try{await p2Rpc("payment_methods_admin_save",{p_methods:collectP2Methods()});toast("حُفظت وسائل الدفع v2");await loadPaymentV2Admin();}catch(err){toast("فشل الحفظ: "+err.message,"e");}})();
+  if (a === "p2-add-method") { P2_METHODS.push({id:"method_"+uid(),kind:"manual",currency:"USD",enabled:false,sort:50,min_base:null,max_base:null,min_amount:null,max_amount:null,fee_pct:0,fee_fixed:0,requires_proof:true,expiry_minutes:1440,config:{}}); const box=$("#p2-methods"); if(box){box.innerHTML='<p class="hint">أُضيف صف جديد؛ اضغط حفظ وسائل الدفع v2.</p>'+P2_METHODS.map((m,i)=>`<div class="card p2-method" data-p2-method="${i}"><label>ID<input class="inp" data-p2-field="id" value="${esc(m.id)}"></label><label>Kind<select class="inp" data-p2-field="kind"><option value="manual">manual</option><option value="wallet">wallet</option><option value="crypto_auto">crypto_auto</option><option value="gateway">gateway</option></select></label><label>Currency<input class="inp" data-p2-field="currency" value="USD"></label><label>Account/address<input class="inp" data-p2-field="acc" value=""></label><label>Name AR<input class="inp" data-p2-field="ar" value=""></label><label>Name EN<input class="inp" data-p2-field="en" value=""></label><label>Network<input class="inp" data-p2-field="network" value=""></label><label>Instructions AR<textarea class="inp" data-p2-field="da"></textarea></label><label>Instructions EN<textarea class="inp" data-p2-field="de"></textarea></label><label><input type="checkbox" data-p2-field="enabled"> Enabled</label><label><input type="checkbox" data-p2-field="requires_proof" checked> Requires proof</label><input type="hidden" data-p2-field="sort" value="50"><input type="hidden" data-p2-field="fee_pct" value="0"><input type="hidden" data-p2-field="fee_fixed" value="0"><input type="hidden" data-p2-field="expiry_minutes" value="1440"></div>`).join('');} return; }
+  if (a === "p2-delete-method") return (async()=>{if(!confirm("تعطيل أو حذف وسيلة الدفع؟ سيتم تعطيلها إذا كانت مرتبطة بدفعات."))return;try{await p2Rpc("payment_methods_admin_delete",{p_id:d.id});toast("تم تحديث الوسيلة");await loadPaymentV2Admin();}catch(err){toast("فشل: "+err.message,"e");}})();
+  if (a === "p2-save-fx") return (async()=>{const v=Number($("#p2-fx")?.value); if(!(v>0))return toast("أدخل سعراً موجباً","e"); try{await p2Rpc("fx_rate_set",{p_pair:"SYP/USDT",p_rate:v});toast("تم حفظ سعر الصرف؛ الدفعات القديمة لا تتغير.");}catch(err){toast("فشل السعر: "+err.message,"e");}})();
+  if (a === "p2-reconcile") return (async()=>{try{const q=await p2Rpc("payments_reconcile",{});$("#p2-reconcile").textContent=JSON.stringify(q,null,2); }catch(err){toast("فشلت المطابقة: "+err.message,"e");}})();
+  if (a === "p2-wallet-reconcile") return (async()=>{try{const q=await p2Rpc("wallet_reconcile",{});$("#p2-reconcile").textContent=JSON.stringify(q,null,2); }catch(err){toast("فشلت المطابقة: "+err.message,"e");}})();
+  if (a === "p2-proof") return (async()=>{try{const r=await api("/storage/v1/object/sign/payment-proofs/"+d.path.split("/").map(encodeURIComponent).join("/"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({expiresIn:300})});if(!r.ok)throw new Error(await r.text());const q=await r.json();const url=SB_URL+(q.signedURL.startsWith("/")?q.signedURL:"/storage/v1/"+q.signedURL);window.open(url,"_blank","noopener,noreferrer");}catch(err){toast("تعذّر فتح الإثبات: "+err.message,"e");}})();
   if (a == "logout") {
     try {
       localStorage.removeItem("amx_sb");
@@ -1334,6 +1422,7 @@ document.addEventListener("click", (e) => {
   if (a == "f-add-opt") return addFilterOpt(b);
   if (a == "proof-link") return proofLink(b);
   if (a == "save-api") return saveApis(b);
+  if (a == "smm-clear-legacy-keys") return smmClearLegacyKeys(b);
   if (a == "prov-save") return provSave(b);
   if (a == "prov-test") return provTest(b);
   if (a == "prov-del") return provDel(b);
@@ -1824,16 +1913,13 @@ async function publish(btn) {
 }
 async function loadApis() {
   try {
-    const r = await api("/rest/v1/api_settings?id=eq.1&select=*");
+    const r = await api("/rest/v1/api_settings?id=eq.1&select=smm_api_url,smm_api_secret_name,smm_api_path,ai_system_prompt");
     if (!r.ok) throw new Error();
     const d = (await r.json())[0] || {};
     D.api = {
       smm_url: d.smm_api_url || "",
-      smm_key: d.smm_api_key || "",
-      payment_gateway: d.payment_gateway || "",
-      payment_public_key: d.payment_public_key || "",
-      payment_secret_key: d.payment_secret_key || "",
-      ai_api_key: d.ai_api_key || "",
+      smm_secret_name: d.smm_api_secret_name || "SMM_API_KEY",
+      smm_path: d.smm_api_path || "",
       ai_system_prompt: d.ai_system_prompt || "",
     };
     API_LOADED = true;
@@ -1851,13 +1937,14 @@ async function saveApis(btn) {
   }
   const d = D.api || {};
   busy(btn, true);
+  const secretName = String(d.smm_secret_name || "SMM_API_KEY").trim();
+  if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(secretName)) { busy(btn, false); toast("اسم السر يجب أن يكون متغيراً مثل SMM_API_KEY؛ لا تُدخل قيمة المفتاح هنا", "e"); return; }
+  const smmUrl = String(d.smm_url || "").trim();
+  if (smmUrl && !/^https:\/\/\S+$/i.test(smmUrl)) { busy(btn, false); toast("رابط المزوّد يجب أن يبدأ بـ https://", "e"); return; }
   const row = {
-    smm_api_url: (d.smm_url || "").trim(),
-    smm_api_key: (d.smm_key || "").trim(),
-    payment_gateway: d.payment_gateway || "",
-    payment_public_key: d.payment_public_key || "",
-    payment_secret_key: d.payment_secret_key || "",
-    ai_api_key: d.ai_api_key || "",
+    smm_api_url: smmUrl,
+    smm_api_secret_name: secretName,
+    smm_api_path: String(d.smm_path || "").trim() || null,
     ai_system_prompt: d.ai_system_prompt || "",
   };
   const H = {
@@ -2633,11 +2720,12 @@ async function fn(name, body) {
 }
 /* ---------- multi-site SMM ----------
    "main" = the original provider kept in api_settings (Edge Function secrets stay server-side).
-   Extra sites live in the admin-only table smm_providers (id, name, api_url, api_key, enabled).
+   Extra sites live in the admin-only table smm_providers; this page only reads a secret-name and a redacted config projection.
    A product points at its site with `smm_provider` (missing / "main" = the main provider).
    Keys are loaded only to edit them and are NEVER part of the published store config (pubData drops them: they are not in D). */
 let PROV_KIND = {}, PROVS = [], PROV_LOADED = false, PROV_NAME = {}, SMM_PROV = "main", SMM_SVC_PROV = null, SITES_OK = false;
 const PROV_RE = /^[a-z0-9_-]{1,30}$/;
+const provSecretDefault = (id) => `SMM_PROVIDER_${String(id || "").toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`;
 const provOf = (p) => String((p && p.smm_provider) || "main").trim().toLowerCase() || "main";
 const provName = (id) => (id == "main" ? "المزوّد الرئيسي" : PROV_NAME[id] || id);
 function provOpts(cur) {
@@ -2649,12 +2737,13 @@ function provOpts(cur) {
 }
 const provSel = () => provOpts().map(([k, n]) => `<option value="${esc(k)}"${k == SMM_PROV ? " selected" : ""}>${esc(n)}</option>`).join("");
 const smmProv = () => { const el = $("#smm-prov"); if (el) SMM_PROV = el.value || "main"; return SMM_PROV || "main"; };
-/* namesOnly: just id + name for dropdowns / labels (no keys). Otherwise the full rows for the editor. */
+/* namesOnly: simple labels; full editor data comes from a redacting RPC, never a raw credential column. */
 async function loadProviders(namesOnly) {
   try {
-    let r = await api("/rest/v1/smm_providers?select=" + (namesOnly ? "id,name,kind,enabled" : "id,name,kind,config,api_url,api_key,enabled") + "&order=created_at.asc");
-    if (!r.ok) r = await api("/rest/v1/smm_providers?select=" + (namesOnly ? "id,name,enabled" : "id,name,api_url,api_key,enabled") + "&order=created_at.asc"); // older database without kind / config
-    if (!r.ok) throw new Error((await r.text()).slice(0, 120));
+    let r = namesOnly
+      ? await api("/rest/v1/smm_providers?select=id,name,kind,enabled&order=created_at.asc")
+      : await api("/rest/v1/rpc/smm_providers_admin_list", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 180) || "انشر migration إخفاء أسرار المزوّدين أولاً");
     const rows = await r.json();
     PROV_NAME = {}; PROV_KIND = {};
     rows.forEach((x) => { PROV_NAME[x.id] = x.name || x.id; PROV_KIND[x.id] = x.kind || "smm"; });
@@ -2691,14 +2780,14 @@ const cfgBox = (c) => `<label class="fld w2"><span>الإعدادات JSON (لل
 const PROV_EX_NUM = '{\n  "country": "0",\n  "currency": "RUB",\n  "rate_factor": 0.011\n}';
 const PROV_EX_CUSTOM = '{\n  "self_service": true,\n  "balance": { "path": "/balance", "value": "data.balance", "currency": "data.currency" },\n  "order": {\n    "method": "POST", "path": "/orders",\n    "body": { "product_id": "{service}", "player_id": "{input}", "quantity": "{quantity}", "reference": "{ref}" },\n    "id": "data.order_id", "error": "message",\n    "delivery": { "text": "data.note", "code": "data.code" }\n  },\n  "status": {\n    "method": "GET", "path": "/orders/{order}", "state": "data.status",\n    "done": ["delivered", "completed"], "failed": ["failed", "refunded"],\n    "delivery": { "text": "data.note", "code": "data.code" }\n  }\n}';
 const provHelp = () => `<details style="margin:8px 0"><summary><b>كيف أضيف خدمات غير الرشق؟ (أرقام، شحن ألعاب، اشتراكات)</b></summary>` +
-  `<p class="hint"><b>أرقام تفعيل:</b> اختر النوع «أرقام تفعيل»، الرابط مثل <bdi dir="ltr">https://api.sms-activate.org/stubs/handler_api.php</bdi> (أو أي موقع بنفس الواجهة) والمفتاح. «عرض الخدمات» يجلب الأسعار، والمنتج يحمل رمز الخدمة (wa / tg ...) ورمز الدولة. الرقم والرمز يصلان للزبون تلقائياً في صفحة طلباته. إن كان سعر المزوّد بعملة غير عملة المتجر فضع <bdi dir="ltr">rate_factor</bdi> (مثلاً 0.011 للروبل→دولار).</p><pre class="hint" dir="ltr" style="white-space:pre-wrap;user-select:all">${esc(PROV_EX_NUM)}</pre>` +
+  `<p class="hint"><b>أرقام تفعيل:</b> اختر النوع «أرقام تفعيل»، والرابط الذي يحدده مزوّدك من وثائقه الرسمية. أدخل اسم Edge Secret فقط في الحقل المجاور، وضع قيمة المفتاح في Supabase Secrets. «عرض الخدمات» يجلب الأسعار، والمنتج يحمل رمز الخدمة والدولة. إعدادات العملة لا تغني عن توثيق المزوّد.</p><pre class="hint" dir="ltr" style="white-space:pre-wrap;user-select:all">${esc(PROV_EX_NUM)}</pre>` +
   `<p class="hint"><b>شحن ألعاب / Canva / Midjourney / ذكاء اصطناعي:</b> اختر «مخصّص» وصِف الـ API كاملاً في الإعدادات بدل تعديل الكود. القوالب المتاحة: <bdi dir="ltr">{service} {input} {quantity} {country} {ref} {order} {key}</bdi>. بلا قسم <bdi dir="ltr">status</bdi> يُعتبر الطلب مكتملاً فور نجاحه (تسليم فوري). <bdi dir="ltr">self_service:true</bdi> يسمح للزبون بتشغيل الطلب بنفسه بعد الدفع. في المنتج اختر «نوع التسليم» وضع رمز السلعة في «رقم أو رمز الخدمة». إن لم يوفّر المزوّد قائمة خدمات فأضف المنتجات يدوياً.</p><pre class="hint" dir="ltr" style="white-space:pre-wrap;user-select:all">${esc(PROV_EX_CUSTOM)}</pre></details>`;
 function provRow(x) {
   const used = D.products.filter((p) => p.smm_service && provOf(p) == x.id).length;
   return `<div class="card" style="background:var(--bg)" data-pbox="${esc(x.id)}"><div class="od-m"><b dir="ltr">${esc(x.id)}</b> · ${used} منتج مرتبط</div>` +
     `<div class="g2"><label class="fld"><span>الاسم (يظهر لك فقط)</span><input class="inp" data-pv="name" value="${esc(x.name || "")}"></label><label class="fld"><span>نوع المزوّد</span>${kindSel(x.kind)}</label>` +
     `<label class="fld"><span>API URL</span><input class="inp" dir="ltr" data-pv="url" value="${esc(x.api_url || "")}" placeholder="https://example.com/api/v2" autocomplete="off"></label>` +
-    `<label class="fld"><span>API Key</span><input class="inp" dir="ltr" data-pv="key" value="${esc(x.api_key || "")}" autocomplete="off"></label>` +
+    `<label class="fld"><span>اسم Edge Secret للمفتاح (القيمة لا تُحفظ هنا)</span><input class="inp" dir="ltr" data-pv="secret" value="${esc(x.api_key_secret_name || x.config?.api_key_secret_name || provSecretDefault(x.id))}" autocomplete="off" spellcheck="false"></label>` +
     `${cfgBox(x.config)}<label class="chk"><input type="checkbox" data-pv="on" ${x.enabled !== false ? "checked" : ""}> مفعّل (يسمح بإرسال الطلبات إليه)</label></div>` +
     `<div class="acts"><button class="b sm" data-a="prov-save" type="button">حفظ</button><button class="b b2 sm" data-a="prov-test" data-id="${esc(x.id)}" type="button">فحص الاتصال والرصيد</button><button class="b bd2 sm" data-a="prov-del" data-id="${esc(x.id)}" type="button">حذف</button></div>` +
     `<div class="hint" data-pout></div></div>`;
@@ -2706,13 +2795,13 @@ function provRow(x) {
 function provBox() {
   const rows = PROV_LOADED ? (PROVS.length ? PROVS.map(provRow).join("") : '<p class="hint">لا توجد مواقع إضافية بعد.</p>') : '<div class="ld"><span class="spin"></span> جارٍ التحميل…</div>';
   return `<div class="card" id="prov-box"><h2>مواقع رشق إضافية</h2>` +
-    `<p class="hint">أضف أي عدد من المزوّدين: مواقع رشق (واجهة API القياسية v2) أو مواقع أرقام تفعيل أو أي API آخر لشحن الألعاب والاشتراكات (انظر الشرح أدناه). المزوّد الرئيسي أعلاه لا يتغيّر ويبقى معرّفه <b>main</b>. كل منتج رشق يُربط بموقعه عند الاستيراد، ويُرسَل طلبه إلى موقعه تلقائياً (وطلب واحد قد يحوي منتجات من مواقع مختلفة). المفاتيح تُحفظ في جدول smm_providers (أدمن فقط) ولا تُنشر مع المتجر. «فحص الاتصال» يختبر القيم المحفوظة، فاحفظ أولاً.</p>` +
+    `<p class="hint">أضف أي عدد من المزوّدين: مواقع رشق (واجهة API القياسية v2) أو مواقع أرقام تفعيل أو أي API آخر لشحن الألعاب والاشتراكات (انظر الشرح أدناه). المزوّد الرئيسي أعلاه لا يتغيّر ويبقى معرّفه <b>main</b>. كل منتج رشق يُربط بموقعه عند الاستيراد، ويُرسَل طلبه إلى موقعه تلقائياً (وطلب واحد قد يحوي منتجات من مواقع مختلفة). حقل هذا النموذج يحفظ اسم Edge Secret فقط؛ قيمة المفتاح تُضاف في Supabase Secrets ولا تُقرأ من قاعدة البيانات. «فحص الاتصال» يختبر السر الفعلي، فاحفظ الاسم وأضف السر أولاً.</p>` +
     provHelp() + rows +
     `<div class="card" style="background:var(--bg)" data-pbox="__new"><h3>إضافة موقع جديد</h3>` +
     `<div class="g2"><label class="fld"><span>المعرّف (إنجليزي صغير بلا مسافات)</span><input class="inp" dir="ltr" data-pv="id" placeholder="s2" maxlength="30" autocomplete="off"></label>` +
     `<label class="fld"><span>الاسم (يظهر لك فقط)</span><input class="inp" data-pv="name" placeholder="الموقع الثاني"></label><label class="fld"><span>نوع المزوّد</span>${kindSel("smm")}</label>` +
     `<label class="fld"><span>API URL</span><input class="inp" dir="ltr" data-pv="url" placeholder="https://example.com/api/v2" autocomplete="off"></label>` +
-    `<label class="fld"><span>API Key</span><input class="inp" dir="ltr" data-pv="key" autocomplete="off"></label>` +
+    `<label class="fld"><span>اسم Edge Secret للمفتاح</span><input class="inp" dir="ltr" data-pv="secret" value="${provSecretDefault("s2")}" autocomplete="off" spellcheck="false"></label>` +
     `${cfgBox({})}<label class="chk"><input type="checkbox" data-pv="on" checked> مفعّل</label></div>` +
     `<p class="hint warn">⚠ المعرّف يُحفظ داخل بيانات المنتج العامة (يراه من يفحص ملفات المتجر)، فاختر معرّفاً محايداً مثل s2 ولا تضع اسم الموقع فيه. الرابط يجب أن يبدأ بـ https.</p>` +
     `<div class="acts"><button class="b" data-a="prov-save" type="button">إضافة الموقع</button></div></div></div>`;
@@ -2723,7 +2812,7 @@ async function provSave(btn) {
   const isNew = box.dataset.pbox == "__new";
   const gv = (k) => { const el = box.querySelector(`[data-pv="${k}"]`); return !el ? "" : el.type == "checkbox" ? el.checked : el.value.trim(); };
   const id = isNew ? String(gv("id")).toLowerCase() : box.dataset.pbox;
-  const url = gv("url"), key = gv("key"), name = gv("name") || id, enabled = gv("on") === true;
+  const url = gv("url"), secretName = String(gv("secret") || provSecretDefault(id)).trim(), name = gv("name") || id, enabled = gv("on") === true;
   const kind = ["smm", "smsactivate", "custom"].includes(gv("kind")) ? gv("kind") : "smm";
   let config = {};
   if (kind != "smm" && gv("cfg")) {
@@ -2733,7 +2822,7 @@ async function provSave(btn) {
   if (kind == "custom" && !(config.order && config.order.path)) return toast("النوع المخصّص يحتاج على الأقل order.path في الإعدادات (انظر الأمثلة)", "e");
   if (!PROV_RE.test(id) || id == "main") return toast("المعرّف: حروف إنجليزية صغيرة وأرقام و - _ فقط (حتى 30 حرفاً) ولا يصح main", "e");
   if (!/^https:\/\/\S+$/i.test(url)) return toast("الرابط يجب أن يبدأ بـ https://", "e");
-  if (!key) return toast("أدخل مفتاح API", "e");
+  if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(secretName)) return toast("أدخل اسم Edge Secret فقط (مثل SMM_PROVIDER_S2_API_KEY)، ولا تُدخل قيمة المفتاح", "e");
   if (isNew && PROVS.some((x) => x.id == id)) return toast("هذا المعرّف مستخدم من قبل", "e");
   busy(btn, true);
   try {
@@ -2741,7 +2830,8 @@ async function provSave(btn) {
       const inf = await fn("smm-order", { action: "info" }).catch(() => null);
       if (!(inf && inf.kinds)) throw new Error("انشر النسخة الجديدة من دالة smm-order أولاً (supabase/functions/smm-order) لتدعم الأنواع الجديدة");
     }
-    const row = { name, kind, config, api_url: url, api_key: key, enabled };
+    config.api_key_secret_name = secretName;
+    const row = { name, kind, config, api_url: url, api_key_secret_name: secretName, enabled };
     const H = { "Content-Type": "application/json", Prefer: "return=representation" };
     // POST / PATCH + return=representation: a silent RLS block shows up as 0 rows instead of a fake "saved"
     const r = await api(isNew ? "/rest/v1/smm_providers" : "/rest/v1/smm_providers?id=eq." + encodeURIComponent(id), {
@@ -2756,6 +2846,39 @@ async function provSave(btn) {
     await loadProviders();
   } catch (e) {
     toast("فشل الحفظ — " + String(e.message || "").slice(0, 90), "e");
+  } finally {
+    busy(btn, false);
+  }
+}
+async function smmClearLegacyKeys(btn) {
+  if (!confirm("سيُحذف مفتاح SMM الرئيسي ومفاتيح المزوّدين المخزّنة في قاعدة البيانات نهائياً. لا يمكن الاستعادة من الواجهة. هل اختبرت Edge Secrets لكل موقع؟")) return;
+  busy(btn, true);
+  try {
+    if (!(await siteSupport())) throw new Error(SITES_OLD);
+    // Fail closed: verify the main provider and every configured additional provider before deleting legacy values.
+    const targets = [{ id: "main", enabled: true }, ...PROVS];
+    if (PROVS.some((x) => !x.api_key_secret_name && !x.config?.api_key_secret_name)) throw new Error("أدخل اسم Edge Secret لكل مزوّد أولاً");
+    const failures = [];
+    for (const provider of targets) {
+      try {
+        const result = await fn("smm-order", { action: "balance", provider: provider.id });
+        if (result?.error) throw new Error(result.error);
+      } catch (e) {
+        failures.push(provider.id + ": " + String(e.message || e).slice(0, 100));
+      }
+    }
+    if (failures.length) throw new Error("لم تُحذف المفاتيح. أصلح اختبارات الاتصال أولاً: " + failures.join(" | "));
+    const response = await api("/rest/v1/rpc/smm_legacy_keys_clear", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_confirm: "CLEAR_LEGACY_SMM_KEYS" })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || result.error || "تعذر حذف المفاتيح القديمة");
+    toast(`تم حذف بيانات المفاتيح القديمة: ${result.provider_rows_changed || 0} موقع إضافي`);
+    await loadApis();
+    await loadProviders();
+  } catch (e) {
+    toast("لم تُحذف المفاتيح: " + String(e.message || e).slice(0, 180), "e");
   } finally {
     busy(btn, false);
   }
@@ -2777,7 +2900,7 @@ async function provTest(btn) {
 async function provDel(btn) {
   const id = btn.dataset.id, n = D.products.filter((p) => provOf(p) == id).length;
   if (n) return toast(`لا يمكن الحذف: ${n} منتج مرتبط بهذا الموقع. احذف منتجاته أولاً (اختر الموقع في «اختبار موقع الرشق» ثم «حذف كل منتجات الرشق»).`, "e");
-  if (!confirm(`حذف الموقع «${provName(id)}» (${id}) ومفتاحه نهائياً؟`)) return;
+  if (!confirm(`حذف الموقع «${provName(id)}» (${id}) ومرجع السر نهائياً؟ احذف/دوّر قيمة Edge Secret يدوياً إذا لم تعد مستخدمة.`)) return;
   busy(btn, true);
   try {
     const r = await api("/rest/v1/smm_providers?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: { Prefer: "return=representation" } });

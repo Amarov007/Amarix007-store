@@ -14,7 +14,7 @@
 - `SQL-RUN-ORDER.md` — ترتيب تشغيل ملفات SQL (قاعدة جديدة / قاعدة حية) وأوامر Supabase CLI و pg_cron. `docs/LIVE-ONLY.md` — الدوال والجداول الموجودة في القاعدة الحية فقط.
 - `SECURITY-HEADERS.md` — سياسة CSP المعتمدة وقواعد Cloudflare Transform Rules للترويسات (GitHub Pages لا يضبط ترويسات بنفسه).
 - `supabase-schema.sql` — مخطط قاعدة جديدة. `supabase-live-sync.sql` — الجداول والدوال التي كانت في القاعدة الحية فقط (التقييمات، الإشعارات، السلة، السحب، إحصاءات اللوحة). `supabase-security-fixes.sql`, `supabase-support-tickets.sql` — ترقيات للقواعد القديمة. **الترتيب الصحيح لكل الملفات في `SQL-RUN-ORDER.md`**. كل دالة معرَّفة في ملف واحد فقط، وصلاحيات التنفيذ كلها في `supabase-final-grants.sql` الذي يُشغَّل **أخيراً** دائماً.
-- `supabase/functions/*` — مصدر الدالتين الطرفيتين `send-push` و`smm-order` (الأخيرة تدعم عدة مواقع رشق، انظر «تعدد مواقع الرشق»). حمّل الباقي بـ `supabase functions download ai-support smm-order media-seed img-shrink`.
+- `supabase/functions/*` — مصدر الدوال الطرفية، بما فيها `smm-order` و`payment-proof-hash` و`fulfillment-worker` في فرع إعادة هيكلة الدفع (لا تنشرها قبل الاختبارات). للتنزيل، نفّذ أمراً مستقلاً لكل اسم دالة؛ انظر `docs/LIVE-ONLY.md`، ولا تخلط تنزيل المصدر الحي بملفات الفرع الجديد.
 - `supabase/migrations/*` — التعديلات المطبّقة على القاعدة الحية بعد هذا التاريخ.
 
 ## ملاحظات مهمة
@@ -24,17 +24,17 @@
 - CAPTCHA حقيقي: ضع مفتاح Turnstile العام في `TURNSTILE_SITE_KEY` (قسم 13 في `app.js`) وفعّل Captcha في Supabase > Auth > Attack Protection بالمفتاح السري.
 - تفعيل Leaked Password Protection من لوحة Supabase > Auth > Providers > Email (إعداد لا يمكن تغييره بـ SQL).
 
-## إرسال الطلبات للمزود (smm-order v5) ولوحة الطلبات
+## إرسال الطلبات للمزود (smm-order v14 على هذا الفرع) ولوحة الطلبات
 - زر الإرسال في لوحة الطلبات اسمه «**إرسال للمزود**». بعد فشل جزئي يصير «إعادة إرسال البنود الفاشلة للمزود» (البنود التي نجحت لا تُعاد أبداً)، ويختفي عند «أُرسل / مكتمل / جارٍ الإرسال».
 - **قفل الإرسال**: يُكتب في `orders.smm_status` كـ `sending@<وقت>` (لا عمود جديد ولا SQL). قفل أحدث من 3 دقائق = إرسال جارٍ فعلاً (409). أقدم من ذلك أو `sending` القديمة بلا وقت = عالق: لا يُفكّ تلقائياً (قد يكون المزود قبل بنداً لم يُحفظ)، بل يظهر زر «فكّ القفل وإعادة الإرسال» للأدمن/الموظف مع تحذير بفحص لوحة المزود أولاً (`unlock:true`). الزبون لا يستطيع فكّ القفل.
 - **حفظ كل بند** فور قبول المزود له، فانقطاع الدالة في المنتصف لا يضيّع رقم الطلب عند المزود ولا يسبب إرسالاً مزدوجاً.
 - **التحديث لا يكتب أثناء إرسال جارٍ** (كان قد يمحو التقدّم)، والطلب الذي فيه بند فاشل يبقى `partial` ولا يتحول إلى `completed` (كان يُقفل ولا يمكن إعادة إرسال البند الفاشل).
 - لوحة الطلبات: تنبيه قبل تعليم طلب «مكتمل» وهو لم يُرسل للمزود، حالات المزود بالعربية، مبالغ البنود منسّقة بالعملة، فلاتر الدفع وحالة المزود («مدفوع ولم يُرسل» و«مشاكل»)، بحث برقم الطلب عند المزود، وعرض 50 طلباً مع «عرض المزيد» وتحميل صفحات أقدم من الخادم.
-- الإرسال التلقائي ما زال من المتصفح فقط (والوحدة مفتوحة). فشله يُسجَّل في الجلسة: لا إعادة قبل 10 دقائق ولا أكثر من 3 محاولات ولا تكرار لرسالة الخطأ. الإرسال التلقائي من الخادم (trigger / pg_cron) غير مُنفَّذ بعد.
+- النسخة الحية القديمة كانت تعتمد الإرسال التلقائي من المتصفح. يضيف هذا الفرع طابور `fulfillment_jobs` وعاملاً مجدولاً، لكنه لا يعمل قبل مراجعة المخطط وتطبيق migration على بيئة اختبار وضبط Vault/`pg_cron`/`pg_net` ثم نشر الدوال. لا تُعدّ ميزة التنفيذ الخادمي مفعّلة بمجرد رفع ملفات الواجهة.
 - **النشر**: `supabase functions deploy smm-order` أولاً ثم ارفع الواجهة. الواجهة الجديدة تعمل مع الدالة القديمة (دون فكّ القفل).
 
 ## تعدد مواقع الرشق (أكثر من API)
-- **المزوّد الرئيسي** (`main`) هو نفسه كما كان: رابط ومفتاح `api_settings` من لوحة التحكم › APIs. لا يتغيّر شيء في المنتجات والطلبات الحالية.
+- **المزوّد الرئيسي** (`main`) يحتفظ بالرابط ومسار API، أما هذا الفرع فيستخدم اسم Edge Secret بدلاً من إرجاع المفتاح أو حفظه عبر الواجهة. نقل القيم القديمة إلى Edge Secrets خطوة يدوية موثقة؛ لا تفعّل `ALLOW_LEGACY_DB_API_KEYS` في الإنتاج.
 - **مواقع إضافية**: من لوحة التحكم › APIs › «مواقع رشق إضافية» أضف أي عدد (معرّف إنجليزي محايد مثل `s2`، اسم، رابط https، مفتاح). تُحفظ في جدول `smm_providers` (أدمن فقط، لا تُنشر مع المتجر). زر «فحص الاتصال والرصيد» يختبر القيم المحفوظة. لا يلزم SQL جديد: الجدول موجود في `supabase-live-sync.sql`.
 - **الاستيراد**: في «اختبار موقع الرشق» اختر الموقع ثم «عرض الخدمات» ثم استورد. كل منتج مستورد يحمل `smm_provider` (غيابه = `main`)، ومعرّفه `smm_<موقع>_<رقم>` كي لا يتعارض رقم الخدمة بين موقعين (منتجات `main` تحتفظ بمعرّف `smm<رقم>`). «حذف كل منتجات الرشق» و«حذف وإعادة جلب» يعملان على الموقع المختار فقط ولا يمسّان منتجات المواقع الأخرى. يمكن تغيير موقع أي منتج يدوياً من حقل «موقع الرشق» في تحرير المنتج.
 - **الإرسال**: `smm-order` يقرأ `smm_provider` من كل منتج في الطلب ويرسل كل بند إلى موقعه؛ الطلب الواحد قد يحوي منتجات من مواقع مختلفة. تُحفظ النتيجة لكل بند مع `site` (الحقل `provider` محجوز لحالة الطلب عند الموقع بعد «تحديث الحالة»). تُتحقق كل المواقع المطلوبة **قبل** إرسال أي بند، فموقع معطّل أو بلا مفتاح يرفض الطلب كله دون إرسال جزئي. المواقع الإضافية: https فقط ولا عناوين داخلية ولا تتبّع تحويلات (حماية SSRF).
@@ -44,7 +44,7 @@
   - `custom`: أي API آخر (شحن PUBG، Canva Pro، Midjourney، اشتراكات ذكاء اصطناعي ...) يُوصَف في `config` بلا تعديل كود: `balance`, `services`, `order`, `status` وكل منها `method` و`path` (يبدأ بـ `/` ويُضاف لرابط الموقع) و`headers` و`query` و`body` بقوالب `{service} {input} {quantity} {country} {ref} {order} {key}`، ومسارات الرد بنقاط مثل `data.order_id`. `order.delivery` و`status.delivery` يحدّدان ما يُعرض للزبون (`text`, `code`, `number`, `email`, `password`, `pin`, `serial`, `link`). بلا `status` يُعتبر الطلب مكتملاً فور نجاحه (تسليم فوري). `self_service:true` يسمح للزبون بتشغيل الطلب بنفسه بعد الدفع. أمثلة جاهزة داخل لوحة التحكم (شرح «كيف أضيف خدمات غير الرشق»). سعر `services` يُقرأ كسعر الوحدة الواحدة، و`rate_is_unit:false` إن كان سعر الألف.
 - **حقول المنتج الجديدة**: `smm_service` يقبل رقماً أو رمزاً نصياً (`wa`, `tg`, `uc_60`)، `smm_input` = `""` رشق (رابط + كمية) | `none` رقم أو كود بلا مدخل | `text` الزبون يكتب معرّف لاعب أو إيميل، `smm_country` رمز دولة الرقم أو خيار إضافي. المنتجات من النوعين `none` و`text` تُباع كمنتجات عادية (سعر الوحدة لا «/ 1000») وتُدفع بغير المحفظة. بند الأرقام كميته 1 دائماً (رقم واحد لكل بند).
 - **الأمان**: الزبون لا يستطيع تشغيل `send/poll` إلا لطلبه المدفوع هو، ولبنود مزوّدين `self_service` فقط (الرشق مرفوض دائماً). قفل `smm_status = sending` يمنع الإرسال المزدوج. تحديث الزبون محدود بمرة كل 4 ثوانٍ لكل طلب. كل مزوّد إضافي: https فقط، مضيف عام، بلا تتبّع تحويلات، والمسارات لا تخرج عن مضيف الموقع.
-- **حدود معروفة**: الاسترداد التلقائي للمحفظة عند إلغاء رقم لم يصله رمز غير مبرمج (يظهر للزبون «أُلغي — تواصل مع الدعم»)؛ نوع `custom` يعتمد على أن المزوّد يقبل `ref` أو يمنع التكرار بنفسه عند إعادة محاولة بند فشل.
+- **حدود معروفة في هذا الفرع**: عامل التنفيذ يسترد حالات الفشل و`Partial` فقط عند توافر بيانات موثوقة من المزوّد، وإلا يحوّلها إلى `manual_review`. خدمات التسليم غير الرشق بلا adapter موثّق تبقى للمراجعة اليدوية. لا تُفعّل تأكيد USDT/Binance Pay الآلي.
 - **الأسعار والرصيد**: فحص تغيّر الأسعار ورصيد المزوّد في الرئيسية يعملان لكل موقع مستخدم على حدة؛ تعذّر موقع واحد لا يخفي الباقي ولا يُعدّ «خدمة محذوفة».
 - **ترتيب النشر المهم**: انشر دالة `smm-order` الجديدة **أولاً** (`supabase functions deploy smm-order`)، ثم ارفع الواجهة. الدالة الجديدة متوافقة مع الواجهة القديمة. الواجهة الجديدة تتحقق عبر `{action:"info"}` وترفض أي عملية على موقع غير رئيسي إن كانت الدالة المنشورة قديمة (كانت ستخاطب الموقع الرئيسي بالخطأ).
 - جدول `api_integrations` ودالة `api-hub` الموجودان في القاعدة الحية (فحص تكاملات عامة) منفصلان ولا تستخدمهما هذه الميزة.
@@ -82,12 +82,12 @@
 - `refInfo.loaded` لا يصبح `true` إلا بعد قراءة صف `affiliates` فعلاً. و`syncProfile()` تعيد قراءة الملف بعد إنشائه لأول مرة.
 - العمولة تُحتسب للشركاء المعتمدين فقط؛ النسبة الافتراضية من `affiliate_rate` في `store_config` (5% إن لم توجد) ويمكن تخصيصها لكل شريك.
 
-## المحفظة (Wallet) — خدمات الرشق
-- نفّذ `supabase-wallet.sql` مرة واحدة في Supabase SQL Editor. ينشئ `wallets` (رصيد لكل مستخدم **لكل قسم**) و`wallet_transactions` (دفتر الحركات) و`wallet_topups` (طلبات الشحن). العميل لا يكتب فيها مباشرة؛ كل شيء عبر دوال `security definer`.
-- العميل: صفحة `#/wallet` (من «محفظتي» في الحساب): يختار المبلغ ووسيلة الدفع ← تظهر تعليمات التحويل ← يرفع إثبات الدفع ويضغط «تم الدفع» ← المدير يوافق من لوحة التحكم > **المحافظ** فيُضاف الرصيد.
-- الدفع: في السلة يظهر خيار «المحفظة» **فقط** إذا كانت كل المنتجات خدمات رشق. الخصم ذري على الخادم (`pay_order_with_wallet`) ثم يصبح الطلب «تم الدفع» وينفّذه الإرسال التلقائي/اليدوي المعتاد. إلغاء الطلب من لوحة التحكم يُرجع المبلغ للمحفظة تلقائياً (مرة واحدة).
-- الإعدادات (لوحة التحكم > المحافظ ثم «نشر»): تفعيل/إيقاف، أقل/أعلى مبلغ شحن.
-- **إضافة قسم جديد لاحقاً** (مثلاً حسابات): ١) أضف اسمه في `WALLET_SECTIONS` (أعلى قسم المحفظة في `app.js`) وفي `store_config.data.wallet.sections`؛ ٢) عدّل `wallet_item_section()` في `supabase-wallet.sql` ليُرجع اسم القسم لمنتجاته، و`walletCartSec()` في `app.js` بالمنطق نفسه. الجداول لا تتغيّر.
+## المحفظة (Wallet) — رصيد موحّد `main`
+- يُدار الرصيد عبر `wallets` و`wallet_transactions` و`wallet_topups` ودوال خادمية فقط؛ لا يكتب المتصفح إلى دفتر الحركات مباشرة.
+- صفحة `#/wallet` تسمح بطلب شحن المحفظة، عرض تعليمات الوسيلة بعد إنشاء الدفعة، رفع الإثبات، ثم المراجعة اليدوية. لا تُكشف بيانات الحساب قبل إنشاء دفعة مملوكة للعميل.
+- تستخدم المحفظة قسماً واحداً `main`، ولا تعتمد أهلية الدفع على شرط «كل المنتجات خدمات رشق» في الواجهة. يستدعي المتجر `wallet_eligible(items)` في الخادم، وهو المصدر المعتمد للأرقام ومنتجات التسليم الفوري والخدمات الأخرى. لا تضف منطق أهلية موازياً في JavaScript.
+- الخصم والاسترداد يجب أن يكونا عمليتين ذريّتين عبر payments v2 والدفتر غير القابل للتعديل؛ عند التراجع، أضف قيداً عكسياً ولا تعدّل السجل التاريخي. لا تعتمد على فتح لوحة الإدارة لتشغيل التنفيذ المجدول.
+- إعدادات التسعير والشحن تُراجع في لوحة الإدارة؛ تظل ميزة `payments_v2.on` معطّلة إلى حين نجاح اختبارات قاعدة محلية، وRLS بين مستخدمين، والتزامن والمطابقة المالية.
 
 ## السيو والسرعة
 - الصفحات العامة القابلة للفهرسة فقط: الرئيسية `/` و`/faq/` و`/policies/`. بقية المتجر خلف تسجيل الدخول فتُعلَّم `noindex` تلقائياً (`seoHead()` في `app.js`).
@@ -96,3 +96,12 @@
 - `404.html`: صفحة خطأ بهوية المتجر (GitHub Pages يستخدمها تلقائياً).
 - `index.html` يضيف `preconnect` إلى Supabase لتسريع تحميل الإعدادات، و`robots` وبيانات Organization/WebSite.
 - لم تُصغَّر ملفات JS/CSS عمداً: التوفير بعد الضغط (gzip) نحو 20KB فقط ولا يستحق تعقيد التحرير. الأيقونات محسّنة أصلاً.
+
+## Payments restructure (branch `payments-restructure`)
+
+- `pay.js` is the CSP-compatible ES module for v2 payment instructions, proof upload, wallet checkout/top-up, payment state and refund requests. The public payment-method RPC exposes only display metadata; account destinations are returned by the owner-scoped `payment_instructions()` RPC after payment creation.
+- `supabase/migrations/20261028070000_payments_restructure.sql` is an additive, feature-flagged migration. Pair it with `supabase/rollbacks/20261028070000_payments_restructure.sql`; the recovery file preserves financial rows and pauses the feature rather than dropping data. Follow `SQL-RUN-ORDER.md` exactly and never apply the migration directly to production without a tested backup and diff.
+- `supabase/functions/fulfillment-worker` consumes durable jobs after payment capture. Configure Vault secrets `supabase_url`, `service_role_key`, and `fulfillment_worker_token`, plus Edge Secret `FULFILLMENT_WORKER_TOKEN` with the same random value and `pg_cron`/`pg_net`; do not assume scheduling is active just because the SQL file ran.
+- `CHANGELOG-PAYMENTS.md` maps requested issues to files and tests, including features still not verified. `docs/LIVE-ONLY.md` describes the read-only Supabase metadata observed; it is not a schema dump.
+- Run `python3 tests/verify-project.py`, `for f in *.js; do node --check "$f"; done`, and `deno test --allow-net tests/smm-order.test.ts`. SQL contract assertions are in `supabase/tests/payments_v2_contract.sql` and must be run on a disposable local Supabase instance after applying the full schema and migration.
+- Automated USDT and Binance Pay confirmation remains disabled (`confirm_mode='manual'`); no provider API was guessed. Do not turn on `payments_v2.on` until local database, two-user RLS and concurrency tests pass.

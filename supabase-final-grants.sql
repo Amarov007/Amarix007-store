@@ -31,6 +31,7 @@ declare
     'apply_affiliate', 'affiliate_balance', 'my_affiliate_balance', 'my_affiliate_monthly', 'my_affiliate_payouts', 'request_payout',
     'approve_manual_payment', 'payment_create', 'payment_create_wallet_pay', 'payment_create_topup', 'payment_instructions',
     'payment_attach_proof', 'payment_submit', 'payment_cancel', 'payment_review_queue', 'payment_approve', 'payment_reject',
+    'payment_methods_admin_save', 'payment_methods_admin_delete', 'payments_v2_flag_set', 'smm_providers_admin_list', 'smm_legacy_keys_clear', 'payment_confirmation_issue', 'payment_approve_received', 'wallet_eligible', 'payments_status', 'payments_status_for_order',
     'refund_request', 'refund_approve', 'refund_reject', 'payments_reconcile', 'payment_settings_save', 'fx_rate_set',
     'pay_order_with_wallet', 'wallet_reconcile', 'wallet_topup_create', 'wallet_topup_set_proof', 'wallet_topup_claim',
     'wallet_topup_approve', 'wallet_topup_reject', 'wallet_admin_adjust',

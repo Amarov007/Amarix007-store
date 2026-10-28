@@ -877,7 +877,7 @@ function setCfg(cfg) {
         currency: String(m.currency || d0.currency || "").trim().toUpperCase(),
       };
     })
-    .filter((m) => (m.ar || m.en || m.logo || pmReadable(m)) && m.acc); // a method with no account/number yet is hidden (customers would have nowhere to pay)
+    .filter((m) => (m.ar || m.en || m.logo || pmReadable(m))); // account/address is private and returned only by payment_instructions()
   Object.keys(SBM).forEach((k) => delete SBM[k]); // boost panel: platform / type detection is recomputed for the new catalogue
   R = normRates(CFG.rates);
   BASE = "USD";
@@ -1068,7 +1068,7 @@ const pmLimitHint = (m, usd) => {
   return e ? `<p class="hint wl-low">${ic("warn", 14)} ${ex(e)}</p>` : "";
 };
 function emptyBox(icon, title, hint, extra) {
-  return `<div class="emp">${ic(icon, 40)}<br><b>${title}</b>${hint ? `<br><small>${hint}</small>` : ""}${extra ? `<br><br>${extra}` : ""}</div>`;
+  return `<div class="emp">${ic(icon, 40)}<br><b>${ex(title)}</b>${hint ? `<br><small>${ex(hint)}</small>` : ""}${extra ? `<br><br>${extra}` : ""}</div>`;
 }
 const ratingHtml = (p) => {
   const st = STATS[p.id],
@@ -1128,7 +1128,7 @@ function catAdv(c) {
   if (!sv || all.length < 2) return "";
   const st = fstate(c.id), ar = lang == "ar";
   const types = [...new Set(all.map((p) => sv.typeOf(p)))], provs = [...new Set(all.map((p) => sv.providerOf(p)))].sort();
-  const sel = (k, label, opts, cur) => `<label class="fsort"><span>${label}</span><select class="sel" data-a="cfx" data-k="${k}" data-c="${ex(c.id)}">${opts.map(([v, l]) => `<option value="${ex(v)}"${cur == v ? " selected" : ""}>${ex(l)}</option>`).join("")}</select></label>`;
+  const sel = (k, label, opts, cur) => `<label class="fsort"><span>${ex(label)}</span><select class="sel" data-a="cfx" data-k="${ex(k)}" data-c="${ex(c.id)}">${opts.map(([v, l]) => `<option value="${ex(v)}"${cur == v ? " selected" : ""}>${ex(l)}</option>`).join("")}</select></label>`;
   const pvName = (k) => (k == "main" ? (ar ? "المزوّد الرئيسي (SMM)" : "Main provider (SMM)") : k == "manual" ? (ar ? "يدوي" : "Manual") : k == "fazer" ? "FazerCards" : k);
   return (
     (types.length > 1 ? sel("ty", ar ? "النوع" : "Type", [["", ar ? "الكل" : "All"], ...types.map((k) => [k, sv.typeLabel(k, ar)])], st.ty) : "") +
@@ -1195,7 +1195,7 @@ function searchPage() {
       ? grid(st)
       : nb
       ? ""
-      : emptyBox("search", `${t("nores")} «${ex(q)}»`, t("noresh"), `<button class="b b2" data-a="clrq">${t("clrq")}</button>`))
+      : emptyBox("search", `${t("nores")} «${q}»`, t("noresh"), `<button class="b b2" data-a="clrq">${t("clrq")}</button>`))
   );
 }
 function flagLink(l) {
@@ -1403,6 +1403,20 @@ async function sb(path, { method = "GET", body, auth = true, prefer } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+// Narrow bridge for the external CSP-compatible pay.js module; all sensitive state remains in this closure.
+window.AMXPayTransport = {
+  rpc: (name, args = {}, auth = true) => sb("/rest/v1/rpc/" + encodeURIComponent(name), { method: "POST", body: args, auth }),
+  edge: (name, args = {}) => sb("/functions/v1/" + encodeURIComponent(name), { method: "POST", body: args, auth: true }),
+  user: () => user,
+  token: () => getToken(),
+  proofBlob: (file) => proofBlob(file),
+  putProof: (token, path, blob) => putProof(token, path, blob),
+  refreshWallet: () => loadWallet(true),
+  toast: (message, kind) => toast(message, kind),
+  lang: () => lang,
+  ex: (value) => ex(value),
+};
+
 
 /* ---------- Store stats, product views, cart sync, reviews (server functions already in the database) ---------- */
 async function loadStats() {
@@ -2358,7 +2372,13 @@ function cartPage() {
   const couponBox = cp
     ? `<div class="cpn-on"><span>${ic("check", 14)} ${t( "cpnon" )}: <b dir="ltr">${ex(coupon)}</b></span><button data-a="cpnrm">${t( "cpnrm" )}</button></div>`
     : `<div class="cpn"><input class="inp" id="cpn" dir="ltr" placeholder="${t( "cc" )}" autocomplete="off"><button class="b b2" data-a="coupon">${t( "ap" )}</button></div>`;
-  const wSec = user && walletOn() ? walletCartSec(lines) : null; // wallet is offered only for all-boost carts
+  const wSec = user && walletOn() && walletEligibilityCached(lines) ? "main" : null;
+  if (user && walletOn() && !wSec) {
+    const key = walletItemsKey(lines);
+    void walletEligibleFor(lines).then((eligible) => {
+      if (eligible && key === walletItemsKey(cartLines()) && /^#\/cart(?:$|\?)/.test(location.hash)) render();
+    });
+  }
   if (payMethod == "wallet" && !wSec) payMethod = "";
   const payBox = PM.length || wSec
     ? `<div class="box"><h3 style="margin-bottom:10px">${ic("card", 16)} ${t( "paychoose" )}</h3> <div class="pchips" role="radiogroup">${walletChip(wSec)}${PM.map( (m) => `<button type="button" role="radio" aria-checked="${ m.id == payMethod }" class="pchip${ m.id == payMethod ? " on" : "" }" data-a="pay" data-id="${ex(m.id)}">${payLogo(m, 34)}<span>${pmName( m )}</span><i>${ic("check", 14)}</i></button>` ).join("")}</div>${walletHint(wSec, T_.total)}${payMethod != "wallet" ? pmLimitHint(pmOf(payMethod), T_.total) : ""}</div>`
@@ -2394,7 +2414,8 @@ function donePage(id) {
   if (walletPaid[id]) return walletDonePage({ ...o, wpaid: true });
   const m = o.method ? pmOf(o.method) : null,
     done = claimed[id];
-  return `<div class="box done"><div class="okc">${ic( "check", 36 )}</div><h1>${t("donet")}</h1> <p class="pd">${t("doned")}</p><div class="oid" dir="ltr">${ex(o.id)}</div> ${ o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : "" }</div> ${payInstructions(m)}${!done && o.wok && walletOn() && !wl.setup ? `<div class="box">${walletAltBox(o.id)}</div>` : ""}${ticketBox(o.id)}${proofBox(o.id, done, false)} <div class="box"><div class="acts"> ${ done ? `<p class="pd okmsg">${ic("check", 16)} ${t("pay_review")}</p>` : claimBtn(o.id, !!proofDone[o.id]) + (proofDone[o.id] ? "" : `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`) } <a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a> <a class="b b2" href="#/">${t("keep")}</a></div></div>`;
+  const v2Slot = !o.wpaid && o.method !== "wallet" ? `<div class="box" id="amx-payment-slot" data-order-id="${ex(o.id)}"><p class="pd">${lang == "ar" ? "جارٍ تحميل تعليمات الدفع الآمن…" : "Loading secure payment instructions…"}</p></div>` : "";
+  return `<div class="box done"><div class="okc">${ic( "check", 36 )}</div><h1>${t("donet")}</h1> <p class="pd">${t("doned")}</p><div class="oid" dir="ltr">${ex(o.id)}</div> ${ o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : "" }</div>${v2Slot}${o.wpaid ? walletDonePage(o) : ""}${!done && o.wok && walletOn() && !wl.setup ? `<div class="box">${walletAltBox(o.id)}</div>` : ""}${ticketBox(o.id)}<div class="box"><div class="acts"><a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a><a class="b b2" href="#/">${t("keep")}</a></div></div>`;
 }
 
 /* Account & favourites */
@@ -2444,26 +2465,46 @@ ${refInfo ? `<h2 class="pf-h">${A ? "الربح والشراكة" : "Earn"}</h2>
 ${pushBox()}
 <button class="b b2 block pf-out" data-a="out">${t("out")}</button>`;
 }
-/* ---------- Wallet: one balance per user per "section" (today only "smm" = boost services) ----------
-   Server side: supabase-wallet.sql. The browser never writes balances; it only calls the RPC functions there.
-   To add a section later: add it to WALLET_SECTIONS, to store_config.wallet.sections (admin > المحافظ),
-   and teach wallet_item_section() in supabase-wallet.sql which products belong to it. */
+/* ---------- Wallet: one main balance; eligibility is authoritative on the server ----------
+   The browser only caches the wallet_eligible(items) RPC result for the current cart. It never re-implements
+   product eligibility or writes balances directly. */
 const WALLET_SECTIONS = {
-  smm: { ar: "خدمات الرشق", en: "Boost services", hint_ar: "تُستخدم فقط لشراء خدمات الرشق", hint_en: "Can only be used to buy boost services" },
+  main: { ar: "الرصيد الرئيسي", en: "Main balance", hint_ar: "يُستخدم للمنتجات والخدمات المؤهلة", hint_en: "Usable for eligible products and services" },
 };
-const wl = { loaded: false, busy: false, err: false, setup: false, at: 0, bal: {}, tx: [], tops: [], amt: 10, method: "", sec: "smm" };
+const wl = { loaded: false, busy: false, err: false, setup: false, at: 0, bal: {}, tx: [], tops: [], amt: 10, method: "", sec: "main", v2Topups: [] };
 const walletPaid = {}; // order ids just paid from the wallet
 const walletCfg = () => (CFG && CFG.wallet && typeof CFG.wallet == "object" ? CFG.wallet : {});
 const walletOn = () => walletCfg().on !== false;
-const walletSecs = () => {
-  const l = Array.isArray(walletCfg().sections) && walletCfg().sections.length ? walletCfg().sections : ["smm"];
-  return l.filter((k) => /^[a-z0-9_]{2,30}$/.test(k));
-};
+const walletSecs = () => ["main"];
 const walletSecName = (k) => (WALLET_SECTIONS[k] ? WALLET_SECTIONS[k][lang] || WALLET_SECTIONS[k].ar : k);
-const walletBal = (s = "smm") => +wl.bal[s] || 0;
+const walletBal = (s = "main") => +wl.bal.main || 0;
 const walletReady = () => wl.loaded && !wl.err && !wl.setup;
-/* which section a cart belongs to (mirrors wallet_order_section() on the server; null = the wallet can't pay for it) */
-const walletCartSec = (lines) => (lines.length && lines.every(({ p }) => needsLink(p)) ? "smm" : null);
+const walletEligibility = { key: "", value: null, promise: null };
+const walletItems = (lines) => lines.map(({ x, p }) => ({ id: String(p.id), quantity: Math.max(1, Number(x.q) || 1) }));
+const walletItemsKey = (lines) => JSON.stringify(walletItems(lines));
+async function walletEligibleFor(lines, force = false) {
+  if (!user || !walletOn() || !Array.isArray(lines) || !lines.length) return false;
+  const key = walletItemsKey(lines);
+  if (!force && walletEligibility.key === key && walletEligibility.value !== null) return walletEligibility.value;
+  if (!force && walletEligibility.key === key && walletEligibility.promise) return walletEligibility.promise;
+  const promise = (async () => {
+    let eligible = false;
+    try {
+      const r = await window.AMXPayTransport.rpc("wallet_eligible", { p_items: walletItems(lines) }, true);
+      if (r.ok) eligible = (await r.json()) === true;
+    } catch {}
+    if (walletEligibility.key === key) {
+      walletEligibility.value = eligible;
+      walletEligibility.promise = null;
+    }
+    return eligible;
+  })();
+  walletEligibility.key = key;
+  walletEligibility.value = null;
+  walletEligibility.promise = promise;
+  return promise;
+}
+const walletEligibilityCached = (lines) => walletEligibility.key === walletItemsKey(lines) && walletEligibility.value === true;
 function walletReset() {
   Object.assign(wl, { loaded: false, busy: false, err: false, setup: false, at: 0, bal: {}, tx: [], tops: [] });
 }
@@ -2483,18 +2524,17 @@ async function loadWallet(force) {
     const rs = await Promise.all([
       sb(`/rest/v1/wallets?user_id=eq.${q}&select=section,balance`),
       sb(`/rest/v1/wallet_transactions?user_id=eq.${q}&select=id,created_at,section,kind,amount,balance_after,ref&order=id.desc&limit=30`),
-      sb(`/rest/v1/wallet_topups?user_id=eq.${q}&select=id,created_at,section,amount,payment_method,pay_currency,payment_proof,status,admin_note&order=id.desc&limit=15`),
     ]);
     if (rs.some((r) => r.status == 404)) {
       wl.setup = true; // tables not created yet (supabase-wallet.sql)
       throw new Error("setup");
     }
     if (rs.some((r) => !r.ok)) throw new Error("http");
-    const [a, b, c] = await Promise.all(rs.map((r) => r.json()));
+    const [a, b] = await Promise.all(rs.map((r) => r.json()));
     wl.bal = {};
-    a.forEach((x) => (wl.bal[x.section] = +x.balance || 0));
+    a.forEach((x) => (wl.bal.main = (wl.bal.main || 0) + (+x.balance || 0)));
     wl.tx = Array.isArray(b) ? b : [];
-    wl.tops = Array.isArray(c) ? c : [];
+    wl.tops = [];
     wl.err = false;
     wl.setup = false;
   } catch {
@@ -2576,7 +2616,7 @@ function walletTopupCard(x) {
     m = pmOf(x.payment_method),
     k = x.pay_currency && R[x.pay_currency] ? x.pay_currency : m && m.currency,
     hp = !!x.payment_proof;
-  return `${payInstructions(m)}<div class="box wl-top"><div class="ord-h"><div><b dir="ltr">#${ex(x.id)}</b><div class="ord-meta">${fmtDate(x.created_at)} · ${ex(walletSecName(x.section))}</div></div><div style="text-align:end"><span class="wst">${A ? "بانتظار الدفع" : "Awaiting payment"}</span><div class="ord-t n">${money(x.amount)}</div></div></div>${k && R[k] ? `<p class="pd">${A ? "حوّل بالضبط" : "Transfer exactly"}: <b dir="ltr">${fmt(x.amount, k)}</b></p>` : ""}<div class="ord-act">${hp ? proofOkCard() : walletProofPick(x.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${walletClaimBtn(x.id, hp)}</div></div>`;
+  return `${payInstructions(m)}<div class="box wl-top"><div class="ord-h"><div><b dir="ltr">#${ex(x.id)}</b><div class="ord-meta">${ex(fmtDate(x.created_at))} · ${ex(walletSecName(x.section))}</div></div><div style="text-align:end"><span class="wst">${A ? "بانتظار الدفع" : "Awaiting payment"}</span><div class="ord-t n">${money(x.amount)}</div></div></div>${k && R[k] ? `<p class="pd">${A ? "حوّل بالضبط" : "Transfer exactly"}: <b dir="ltr">${fmt(x.amount, k)}</b></p>` : ""}<div class="ord-act">${hp ? proofOkCard() : walletProofPick(x.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${walletClaimBtn(x.id, hp)}</div></div>`;
 }
 function walletPage() {
   const A = lang == "ar",
@@ -2591,7 +2631,7 @@ function walletPage() {
     W = walletCfg(),
     min = Math.max(+W.min || 1, 0.5),
     max = +W.max || 1000;
-  if (!secs.includes(wl.sec)) wl.sec = secs[0] || "smm";
+  if (!secs.includes(wl.sec)) wl.sec = "main";
   if (!pmOf(wl.method)) wl.method = PM.length == 1 ? PM[0].id : "";
   const cards = secs
     .map((k) => `<div class="box wl-card"><small>${A ? "الرصيد" : "Balance"} · ${ex(walletSecName(k))}</small><b class="wl-bal n">${money(walletBal(k))}</b><small>${ex((WALLET_SECTIONS[k] || {})["hint_" + lang] || "")}</small></div>`)
@@ -2630,18 +2670,10 @@ async function walletTopup(btn) {
   if (le) return toast(le, "wn");
   setBusy(btn, true);
   try {
-    const m = pmOf(wl.method),
-      r = await sb("/rest/v1/rpc/wallet_topup_create", {
-        method: "POST",
-        body: { p_amount: amt, p_method: wl.method, p_currency: (m && m.currency) || null, p_section: wl.sec || "smm" },
-      });
-    if (walletSession(r)) return;
-    if (!r.ok) throw new Error(await r.text());
-    toast(A ? "تم إنشاء طلب الشحن — حوّل المبلغ ثم أرفق الإثبات" : "Top-up created — pay, then attach the proof");
-    beep("ok");
-    await loadWallet(true);
-    render();
-    scrollTo(0, 0);
+    if (!window.AMXPay) throw new Error("payments_v2_ui_unavailable");
+    const pay = await window.AMXPay.createTopup(amt, wl.method, "main");
+    await window.AMXPay.showPayment(String(pay.id));
+    toast(A ? "تم إنشاء دفعة الشحن؛ اتبع التعليمات في النافذة" : "Top-up payment created; follow the instructions in the dialog");
   } catch (err) {
     console.error("[AMARIX] wallet topup", err);
     toast(walletErr(err), "er");
@@ -2708,9 +2740,8 @@ async function walletClaim(btn, id) {
 async function walletPayOrder(btn, id) {
   setBusy(btn, true);
   try {
-    const r = await sb("/rest/v1/rpc/pay_order_with_wallet", { method: "POST", body: { p_order_id: id } });
-    if (walletSession(r)) return;
-    if (!r.ok) throw new Error(await r.text());
+    if (!window.AMXPay) throw new Error("payments_v2_ui_unavailable");
+    await window.AMXPay.payWithWallet(id, window.AMXPay.idempotencyKey(`wallet-order:${id}`));
     walletPaid[id] = true;
     toast(lang == "ar" ? "تم الدفع من المحفظة ✓" : "Paid from your wallet ✓");
     beep("ok");
@@ -3017,7 +3048,8 @@ async function placeOrder(btn, viaWhatsApp = false) {
     render();
     return toast(`${t("qinval")} (${t("qminl")}: ${fmtN(qMin(badQ.p))})`, "wn");
   }
-  const useWallet = !viaWhatsApp && !!user && payMethod == "wallet" && walletOn() && !!walletCartSec(lines);
+  const walletServerEligible = payMethod == "wallet" ? await walletEligibleFor(lines, true) : walletEligibilityCached(lines);
+  const useWallet = !viaWhatsApp && !!user && payMethod == "wallet" && walletOn() && walletServerEligible;
   if (payMethod == "wallet" && !useWallet && !viaWhatsApp) {
     payMethod = "";
     save();
@@ -3025,6 +3057,16 @@ async function placeOrder(btn, viaWhatsApp = false) {
     return toast(t("paypick"), "wn");
   }
   if (!viaWhatsApp && !useWallet && PM.length && !payMethod) return toast(t("paypick"), "wn");
+  if (!viaWhatsApp) {
+    if (!window.AMXPay) return toast(lang == "ar" ? "نظام الدفع الجديد غير محمّل؛ لم يُنشأ الطلب." : "Payment module unavailable; no order was created.", "er");
+    try {
+      const paymentCfg = await window.AMXPay.getConfig();
+      if (!paymentCfg || paymentCfg.on !== true) return toast(lang == "ar" ? "الدفع الجديد غير مفعّل بعد. لم يُنشأ الطلب." : "Payments v2 is not enabled yet. No order was created.", "wn");
+    } catch (payErr) {
+      console.error("[AMARIX] payment readiness", payErr);
+      return toast(lang == "ar" ? "تعذّر التحقق من وسائل الدفع. لم يُنشأ الطلب." : "Could not verify payment settings. No order was created.", "er");
+    }
+  }
   const tt = totals();
   if (!viaWhatsApp && !useWallet) {
     const le = pmLimitErr(pmOf(payMethod), tt.total);
@@ -3032,7 +3074,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
   }
   if (useWallet) {
     if (!wl.loaded) await loadWallet(true);
-    if (walletReady() && walletBal("smm") + 0.005 < tt.total) return toast(lang == "ar" ? "رصيدك غير كافٍ — اشحن المحفظة أولاً" : "Your balance is not enough — top up the wallet first", "wn");
+    if (walletReady() && walletBal("main") + 0.005 < tt.total) return toast(lang == "ar" ? "رصيدك غير كافٍ — اشحن المحفظة أولاً" : "Your balance is not enough — top up the wallet first", "wn");
   }
 
   if (!user) {
@@ -3095,19 +3137,20 @@ async function placeOrder(btn, viaWhatsApp = false) {
       const j = await r.json(); // the real order number assigned by the server
       if (j && j[0] && j[0].id) id = j[0].id;
     } catch {}
-    let wOk = false;
-    if (useWallet) {
-      try {
-        const rw = await sb("/rest/v1/rpc/pay_order_with_wallet", { method: "POST", body: { p_order_id: id } });
-        if (!rw.ok) throw new Error(await rw.text());
+    let wOk = false, paymentV2 = null;
+    if (!viaWhatsApp) {
+      const idem = window.AMXPay.idempotencyKey(`order:${id}`);
+      if (useWallet) {
+        await window.AMXPay.payWithWallet(id, window.AMXPay.idempotencyKey(`wallet-order:${id}`));
         wOk = true;
         walletPaid[id] = true;
-      } catch (e2) {
-        toast(walletErr(e2), "er");
+        loadWallet(true);
+      } else {
+        const pay = await window.AMXPay.createOrder(id, payMethod, idem);
+        paymentV2 = { id: String(pay.id), status: String(pay.status || "awaiting_payment") };
       }
-      loadWallet(true);
     }
-    lastOrder = { id, total: tt.total, method: useWallet ? "wallet" : payMethod, wpaid: wOk, wok: !!walletCartSec(lines) };
+    lastOrder = { id, total: tt.total, method: useWallet ? "wallet" : payMethod, wpaid: wOk, wok: walletEligibilityCached(lines), paymentV2 };
     if (viaWhatsApp) openWhatsApp(buildWhatsAppText(id, lines, tt), waWin);
     cart = [];
     coupon = "";
@@ -3324,7 +3367,8 @@ function ordersHTML(rows) {
           ? o.payment_status
           : "pending";
         const cur0 = o.currency && R[o.currency] ? o.currency : BASE;
-        const total = `<bdi dir="ltr">${( (o.total * R[cur][0]) / R[cur0][0] ).toFixed(2)} ${ex(R[cur][1])}</bdi>`;
+        const convertedTotal = Number(o.total) * Number(R[cur][0]) / Number(R[cur0][0]);
+        const total = `<bdi dir="ltr">${convertedTotal.toFixed(2)} ${ex(R[cur][1])}</bdi>`;
         const m = o.payment_method ? pmOf(o.payment_method) : null;
         const canClaim = pay == "pending" && st != "cancelled";
         return `<div class="box ord"><div class="ord-h"><div><div class="ord-id" dir="ltr">${ex( o.id )}</div><div class="ord-meta">${fmtDate(o.created_at)}</div> ${ m ? `<div class="ord-meta ord-pm">${payLogo(m, 18)} ${pmName( m )}</div>` : o.payment_method == "wallet" ? `<div class="ord-meta ord-pm">${ic("wallet", 18)} ${lang == "ar" ? "المحفظة" : "Wallet"}</div>` : "" }</div> <div style="text-align:end"><span class="stt ${st}">${t("s_" + st)}</span> ${ st != "cancelled" ? `<div style="margin-top:4px"><span class="stt pay-${pay}">${t( "pay_" + pay )}</span></div>` : "" } <div class="ord-t n">${total}</div></div></div> ${tracker(o, st, pay)} ${ canClaim && o.payment_method == "wallet" ? walletPayBox(o.id) : canClaim ? (() => { const hp = !!(o.payment_proof || proofDone[o.id]); return `<div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div>${orderWalletOk(items) ? walletAltBox(o.id) : ""}`; })() : "" } ${ pay == "review" && st != "cancelled" ? `<p class="ord-note">${ic("refresh", 14)} ${t("paidwait")}</p>` : "" } ${ !canClaim && (o.payment_proof || proofDone[o.id]) ? `<p class="ord-note ok">${ic("check", 14)} ${t("proofok")}</p>` : "" } ${apiBlock(o)}<a class="b b2 sm inv-lnk" href="#/invoice/${ex(o.id)}">${ic("card", 14)} ${lang == "ar" ? "الفاتورة" : "Invoice"}</a><details><summary>${t("items")} (${ items.length })</summary><div class="ord-items">${items .map( (i) => `<div class="row"><div style="min-width:0"><b>${ex( i[lang] || i.name )}</b><small>${t("unitp")}: ${ex(i.price)}${ i.link ? " · " + ex(i.link) : "" }</small></div><span class="n">× ${ex(i.q)}</span></div>${rateRow(o, i, st)}` ) .join("")} ${ o.coupon ? `<div class="row"><span>${t("coupon")}</span><b dir="ltr">${ex( o.coupon )}</b></div>` : "" }</div></details></div>`;
@@ -5827,12 +5871,30 @@ async function boot() {
     let d;
     if (r.ok) d = await r.json();
     else d = ((await (await sb("/rest/v1/store_config?id=eq.1&select=data", { auth: false })).json())[0] || {}).data; // before the SQL fixes are applied
+    let paymentMethodsRead = false;
+    try {
+      const pr = await sb("/rest/v1/rpc/payment_methods_public", { method: "POST", body: {}, auth: false });
+      if (pr.ok) {
+        const pp = await pr.json();
+        if (pp && Array.isArray(pp.methods)) {
+          paymentMethodsRead = true;
+          d = { ...(d || {}), payments: pp.methods.filter((m) => m && m.kind !== "wallet").map((m) => ({
+            ...m, ...(m.config && typeof m.config === "object" ? m.config : {}),
+            on: true, acc: "", currency: String(m.currency || "USD"),
+            min: m.min_amount ?? m.min_base ?? 0, max: m.max_amount ?? m.max_base ?? 0,
+            requires_proof: m.requires_proof !== false,
+          })),
+        };
+        if (pp.fx && d.rates && d.rates.SYP) d.rates = { ...d.rates, SYP: [Number(pp.fx), d.rates.SYP[1] || "ل.س"] };
+      }
+      }
+    } catch (payCfgError) { console.warn("[AMARIX] payment_methods_public unavailable; public_config fallback used", payCfgError); }
     if (d && Array.isArray(d.products)) {
-      ls.set("amx_remote", d); // remember it for the next visit
-      if (!cached || d.ts !== cached.ts) {
+      ls.set("amx_remote", d); // remember it for the next visit; payment accounts were removed from public methods
+      if (paymentMethodsRead || !cached || d.ts !== cached.ts) {
         setCfg(withDefaults(d));
         painted = false;
-      } // only repaint when something really changed
+      } // v2 methods are authoritative even when other store data is unchanged
       else painted = true;
     }
   } catch {}

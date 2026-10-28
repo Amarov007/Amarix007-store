@@ -133,150 +133,29 @@ end $$;
 
 -- ---------- دوال العميل ----------
 -- 1) طلب شحن
-create or replace function public.wallet_topup_create(p_amount numeric, p_method text, p_currency text default null, p_section text default 'smm')
-returns bigint
-language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); cfg jsonb; w jsonb; mn numeric; mx numeric; amt numeric; nid bigint; nm text; em text;
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if not public.rl_hit('wtopup:' || uid::text, 10, 3600) then raise exception 'rate_limited'; end if;
-  select data into cfg from public.store_config where id = 1;
-  w := coalesce(cfg->'wallet', '{}'::jsonb);
-  if coalesce(w->>'on', 'true') = 'false' then raise exception 'wallet_disabled'; end if;
-  if not (p_section = any (public.wallet_sections(cfg))) then raise exception 'invalid_section'; end if;
-  mn := greatest(coalesce(nullif(w->>'min', '')::numeric, 1), 0.5);
-  mx := coalesce(nullif(w->>'max', '')::numeric, 1000);
-  amt := round(coalesce(p_amount, 0), 2);
-  if amt < mn then raise exception 'below_min'; end if;
-  if mx > 0 and amt > mx then raise exception 'above_max'; end if;
-  if p_method is null or not exists (
-       select 1 from jsonb_array_elements(coalesce(cfg->'payments', '[]'::jsonb)) m
-        where m->>'id' = p_method and coalesce(m->>'on', 'true') <> 'false') then
-    raise exception 'invalid_method';
-  end if;
-  if (select count(*) from public.wallet_topups where user_id = uid and status in ('pending','review')) >= 5 then
-    raise exception 'too_many_pending';
-  end if;
-  insert into public.wallet_topups (user_id, section, amount, payment_method, pay_currency)
-  values (uid, p_section, amt, p_method,
-          case when upper(coalesce(p_currency, '')) ~ '^[A-Z]{3,10}$' then upper(p_currency) else null end)
-  returning id into nid;
-  select full_name, email into nm, em from public.profiles where id = uid;
-  perform public.notify_telegram('💼 طلب شحن محفظة #' || nid || E'\n👤 ' || coalesce(nm, '') || ' (' || coalesce(em, '') || ')'
-                                 || E'\n💰 ' || amt || ' USD · ' || p_section || E'\n💳 ' || p_method);
-  return nid;
-end $$;
+-- [moved] public.wallet_topup_create is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 -- 2) إرفاق إثبات الدفع (صورة في حاوية payment-proofs داخل مجلد المستخدم)
 drop function if exists public.wallet_topup_set_proof(bigint, text);  -- توقيع قديم (بلا بصمة)
-create or replace function public.wallet_topup_set_proof(p_id bigint, p_path text, p_hash text default null) returns void
-language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid();
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if p_path is null or length(p_path) > 300
-     or p_path !~ ('^' || uid::text || '/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$') then
-    raise exception 'invalid_path';
-  end if;
-  if p_hash is not null and p_hash !~ '^[a-f0-9]{64}$' then raise exception 'invalid_path'; end if;
-  if not exists (select 1 from storage.objects where bucket_id = 'payment-proofs' and name = p_path) then
-    raise exception 'proof_missing';
-  end if;
-  begin
-    update public.wallet_topups set payment_proof = p_path, proof_hash = p_hash
-     where id = p_id and user_id = uid and status = 'pending';
-  exception when unique_violation then
-    raise exception 'duplicate_proof';
-  end;
-  if not found then raise exception 'not_allowed'; end if;
-end $$;
+-- [moved] public.wallet_topup_set_proof is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 -- 3) «تم الدفع» -> مراجعة المدير
 drop function if exists public.wallet_topup_claim(bigint);  -- توقيع قديم (بلا رقم عملية)
-create or replace function public.wallet_topup_claim(p_id bigint, p_tx_ref text default null) returns void
-language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); r public.wallet_topups%rowtype; nm text; em text; ref text := nullif(btrim(coalesce(p_tx_ref, '')), '');
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if ref is not null and (length(ref) < 6 or length(ref) > 100 or ref !~ '^[A-Za-z0-9_:.\- ]+$') then
-    raise exception 'invalid_reference';
-  end if;
-  select * into r from public.wallet_topups where id = p_id and user_id = uid for update;
-  if not found then raise exception 'not_allowed'; end if;
-  if r.status in ('review','approved') then return; end if;
-  if r.status <> 'pending' then raise exception 'not_allowed'; end if;
-  if coalesce(r.payment_proof, '') = '' then raise exception 'proof_required'; end if;
-  begin
-    update public.wallet_topups set status = 'review', tx_ref = coalesce(ref, tx_ref) where id = p_id;
-  exception when unique_violation then
-    raise exception 'duplicate_reference';
-  end;
-  select full_name, email into nm, em from public.profiles where id = uid;
-  perform public.notify_telegram('💸 شحن محفظة يحتاج مراجعة #' || p_id || E'\n👤 ' || coalesce(nm, '') || ' (' || coalesce(em, '') || ')'
-                                 || E'\n💰 ' || r.amount || ' USD · ' || r.section || E'\n💳 ' || coalesce(r.payment_method, '')
-                                 || E'\n🧾 إثبات: مرفق' || case when coalesce(ref, r.tx_ref) is not null then E'\n🔖 رقم العملية: ' || coalesce(ref, r.tx_ref) else '' end);
-end $$;
+-- [moved] public.wallet_topup_claim is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 -- 4) الدفع من المحفظة لطلب موجود (يخص المستخدم وبانتظار الدفع)
-create or replace function public.pay_order_with_wallet(p_order_id text) returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); o public.orders%rowtype; cfg jsonb; sec text; bal numeric; nb numeric; nm text;
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if not public.rl_hit('walletpay:' || uid::text, 30, 3600) then raise exception 'rate_limited'; end if;
-  select data into cfg from public.store_config where id = 1;
-  if coalesce(cfg->'wallet'->>'on', 'true') = 'false' then raise exception 'wallet_disabled'; end if;
-  select * into o from public.orders where id = p_order_id and user_id = uid for update;
-  if not found then raise exception 'not_allowed'; end if;
-  if coalesce(o.payment_status, 'pending') <> 'pending' or o.status = 'cancelled' then raise exception 'not_allowed'; end if;
-  if coalesce(o.total, 0) <= 0 then raise exception 'not_allowed'; end if;
-  sec := public.wallet_order_section(o.items, cfg);
-  if sec is null or not (sec = any (public.wallet_sections(cfg))) then raise exception 'wallet_not_eligible'; end if;
-  select balance into bal from public.wallets where user_id = uid and section = sec for update;
-  if bal is null or bal < o.total then raise exception 'insufficient_balance'; end if;
-  nb := public.wallet_apply(uid, sec, -o.total, 'spend', o.id, null);
-  update public.orders set payment_status = 'paid', payment_method = 'wallet' where id = o.id;
-  select full_name into nm from public.profiles where id = uid;
-  perform public.notify_telegram('✅ دُفع من المحفظة ' || o.id || E'\n👤 ' || coalesce(nm, '') || ' (' || coalesce(o.customer_email, '') || ')'
-                                 || E'\n💰 ' || o.total || ' USD');
-  return jsonb_build_object('balance', nb, 'section', sec);
-end $$;
+-- [moved] public.pay_order_with_wallet is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 -- ---------- دوال المدير ----------
-create or replace function public.wallet_topup_approve(p_id bigint, p_amount numeric default null) returns numeric
-language plpgsql security definer set search_path = public as $$
-declare uid uuid := auth.uid(); r public.wallet_topups%rowtype; amt numeric; nb numeric; cfg jsonb; thr numeric;
-begin
-  if not public.is_admin() then raise exception 'not_allowed'; end if;
-  select * into r from public.wallet_topups where id = p_id for update;
-  if not found or r.status not in ('pending','review') then raise exception 'not_allowed'; end if;
-  if coalesce(r.payment_proof, '') = '' then raise exception 'proof_required'; end if;
-  amt := round(coalesce(p_amount, r.amount), 2);
-  if amt <= 0 or amt > 100000 then raise exception 'invalid_amount'; end if;
-  select data into cfg from public.store_config where id = 1;
-  thr := coalesce(nullif(cfg->'wallet'->>'dual_threshold', '')::numeric, 0);
-  if thr > 0 and amt >= thr then
-    if r.first_approved_by is null then
-      update public.wallet_topups set first_approved_by = uid, first_approved_at = now(), status = 'review' where id = p_id;
-      perform public.notify_telegram('🕒 موافقة أولى على شحن #' || p_id || ' بمبلغ ' || amt || ' USD — بانتظار أدمن ثانٍ');
-      return -1;
-    elsif r.first_approved_by = uid then
-      raise exception 'second_approver_required';
-    end if;
-  end if;
-  nb := public.wallet_apply(r.user_id, r.section, amt, 'topup', 'TOPUP-' || r.id, null);
-  update public.wallet_topups set status = 'approved', amount = amt, reviewed_at = now(), reviewed_by = uid where id = p_id;
-  return nb;
-end $$;
+-- [moved] public.wallet_topup_approve is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
 
-create or replace function public.wallet_topup_reject(p_id bigint, p_note text default null) returns void
-language plpgsql security definer set search_path = public as $$
-begin
-  if not public.is_admin() then raise exception 'not_allowed'; end if;
-  update public.wallet_topups set status = 'rejected', admin_note = left(p_note, 300), reviewed_at = now(), reviewed_by = auth.uid()
-   where id = p_id and status in ('pending','review');
-  if not found then raise exception 'not_allowed'; end if;
-end $$;
+
+-- [moved] public.wallet_topup_reject is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 -- تدقيق: أرصدة لا تطابق مجموع دفتر الحركات (فارغ = سليم)
 create or replace function public.wallet_reconcile()
@@ -298,37 +177,23 @@ declare cfg jsonb;
 begin
   if not public.is_admin() then raise exception 'not_allowed'; end if;
   select data into cfg from public.store_config where id = 1;
-  if not (p_section = any (public.wallet_sections(cfg))) then raise exception 'invalid_section'; end if;
+  if p_section is not null and p_section <> 'main' then raise exception 'wallet_section_main_only'; end if;
+  p_section := 'main';
   if p_amount is null or p_amount = 0 or abs(p_amount) > 100000 then raise exception 'invalid_amount'; end if;
   if not exists (select 1 from public.profiles where id = p_user) then raise exception 'not_allowed'; end if;
   return public.wallet_apply(p_user, p_section, round(p_amount, 2), 'adjust', null, '[admin ' || auth.uid()::text || '] ' || coalesce(p_note, ''));
 end $$;
 
 -- ---------- استرجاع الرصيد عند إلغاء طلب دُفع من المحفظة ----------
-create or replace function public.orders_wallet_refund() returns trigger
-language plpgsql security definer set search_path = public as $$
-declare spent numeric; sec text;
-begin
-  if new.status = 'cancelled' and old.status is distinct from 'cancelled' and new.user_id is not null then
-    select -amount, section into spent, sec from public.wallet_transactions
-     where ref = new.id and kind = 'spend' order by id desc limit 1;
-    if spent is not null and spent > 0
-       and not exists (select 1 from public.wallet_transactions where ref = new.id and kind = 'refund') then
-      perform public.wallet_apply(new.user_id, sec, spent, 'refund', new.id, 'cancelled order');
-    end if;
-  end if;
-  return new;
-end $$;
-drop trigger if exists orders_wallet_refund_trg on public.orders;
-create trigger orders_wallet_refund_trg after update of status on public.orders
-  for each row execute function public.orders_wallet_refund();
+-- [moved] public.orders_wallet_refund is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
 
+
+-- [moved] orders_wallet_refund_trg is retired by the payments restructure migration.
 -- ---------- الصلاحيات (اتّباعاً لنمط بقية الملف: لا شيء مفتوح افتراضياً) ----------
 revoke execute on function public.wallet_sections(jsonb)                     from public, anon, authenticated;
 revoke execute on function public.wallet_item_section(jsonb, jsonb)          from public, anon, authenticated;
 revoke execute on function public.wallet_order_section(jsonb, jsonb)         from public, anon, authenticated;
 revoke execute on function public.wallet_apply(uuid, text, numeric, text, text, text) from public, anon, authenticated;
-revoke execute on function public.orders_wallet_refund()                     from public, anon, authenticated;
 revoke execute on function public.wallet_topup_create(numeric, text, text, text) from public, anon;
 revoke execute on function public.wallet_topup_set_proof(bigint, text, text) from public, anon;
 revoke execute on function public.wallet_topup_claim(bigint, text)       from public, anon;

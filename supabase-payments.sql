@@ -206,14 +206,20 @@ $$;
 -- مزامنة orders.payment_status (مشتق) من أحدث دفعة للطلب
 create or replace function public.payment_sync_order(p_order text) returns void
 language plpgsql security definer set search_path = public as $function$
-declare s text; ns text;
+declare s text; ns text; prior text;
 begin
   if p_order is null then return; end if;
-  select status into s from public.payments where order_id = p_order order by created_at desc limit 1;
+  select status into s from public.payments where order_id=p_order order by created_at desc limit 1;
   if s is null then return; end if;
-  ns := case s when 'captured' then 'paid' when 'refunded_partially' then 'paid' when 'refunded' then 'refunded'
-              when 'proof_submitted' then 'review' when 'under_review' then 'review' else 'pending' end;
-  update public.orders set payment_status = ns where id = p_order and payment_status is distinct from ns;
+  ns:=case s when 'captured' then 'paid' when 'refunded_partially' then 'paid' when 'refunded' then 'refunded'
+      when 'proof_submitted' then 'review' when 'under_review' then 'review' else 'pending' end;
+  prior:=current_setting('amx.payment_sync',true);
+  perform set_config('amx.payment_sync','1',true);
+  update public.orders set payment_status=ns where id=p_order and payment_status is distinct from ns;
+  perform set_config('amx.payment_sync',coalesce(prior,''),true);
+exception when others then
+  perform set_config('amx.payment_sync',coalesce(prior,''),true);
+  raise;
 end $function$;
 
 -- الدالة الوحيدة التي تغيّر حالة الدفعة (قفل الصف + التحقق + الحدث + الآثار)
@@ -244,8 +250,10 @@ create or replace function public.payment_methods_public() returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object('fx', public.fx_current(), 'on', public.payments_v2_on(), 'methods',
     coalesce((select jsonb_agg(jsonb_build_object('id', id, 'kind', kind, 'currency', currency, 'min_base', min_base,
-              'max_base', max_base, 'fee_pct', fee_pct, 'fee_fixed', fee_fixed, 'requires_proof', requires_proof,
-              'expiry_minutes', expiry_minutes, 'config', config - 'acc') order by sort, id)
+              'max_base', max_base, 'min_amount',min_amount,'max_amount',max_amount,'fee_pct', fee_pct, 'fee_fixed', fee_fixed, 'requires_proof', requires_proof,
+              'expiry_minutes', expiry_minutes, 'config', jsonb_strip_nulls(jsonb_build_object(
+                'ar',config->'ar','en',config->'en','icon',config->'icon','logo',config->'logo','logo_url',config->'logo_url',
+                'color',config->'color','network',config->'network','memo',config->'memo')) ) order by sort, id)
        from public.payment_methods where enabled), '[]'::jsonb));
 $$;
 
@@ -253,7 +261,7 @@ $$;
 create or replace function public.payment_create(p_order_id text, p_method text, p_key text) returns jsonb
 language plpgsql security definer set search_path = public as $function$
 declare uid uuid := auth.uid(); o public.orders%rowtype; m public.payment_methods%rowtype; ex public.payments%rowtype;
-        rate numeric := 1; fee numeric; pid uuid; exp_min integer; r public.payments%rowtype;
+        rate numeric := 1; fee numeric; quoted_amount numeric; pid uuid; exp_min integer; r public.payments%rowtype;
 begin
   if uid is null then raise exception 'not_allowed'; end if;
   if not public.payments_v2_on() then raise exception 'payments_disabled'; end if;
@@ -280,10 +288,13 @@ begin
   end if;
   if m.currency = 'SYP' then rate := public.fx_current(); end if;
   fee := round(o.total * m.fee_pct / 100 + m.fee_fixed, 2);
+  quoted_amount := public.payment_round(m.currency, (o.total + fee) * rate);
+  if m.min_amount is not null and quoted_amount < m.min_amount then raise exception 'below_min_currency'; end if;
+  if m.max_amount is not null and m.max_amount > 0 and quoted_amount > m.max_amount then raise exception 'above_max_currency'; end if;
   exp_min := least(m.expiry_minutes, public.payments_cfg_num('expiry_minutes', m.expiry_minutes)::int);
   insert into public.payments (user_id, purpose, order_id, method_id, amount_base, fee_amount, pay_currency, pay_amount, fx_rate,
                                idempotency_key, expires_at)
-  values (uid, 'order', o.id, m.id, o.total, fee, m.currency, public.payment_round(m.currency, (o.total + fee) * rate), rate,
+  values (uid, 'order', o.id, m.id, o.total, fee, m.currency, quoted_amount, rate,
           p_key, now() + make_interval(mins => exp_min))
   returning id into pid;
   insert into public.payment_events (payment_id, from_status, to_status, actor, note) values (pid, null, 'created', uid, null);
@@ -310,6 +321,7 @@ begin
   if o.status = 'cancelled' or coalesce(o.payment_status, 'pending') <> 'pending' or coalesce(o.total, 0) <= 0 then
     raise exception 'order_not_payable';
   end if;
+  if not public.wallet_eligible(o.items) then raise exception 'wallet_not_eligible'; end if;
   if exists (select 1 from public.payments where order_id = o.id
               and status in ('created','awaiting_payment','proof_submitted','under_review','captured','refunded_partially')) then
     raise exception 'duplicate_active_payment';
@@ -330,7 +342,7 @@ end $function$;
 create or replace function public.payment_create_topup(p_amount numeric, p_method text, p_key text) returns jsonb
 language plpgsql security definer set search_path = public as $function$
 declare uid uuid := auth.uid(); cfg jsonb; w jsonb; m public.payment_methods%rowtype; ex public.payments%rowtype;
-        amt numeric; mn numeric; mx numeric; dmx numeric; rate numeric := 1; pid uuid; r public.payments%rowtype; exp_min integer;
+        amt numeric; mn numeric; mx numeric; dmx numeric; rate numeric := 1; quoted_amount numeric; pid uuid; r public.payments%rowtype; exp_min integer;
 begin
   if uid is null then raise exception 'not_allowed'; end if;
   if not public.payments_v2_on() then raise exception 'payments_disabled'; end if;
@@ -360,9 +372,12 @@ begin
     raise exception 'too_many_pending';
   end if;
   if m.currency = 'SYP' then rate := public.fx_current(); end if;
+  quoted_amount := public.payment_round(m.currency, amt * rate);
+  if m.min_amount is not null and quoted_amount < m.min_amount then raise exception 'below_min_currency'; end if;
+  if m.max_amount is not null and m.max_amount > 0 and quoted_amount > m.max_amount then raise exception 'above_max_currency'; end if;
   exp_min := least(m.expiry_minutes, public.payments_cfg_num('expiry_minutes', m.expiry_minutes)::int);
   insert into public.payments (user_id, purpose, method_id, amount_base, pay_currency, pay_amount, fx_rate, idempotency_key, expires_at)
-  values (uid, 'wallet_topup', m.id, amt, m.currency, public.payment_round(m.currency, amt * rate), rate, p_key,
+  values (uid, 'wallet_topup', m.id, amt, m.currency, quoted_amount, rate, p_key,
           now() + make_interval(mins => exp_min)) returning id into pid;
   insert into public.payment_events (payment_id, from_status, to_status, actor) values (pid, null, 'created', uid);
   r := public.transition_payment(pid, 'awaiting_payment', null);
@@ -378,32 +393,15 @@ begin
   select * into p from public.payments where id = p_id and user_id = auth.uid();
   if not found or p.status not in ('awaiting_payment','proof_submitted','under_review') then raise exception 'not_allowed'; end if;
   select * into m from public.payment_methods where id = p.method_id;
-  return jsonb_build_object('method', m.id, 'acc', m.config->>'acc', 'da', m.config->>'da', 'de', m.config->>'de',
-                            'pay_amount', p.pay_amount, 'pay_currency', p.pay_currency, 'expires_at', p.expires_at,
-                            'requires_proof', m.requires_proof);
+  return jsonb_build_object('id',p.id,'method', m.id, 'acc', m.config->>'acc', 'da', m.config->>'da', 'de', m.config->>'de',
+                            'pay_amount', p.pay_amount, 'pay_currency', p.pay_currency, 'amount_base',p.amount_base,'fx_rate',p.fx_rate,
+                            'created_at',p.created_at,'expires_at', p.expires_at,'status',p.status,
+                            'requires_proof', m.requires_proof,'purpose',p.purpose,'order_id',p.order_id);
 end $function$;
 
 -- إرفاق إثبات (ينقل awaiting_payment → proof_submitted، والاستبدال مسموح قبل المراجعة)
-create or replace function public.payment_attach_proof(p_id uuid, p_path text, p_hash text default null) returns void
-language plpgsql security definer set search_path = public as $function$
-declare uid uuid := auth.uid(); p public.payments%rowtype;
-begin
-  if uid is null then raise exception 'not_allowed'; end if;
-  if p_path is null or length(p_path) > 300 or p_path !~ ('^' || uid::text || '/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$') then
-    raise exception 'invalid_path';
-  end if;
-  if p_hash is not null and p_hash !~ '^[a-f0-9]{64}$' then raise exception 'invalid_path'; end if;
-  if not public.rl_hit('payproof:' || uid::text, 30, 3600) then raise exception 'rate_limited'; end if;
-  if not exists (select 1 from storage.objects where bucket_id = 'payment-proofs' and name = p_path) then raise exception 'proof_missing'; end if;
-  select * into p from public.payments where id = p_id and user_id = uid for update;
-  if not found or p.status not in ('awaiting_payment','proof_submitted') then raise exception 'not_allowed'; end if;
-  if p.expires_at is not null and p.expires_at < now() then raise exception 'payment_expired'; end if;
-  begin
-    update public.payments set proof_path = p_path, proof_hash = p_hash, updated_at = now() where id = p_id;
-  exception when unique_violation then raise exception 'duplicate_proof';
-  end;
-  if p.status = 'awaiting_payment' then perform public.transition_payment(p_id, 'proof_submitted', 'proof'); end if;
-end $function$;
+-- [moved] public.payment_attach_proof is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 -- «تم الدفع» → قيد المراجعة
 create or replace function public.payment_submit(p_id uuid, p_tx_ref text default null) returns void
@@ -463,32 +461,8 @@ begin
 end $function$;
 
 -- اعتماد: المبلغ من الخادم فقط (لا معامل مبلغ)، وموافقة مزدوجة فوق العتبة
-create or replace function public.payment_approve(p_id uuid, p_note text default null) returns text
-language plpgsql security definer set search_path = public as $function$
-declare uid uuid := auth.uid(); p public.payments%rowtype; m public.payment_methods%rowtype; thr numeric;
-begin
-  if uid is null or not public.has_perm('payments.review') then raise exception 'not_allowed'; end if;
-  select * into p from public.payments where id = p_id for update;
-  if not found then raise exception 'payment_not_found'; end if;
-  if p.status <> 'under_review' then raise exception 'payment_not_reviewable'; end if;
-  select * into m from public.payment_methods where id = p.method_id;
-  if m.requires_proof and coalesce(p.proof_path, '') = '' then raise exception 'proof_required'; end if;
-  thr := public.payments_cfg_num('dual_threshold', 200);
-  if thr > 0 and p.amount_base >= thr then
-    if p.first_reviewed_by is null then
-      update public.payments set first_reviewed_by = uid, first_reviewed_at = now() where id = p_id;
-      insert into public.payment_events (payment_id, from_status, to_status, actor, note)
-      values (p_id, 'under_review', 'under_review', uid, 'first approval: ' || coalesce(left(p_note, 200), ''));
-      perform public.notify_telegram('🕒 موافقة أولى على دفعة ' || left(p_id::text, 8) || ' بمبلغ ' || p.amount_base || ' USDT — بانتظار مراجع ثانٍ');
-      return 'first_approved';
-    elsif p.first_reviewed_by = uid then
-      raise exception 'second_approver_required';
-    end if;
-  end if;
-  update public.payments set reviewed_by = uid, reviewed_at = now() where id = p_id;
-  perform public.transition_payment(p_id, 'captured', p_note);
-  return 'captured';
-end $function$;
+-- [moved] public.payment_approve is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
+
 
 create or replace function public.payment_reject(p_id uuid, p_reason text) returns void
 language plpgsql security definer set search_path = public as $function$
@@ -587,14 +561,15 @@ begin
   for m in select * from jsonb_array_elements(p_methods) loop
     mid := m->>'id'; kd := coalesce(m->>'kind', 'manual');
     if mid is null or mid !~ '^[a-z0-9_-]{1,40}$' or kd not in ('manual','wallet') then raise exception 'invalid_input'; end if;
-    insert into public.payment_methods (id, kind, currency, enabled, sort, min_base, max_base, fee_pct, fee_fixed, requires_proof, expiry_minutes, config)
+    insert into public.payment_methods (id, kind, currency, enabled, sort, min_base, max_base, min_amount, max_amount, fee_pct, fee_fixed, requires_proof, expiry_minutes, config)
     values (mid, kd, upper(coalesce(m->>'currency', 'USD')), coalesce((m->>'enabled')::boolean, true), coalesce((m->>'sort')::int, 0),
             nullif(m->>'min_base', '')::numeric, nullif(m->>'max_base', '')::numeric,
+            nullif(m->>'min_amount', '')::numeric, nullif(m->>'max_amount', '')::numeric,
             coalesce(nullif(m->>'fee_pct', '')::numeric, 0), coalesce(nullif(m->>'fee_fixed', '')::numeric, 0),
             coalesce((m->>'requires_proof')::boolean, true), coalesce(nullif(m->>'expiry_minutes', '')::int, 1440),
             case when jsonb_typeof(m->'config') = 'object' then m->'config' else '{}'::jsonb end)
     on conflict (id) do update set kind = excluded.kind, currency = excluded.currency, enabled = excluded.enabled, sort = excluded.sort,
-      min_base = excluded.min_base, max_base = excluded.max_base, fee_pct = excluded.fee_pct, fee_fixed = excluded.fee_fixed,
+      min_base = excluded.min_base, max_base = excluded.max_base, min_amount = excluded.min_amount, max_amount = excluded.max_amount, fee_pct = excluded.fee_pct, fee_fixed = excluded.fee_fixed,
       requires_proof = excluded.requires_proof, expiry_minutes = excluded.expiry_minutes, config = excluded.config, updated_at = now();
     n := n + 1;
   end loop;
@@ -625,27 +600,27 @@ begin
   return n;
 end $function$;
 
--- إلغاء الطلب: تُلغى الدفعات الحيّة، وتُسترجع المدفوعة (المحفظة تلقائياً، غيرها بطلب استرجاع للإدارة)
+-- Cancellation refund is ledger-backed and defaults to the customer's main wallet for all payment methods.
 create or replace function public.payment_on_order_cancel() returns trigger
 language plpgsql security definer set search_path = public as $function$
-declare p record; rem numeric; rid bigint;
+declare p public.payments%rowtype; rem numeric; rid bigint; ik text;
 begin
-  if new.status = 'cancelled' and old.status is distinct from 'cancelled' then
-    for p in select id from public.payments where order_id = new.id and status in ('awaiting_payment','proof_submitted') loop
-      perform public.transition_payment(p.id, 'cancelled', 'order cancelled');
+  if new.status='cancelled' and old.status is distinct from 'cancelled' then
+    for p in select * from public.payments where order_id=new.id and status in ('awaiting_payment','proof_submitted','under_review') for update loop
+      perform public.transition_payment(p.id,'cancelled','order cancelled before capture');
     end loop;
-    for p in select * from public.payments where order_id = new.id and status in ('captured','refunded_partially') loop
-      rem := p.amount_base - p.refunded_total
-             - coalesce((select sum(amount) from public.refunds where payment_id = p.id and status = 'requested'), 0);
-      if rem > 0 then
-        insert into public.refunds (payment_id, amount, reason, requested_by) values (p.id, rem, 'order cancelled', auth.uid()) returning id into rid;
-        if p.method_id = 'wallet' then
-          perform public.wallet_apply(p.user_id, 'main', rem, 'refund', 'REF-' || rid::text, 'order cancelled');
-          update public.refunds set status = 'approved', approved_by = auth.uid(), decided_at = now() where id = rid;
-          update public.payments set refunded_total = refunded_total + rem where id = p.id;
-          perform public.transition_payment(p.id, 'refunded', 'order cancelled');
-        else
-          perform public.notify_telegram('↩️ طلب ملغى بدفعة مدفوعة ' || left(p.id::text, 8) || ' — طلب استرجاع #' || rid || ' بانتظار الاعتماد');
+    for p in select * from public.payments where order_id=new.id and status in ('captured','refunded_partially') for update loop
+      rem:=greatest(0,round(p.amount_base-p.refunded_total,2));
+      ik:='cancel:'||p.id::text;
+      if rem>0 and not exists(select 1 from public.refunds where payment_id=p.id and reason='order cancelled' and status='approved') then
+        insert into public.refunds(payment_id,amount,target,reason,status,requested_by,approved_by,decided_at,idempotency_key)
+        values(p.id,rem,'wallet','order cancelled','requested',auth.uid(),null,null,ik)
+        on conflict(idempotency_key) do nothing returning id into rid;
+        if rid is not null then
+          perform public.wallet_apply(p.user_id,'main',rem,'refund','REF-'||rid::text,'order cancelled');
+          update public.refunds set status='approved',approved_by=auth.uid(),decided_at=now() where id=rid;
+          update public.payments set refunded_total=refunded_total+rem,updated_at=now() where id=p.id;
+          perform public.transition_payment(p.id,'refunded','order cancelled');
         end if;
       end if;
     end loop;

@@ -1,34 +1,31 @@
-# Amarix007 — Manual payments only
+# دليل المدفوعات اليدوية — AMARIX007 / payments v2
 
-This build keeps the existing Supabase schema and uses the existing `store_config`, `orders`, and payment-proof workflow. No SQL migration is required or included for these frontend changes, and no database operation was performed while preparing this ZIP.
+## المبدأ
 
-## Configure a payment method
+يوحّد `payment_methods` وسائل الدفع، و`payments` سجل الدفعات، و`payment_events` سجل تغيّر الحالات، و`refunds` طلبات الاسترداد. عند إيقاف `payments_v2.on` تبقى مسارات v2 مغلقة. لا يثبت رفع صورة وصول المال؛ يجب مطابقة المبلغ والعملة ومرجع التحويل من مصدر مستقل.
 
-1. Open `admin.html` and sign in as an authorized administrator.
-2. Open **وسائل الدفع**.
-3. Add/edit a method and set its display names, destination account/address, network (for example, the exact crypto network), optional minimum/maximum transfer, reference instructions, and Arabic/English instructions.
-4. Enable only methods you currently accept and can manually verify.
-5. Save the draft and use the existing **نشر** action when you are ready to publish the public store configuration. This publish action is performed by you from the admin UI; this ZIP preparation did not publish or change live data.
+## تجربة العميل
 
-## Manual verification
+1. ينشئ العميل طلباً/شحنة محفظة، ثم الخادم يتحقق من ملكية الطلب وحالته وطريقة الدفع وعملتها وحدود المبلغ ويثبت سعر الصرف ووقت الانتهاء.
+2. تظهر وجهة الدفع عبر `payment_instructions()` فقط لمالك الدفعة بعد إنشائها وفي الحالات المسموح بها. لا تضع رقم الحساب أو عنوان التحويل في `public_config`, أو في اسم الوسيلة، أو في حقول وصف عامة.
+3. يرفع العميل صورة إثبات إلى Storage خاص. يقرأ Edge Function بايتات الملف المخزّن ويحسب SHA-256 على الخادم؛ لا يثق في hash من المتصفح.
+4. يرسل العميل مرجع العملية، ثم تظهر الدفعة في طابور المراجعة. لا تتحول إلى `captured` حتى يتحقق المراجع من وصول المال فعلياً.
+5. يحصل العميل على حالة الدفعة والاسترداد من RPCs تقيّد السجلات بحسابه. الاسترداد الافتراضي إلى المحفظة، والتغييرات المالية تمر عبر قيود دفتر.
 
-- The customer submits an order and can upload a payment proof using the existing private `payment-proofs` flow.
-- An administrator must independently verify the actual received funds, amount, currency, network and transaction reference.
-- Setting an order's payment status to `paid` now asks for explicit confirmation and a one-time typed confirmation token derived from that order ID. This is a browser-side safety prompt, not a replacement for server-side authorization/RLS.
-- Never treat a screenshot by itself as proof that funds arrived. Never share secret keys in public payment instructions.
+## المراجعة الإدارية
 
-## Important boundaries
+- راجع الاسم والطلب والمبلغ والعملة وسعر الصرف المجمّد والإثبات وTX reference.
+- أدخل المبلغ والعملة المستلمين فعلياً. أي فرق خارج حد التسامح يتطلب ملاحظة واضحة.
+- رمز التأكيد المؤقت يُصدر من الخادم ولا يُشتق من رقم الطلب. فوق `dual_threshold` يلزم مراجع ثانٍ مختلف.
+- لا توافق إذا كان المرجع مكرراً أو لا يمكن إثبات وصول المال. اجعل الحالة `manual_review` عند غموض رد مزوّد خارجي.
+- طلبات الاسترداد، والموافقات، والمرفوضات، والمطابقة المالية يجب أن تُراجع من لوحة الإدارة ذات صلاحيات `payments.review`, `payments.refund`, و`payments.settings` المنفصلة.
 
-- No Supabase database schema, tables, rows, policies, functions, or storage objects were modified by creating this ZIP.
-- New payment-method fields (`network`, `min`, `max`, `memo`) are optional properties in the existing JSON store configuration. Older payment methods remain valid without them.
-- The existing admin access and Supabase RLS remain the security boundary. A frontend-only ZIP cannot add durable server-side audit logs, atomic ledger operations, or stronger database permissions without backend/database work.
-- Manual payment review is distinct from automatic fulfilment after a payment has been manually confirmed; existing fulfilment settings are unchanged.
+## أسرار ووسائل الدفع
 
-## How payment methods are linked
+- احتفظ بالحسابات والعناوين في إعدادات خاصة داخل `payment_methods.config.acc`, ولا تنشرها عبر RPC العامة. اضبط وسيلة الدفع يدويّاً وتأكد من العملة وحدودها والرسائل العربية/الإنجليزية.
+- انقل مفاتيح المزوّد إلى Edge Secrets/Vault باسم secret، لا قيمة المفتاح. اتبع `docs/manual-owner-steps.md`.
+- `USDT BEP20` و`Binance Pay` يعملان في الوضع اليدوي. التحقق التلقائي غير مفعّل حتى توجد وثائق رسمية واختبارات TX/webhook والتوقيع وإعادة التشغيل ومنع التكرار.
 
-One list (**وسائل الدفع** in the admin, published to `store_config.payments`) drives every payment surface:
+## قبل الإنتاج
 
-- **Cart + quick-buy sheet, wallet top-up, order success page, "My orders", invoices, admin orders/top-ups/invoices** all read the same method by `id` and show the same name, logo, currency, account, network, memo and limits.
-- **Min / max** are in the method's own currency (USD if none is set). They are shown in the payment instructions and are now enforced in the cart / quick buy (warning + blocked checkout) and in wallet top-up (live warning + blocked request). WhatsApp orders and wallet payments are not affected.
-- **Wallet ↔ manual transfer:** a pending manual-transfer order whose items are all boost services can be paid from the wallet instead (success page and "My orders"). `pay_order_with_wallet()` re-checks balance/eligibility on the server and switches the order's `payment_method` to `wallet`.
-- An enabled method with no account/number is hidden from the store; the admin pre-publish checklist now warns about it, and about a method whose minimum is greater than its maximum.
+اتبع `SQL-RUN-ORDER.md`, شغّل `supabase/tests/payments_v2_contract.sql` وDeno tests على بيئة محلية، اختبر مستخدمين منفصلين وتزامناً على الاعتماد والصرف والاسترداد، وقارن المجاميع قبل/بعد. إذا ظهر اختلاف، أوقف الترحيل ولا تعدّل دفتر الحركات يدوياً.

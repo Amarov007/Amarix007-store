@@ -76,25 +76,4 @@ create trigger orders_payment_audit_log_trg after update of payment_status on pu
   for each row execute function public.orders_payment_audit_log();
 
 -- ---------- 4) اعتماد الدفع اليدوي (الدالة التي يستدعيها admin.js) ----------
-create or replace function public.approve_manual_payment(
-  p_order_id text, p_confirmation text, p_tx_ref text default null, p_note text default null) returns jsonb
-language plpgsql security definer set search_path = public as $function$
-declare o public.orders%rowtype; ref text := nullif(btrim(coalesce(p_tx_ref, '')), '');
-begin
-  if auth.uid() is null or not public.has_perm('orders') then raise exception 'not_allowed'; end if;
-  if ref is not null and (length(ref) > 100 or ref !~ '^[A-Za-z0-9_:.\- ]+$') then raise exception 'invalid_reference'; end if;
-  select * into o from public.orders where id = p_order_id for update;
-  if not found then raise exception 'order_not_found'; end if;
-  if o.status = 'cancelled' or coalesce(o.payment_status, 'pending') not in ('pending', 'review') then
-    raise exception 'payment_not_reviewable';
-  end if;
-  if coalesce(o.payment_proof, '') = '' then raise exception 'payment_proof_required'; end if;
-  if p_confirmation is distinct from ('VERIFY-' || right(o.id, 8)) then raise exception 'confirmation_failed'; end if;
-
-  perform set_config('amx.audit_done', o.id, true);           -- نكتب سطر التدقيق بأنفسنا (مع المرجع والملاحظة)
-  update public.orders set payment_status = 'paid' where id = o.id;
-  insert into public.order_payment_audit (order_id, from_status, to_status, actor, via, tx_ref, note)
-  values (o.id, o.payment_status, 'paid', auth.uid(), 'rpc', ref, left(p_note, 300));
-  perform set_config('amx.audit_done', '', true);
-  return jsonb_build_object('order_id', o.id, 'payment_status', 'paid');
-end $function$;
+-- [moved] public.approve_manual_payment is defined only in supabase/migrations/20261028070000_payments_restructure.sql.
