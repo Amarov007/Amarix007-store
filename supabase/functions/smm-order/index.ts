@@ -194,7 +194,7 @@ Deno.serve(async (req: Request) => {
       const id = String(rawId ?? "").trim().toLowerCase() || MAIN;
       const hit = siteCache.get(id);
       if (hit) return hit;
-      let out: { site?: Site; err?: SiteErr };
+      let out: { site?: Site; err?: SiteErr } = { err: { error: "provider resolution failed", status: 500 } };
       if (id === MAIN) {
         const { data: cfg } = await admin
           .from("api_settings")
