@@ -3365,6 +3365,27 @@ async function autoSweep() {
 
 /* ---- home dashboard: real numbers ---- */
 const usd = (o) => { const r = D.rates && D.rates[o.currency || baseCur()]; const k = r ? +r[0] : 1; return (+o.total || 0) / (k > 0 ? k : 1); };
+async function reportProviderPriceDrift(drift) {
+  if (!drift || !Array.isArray(drift.up) || !drift.up.length) return;
+  const groups = new Map();
+  drift.up.forEach(({ p, np }) => {
+    const provider = provOf(p);
+    if (!groups.has(provider)) groups.set(provider, []);
+    groups.get(provider).push({ name: String(p.ar || p.en || p.id || "منتج").replace(/[\\r\\n]+/g, " ").slice(0, 55), old: p.p, next: np });
+  });
+  await Promise.all([...groups.entries()].map(async ([provider, items]) => {
+    const summary = items.slice(0, 4).map(x => `${x.name}: ${x.old} → ${x.next}`).join(" · ");
+    try {
+      await api("/rest/v1/rpc/notify_provider_price_drift", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ p_provider: provider, p_count: items.length, p_summary: summary }),
+      });
+    } catch {
+      // Provider price alerts are best-effort and must not block the dashboard.
+    }
+  }));
+}
 async function homeStats() {
   const box = $("#hs");
   if (!box) return;
@@ -3410,6 +3431,7 @@ async function homeStats() {
   paid.forEach((o) => orderItems(o).forEach((i) => { const k = i.id; cnt[k] = cnt[k] || { n: 0, t: i.ar || i.name || i.id }; cnt[k].n += +i.q || 1; }));
   const top = Object.values(cnt).sort((a, b) => b.n - a.n).slice(0, 5);
   const thr = parseFloat(localStorage.getItem("amx_smm_low")) || 5, dr = smmDrift(cache), lowL = bals.filter((b) => b.v < thr), low = lowL.length > 0;
+  await reportProviderPriceDrift(dr);
   const kp = (n, l, cl) => `<div class="stat${cl ? " " + cl : ""}"><b>${n}</b><span>${l}</span></div>`;
   box.innerHTML =
     `<div class="stats">${kp(rev(salesToday), "مبيعات اليوم")}${kp(rev(salesWeek), "مبيعات 7 أيام")}${kp(pend, "بانتظار مراجعة الدفع", pend ? "hot" : "")}${kp(open, "طلبات مفتوحة")}${bals.map((b) => kp(b.v.toFixed(2) + " <small>" + esc(b.c) + "</small>", bals.length > 1 || b.id != "main" ? "رصيدك لدى " + esc(provName(b.id)) : "رصيدك لدى المزوّد", b.v < thr ? "hot" : "")).join("")}</div>` +
