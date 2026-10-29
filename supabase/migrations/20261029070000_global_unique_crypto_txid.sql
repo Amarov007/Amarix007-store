@@ -4,7 +4,7 @@
 -- must never be claimed by another payment, regardless of status or method.
 create unique index if not exists payments_tx_ref_global_unique_idx
   on public.payments (
-    (lower(regexp_replace(btrim(tx_ref), '\\s+', '', 'g')))
+    (lower(regexp_replace(btrim(tx_ref), '[[:space:]]+', '', 'g')))
   )
   where nullif(btrim(tx_ref), '') is not null;
 
