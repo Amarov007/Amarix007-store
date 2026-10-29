@@ -141,4 +141,6 @@ select jobname, schedule, active from cron.job order by jobname;
 - `20261029100000_split_storefront_catalog_hubs.sql`: يفصل الألعاب عن تطبيقات الدردشة والبث والتطبيقات الرقمية، وينشئ مساحة مستقلة لاشتراكات الذكاء الاصطناعي، ويطلب User ID لمنتجات Dazz Live.
 - `20261029101500_add_pubg_uc_catalog_slot.sql`: ينشئ بطاقة PUBG Mobile UC بحالة «قريباً» فقط؛ لم يعرض كتالوج FazerCards الحالي PUBG/UC، لذلك لا توجد أسعار وهمية أو زر شراء لمنتج غير متاح.
 - `20261029103000_require_user_ids_for_direct_topups.sql`: يفعّل إدخال User ID في منتجات Bigo Live وChamet وDazz Live وCapCut وCall of Duty Mobile (India) وفق متطلبات كتالوج المزوّد. بيانات العميل تُحفظ في `orders.items[].link` مع الطلب.
+- `20261029104500_correct_chat_app_account_id_labels.sql`: يضمن أن Bigo Live وChamet وDazz Live وCapCut وCall of Duty Mobile تطلب `user_id` بالاسم الصحيح، بدلاً من خلطه بمعرّف لاعب أو بريد إلكتروني.
+
 - لوحة المنتجات تعرض 100 منتج في البداية وبحد أقصى 300 صف مع تحميل تدريجي والبحث بالاسم أو المعرّف. نموذج المنتج يدعم `ptype` واختيار `req` بما فيه `user_id`.
