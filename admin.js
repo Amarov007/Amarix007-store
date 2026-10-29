@@ -56,6 +56,7 @@ let D = clone(PUB),
   pq = "",
   pcat = "",
   ppin = false,
+  prodShow = 100,
   SES = null,
   IS_ADMIN = null,
   STAFF = null; // STAFF: مصفوفة صلاحيات الموظف المفعّل (null = ليس موظفاً)
@@ -632,7 +633,7 @@ const VIEW = {
       const k = "products." + ed + ".",
         p = D.products[ed],
         opts = D.categories.filter((x) => x.ty != "hub").map((x) => [x.id, x.ar]);
-      return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}${F("تثبيت في الرئيسية (1 = الأول، 0 = غير مثبّت)", k + "pin", { t: "num" })}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F("موقع الرشق (المزوّد)", k + "smm_provider", { t: "sel", o: provOpts(p.smm_provider) })}${F( "رقم أو رمز الخدمة في الموقع (service id / wa / uc_60)", k + "smm_service", { d: 1 } )}${F("نوع التسليم", k + "smm_input", { t: "sel", o: [["", "رشق: الزبون يكتب رابطاً + كمية"], ["none", "رقم أو كود جاهز: بلا مدخل من الزبون"], ["text", "شحن أو اشتراك: الزبون يكتب معرّفاً أو إيميل"]] })}${F("الدولة أو خيار إضافي (رمز دولة الرقم)", k + "smm_country", { d: 1 })}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql). منتجات الرشق المستوردة تلقائياً تكون «كمية الرشق لكل وحدة = 1» والسعر هو سعر وحدة واحدة (سعر الألف ÷ 1000)، وأقل/أعلى كمية تأتي مباشرة من المزوّد (شغّل supabase-boost-units.sql مرة واحدة).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
+      return `<div class="card"><button class="b b2" data-a="back">← رجوع</button><h2>${esc( p.ar )}</h2> <div class="g2">${F("نوع العنصر", k + "k", { t: "sel", o: KINDS, re: 1, w: 1 })}${F("القسم", k + "c", { t: "sel", o: opts, re: 1 })}${p.k == "link" ? "" : F("نوع المنتج", k + "ptype", { t: "sel", o: [["smm","خدمة SMM"],["game_topup","شحن لعبة / معرّف لاعب"],["app_subscription","اشتراك تطبيق / حساب"],["gift_card","بطاقة / كود رقمي"]], re: 1 })}${p.k == "link" ? "" : F( "التسليم", k + "t", { t: "sel", o: DELIV, n: 1 } )}${F("الاسم (عربي)", k + "ar", { w: 1 })}${F( "الاسم (إنجليزي)", k + "en", { w: 1, d: 1 } )}</div>${p.k == "link" ? `<div class="card" style="background:var(--bg)"><h3>🔗 إعدادات زر الزيارة</h3><div class="g2">${F("رابط الزيارة (يبدأ بـ https://)", k + "lu", { d: 1, w: 1, ph: "https://example.com/..." })}${F("نص الزر (عربي)", k + "lba", { ph: "زيارة الموقع" })}${F("نص الزر (إنجليزي)", k + "lbe", { d: 1, ph: "Visit website" })}</div><p class="hint">لن يظهر سعر ولا زر «أضف للسلة» لهذا العنصر؛ يظهر زر زيارة متحرك يفتح الرابط في نافذة جديدة. اترك نص الزر فارغاً لاستخدام «زيارة الرابط».</p></div>` : ""}${p.k == "link" ? "" : `<div class="g3">${F("السعر", k + "p", { t: "num" })}${F("سعر قديم", k + "o", { t: "num", })}${F("الخصم %", k + "d", { t: "num" })}${F("التقييم", k + "r", { t: "num", })}${F("عدد التقييمات", k + "n", { t: "num" })}${F( "ترتيب الأكثر مبيعاً (1 = الأول، 0 = بلا ترتيب)", k + "bs", { t: "num" } )}${F("تثبيت في الرئيسية (1 = الأول، 0 = غير مثبّت)", k + "pin", { t: "num" })}</div><p class="hint warn">⚠ التقييم (r) وعدد التقييمات (n): هذا تقييم يدوي وليس مراجعات عملاء.</p>`} <div class="g2">${p.k == "link" ? "" : `${F("موقع الرشق (المزوّد)", k + "smm_provider", { t: "sel", o: provOpts(p.smm_provider) })}${F( "رقم أو رمز الخدمة في الموقع (service id / wa / uc_60)", k + "smm_service", { d: 1 } )}${F("نوع التسليم", k + "smm_input", { t: "sel", o: [["", "رشق: الزبون يكتب رابطاً + كمية"], ["none", "رقم أو كود جاهز: بلا مدخل من الزبون"], ["text", "شحن أو اشتراك: الزبون يكتب معرّفاً أو إيميل"]] })}<div class="fld w2"><span>البيانات المطلوبة من العميل (تظهر في السلة وتُحفظ مع الطلب)</span><div class="acts">${[["player_id","معرّف اللاعب (Player ID)"],["server_id","معرّف السيرفر (Server ID)"],["email","البريد الإلكتروني"],["phone","رقم الهاتف"]].map(([rk,rl])=>`<label class="chk"><input type="checkbox" data-req-field="${ed}" data-req-key="${rk}" ${(Array.isArray(p.req)?p.req:[]).includes(rk)?"checked":""}>${rl}</label>`).join("")}</div></div>${F("الدولة أو خيار إضافي (رمز دولة الرقم)", k + "smm_country", { d: 1 })}${F("كمية الرشق لكل وحدة", k + "smm_qty", { t: "num" })}${F("أقل كمية يمكن للزبون طلبها (بالوحدات)", k + "qmin", { t: "num" })}${F("أعلى كمية (بالوحدات، 0 = بلا حد)", k + "qmax", { t: "num" })}`}${p.k == "link" ? "" : `<p class="hint" style="grid-column:1/-1">💡 الزبون يختار الكمية بحرية (أزرار سريعة + خانة رقم). «الوحدة» هي كمية الرشق لكل وحدة والسعر أعلاه هو سعر الوحدة. مثال: السعر 3.5 وكمية الرشق لكل وحدة 100 وأقل كمية 10 = أقل طلب 1000 متابع، ويمكنه كتابة 15 وحدة = 1500 متابع. اترك أقل كمية 0 أو 1 للسماح بوحدة واحدة. يُطبَّق الحد في المتجر وفي قاعدة البيانات أيضاً (شغّل supabase-support-tickets.sql). منتجات الرشق المستوردة تلقائياً تكون «كمية الرشق لكل وحدة = 1» والسعر هو سعر وحدة واحدة (سعر الألف ÷ 1000)، وأقل/أعلى كمية تأتي مباشرة من المزوّد (شغّل supabase-boost-units.sql مرة واحدة).</p>`}${F( "وسوم", k + "tg", { w: 1 } )}${F("مواصفات", k + "sp", { w: 1 })}${F("الوصف (عربي)", k + "ds.ar", { t: "area", w: 1, })}${F("الوصف (إنجليزي)", k + "ds.en", { t: "area", w: 1, d: 1 })}</div> <div class="card" style="background:var(--bg)"><h3>صور المنتج</h3>${F( "الصورة الرئيسية", k + "img", { t: "img", w: 1 } )}${F("معرض الصور المتعددة", k + "images", { t: "imgs", w: 1 })}</div> </div>`;
     }
     const q = pq.trim().toLowerCase(),
       L = D.products
@@ -641,9 +642,10 @@ const VIEW = {
           ([p]) =>
             (!pcat || p.c == pcat) &&
             (!ppin || +p.pin > 0) &&
-            (!q || (p.ar + " " + p.en).toLowerCase().includes(q))
+            (!q || (p.ar + " " + p.en + " " + p.id).toLowerCase().includes(q))
         );
-    return `<div class="card"><h2>المنتجات (${ D.products.length })</h2><div class="sw"><input class="inp" id="pq" placeholder="بحث…" value="${esc( pq )}"><button class="b" data-a="add" data-k="products">+ منتج</button><button class="b b2" data-a="ppin">📌 المثبّتة في الرئيسية (${D.products.filter((x) => +x.pin > 0).length})${ppin ? " ✓" : ""}</button></div> ${L.map( ([p, i]) => `<div class="it"><span class="thm">${ p.img ? `<img src="${esc(p.img)}" alt="">` : ic("box") }</span><div class="im"><b>${esc(p.ar)}</b><small>${esc(catName(p.c))} · ${ p.k == "link" ? "🔗 رابط للزيارة" : p.p }${p.dup ? " · 🙈 مكرر مخفي" : ""}${+p.pin > 0 ? " · 📌 " + p.pin : ""}</small></div><button class="b b2 sm" data-a="pin" data-i="${i}" title="تثبيت في الرئيسية">${+p.pin > 0 ? "📌" : "📍"}</button><button class="b b2 sm" data-a="edit" data-i="${i}">تعديل</button><button class="b bd2 sm" data-a="del" data-k="products" data-i="${i}">حذف</button></div>` ).join("")}</div>`;
+    const shown = L.slice(0, prodShow);
+    return \`<div class="card"><h2>المنتجات (\${D.products.length})</h2><p class="hint">عرض \${shown.length} من \${L.length} نتيجة مطابقة. تُحمّل النتائج على دفعات لتجنب تعليق لوحة التحكم.</p><div class="sw"><input class="inp" id="pq" placeholder="ابحث بالاسم أو المعرّف…" value="\${esc(pq)}"><button class="b" data-a="add" data-k="products">+ منتج</button><button class="b b2" data-a="ppin">📌 المثبّتة في الرئيسية (\${D.products.filter((x) => +x.pin > 0).length})\${ppin ? " ✓" : ""}</button></div> \${shown.map(([p, i]) => \`<div class="it"><span class="thm">\${p.img ? \`<img src="\${esc(p.img)}" alt="" loading="lazy" decoding="async">\` : ic("box")}</span><div class="im"><b>\${esc(p.ar)}</b><small>\${esc(catName(p.c))} · \${p.k == "link" ? "🔗 رابط للزيارة" : p.p}\${p.dup ? " · 🙈 مكرر مخفي" : ""}\${+p.pin > 0 ? " · 📌 " + p.pin : ""}</small></div><button class="b b2 sm" data-a="pin" data-i="\${i}" title="تثبيت في الرئيسية">\${+p.pin > 0 ? "📌" : "📍"}</button><button class="b b2 sm" data-a="edit" data-i="\${i}">تعديل</button><button class="b bd2 sm" data-a="del" data-k="products" data-i="\${i}">حذف</button></div>\`).join("")} \${L.length > shown.length ? \`<div class="acts"><button class="b b2" data-a="more-products">تحميل \${Math.min(100, L.length - shown.length)} منتج إضافي (\${L.length - shown.length} متبقٍ)</button></div>\` : ""}</div>\`;
   },
   embeds() {
     const opts = D.categories.filter((x) => x.ty != "hub").map((x) => [x.id, x.ar]);
@@ -1117,6 +1119,7 @@ document.addEventListener("input", (e) => {
     later();
   } else if (t.id == "pq") {
     pq = t.value;
+    prodShow = 100;
     const p = t.selectionStart;
     render();
     const n = $("#pq");
@@ -1132,6 +1135,18 @@ document.addEventListener("input", (e) => {
     ordShow = 50;
     renderOrderList();
   }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (!el || el.dataset.reqField == null) return;
+  const p = D.products[Number(el.dataset.reqField)];
+  if (!p) return;
+  const key = el.dataset.reqKey;
+  if (!["player_id", "server_id", "email", "phone"].includes(key)) return;
+  const req = Array.isArray(p.req) ? p.req.slice() : [];
+  p.req = el.checked ? [...new Set([...req, key])] : req.filter((x) => x !== key);
+  if (!p.req.length) delete p.req;
+  save();
 });
 document.addEventListener("keydown", (e) => {
   if (e.key == "Enter" && e.target.dataset && e.target.dataset.fo) {
@@ -1241,6 +1256,11 @@ document.addEventListener("click", (e) => {
   }
   if (a == "ppin") {
     ppin = !ppin;
+    prodShow = 100;
+    return render();
+  }
+  if (a == "more-products") {
+    prodShow += 100;
     return render();
   }
   if (a == "pin") {
