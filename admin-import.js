@@ -799,10 +799,14 @@
   if (storeGrp) storeGrp[1] = storeGrp[1].filter((k) => !["import", "topups", "smmmgr"].includes(k));
   const advancedGrp = TG.find((x) => x[0] === "أدوات متقدمة");
   if (advancedGrp) advancedGrp[1] = advancedGrp[1].filter((k) => k !== "apis");
-  const providerGrp = ["إدارة الخدمات والربط", ["apis", "import", "smmmgr", "topups"]];
-  if (!TG.some((x) => x[0] === providerGrp[0])) TG.splice(Math.max(0, TG.findIndex((x) => x[0] === "أدوات متقدمة")), 0, providerGrp);
-
-  g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, v: 2 };
+  // Group the entire provider-to-catalog workflow in one ordered navigation section.
+  const storeGrpNow = TG.find((x) => x[0] === "المتجر");
+  if (storeGrpNow) storeGrpNow[1] = storeGrpNow[1].filter((k) => k !== "products" && k !== "categories");
+  const providerGrp = ["إدارة المنتجات والمزوّدين", ["apis", "import", "products", "topups", "smmmgr", "categories"]];
+  if (!TG.some((x) => x[0] === providerGrp[0])) TG.splice(Math.max(0, TG.findIndex((x) => x[0] === "المتجر")), 0, providerGrp);
+  const relabel = { apis: "1 · اتصال المزوّدين", import: "2 · جلب وفرز الخدمات", products: "3 · كتالوج المنتجات", topups: "4 · الألعاب والتطبيقات", smmmgr: "5 · خدمات الرشق", categories: "6 · الأقسام والتصنيف" };
+  Object.keys(relabel).forEach((k) => { const i = TABS.findIndex((x) => x[0] === k); if (i >= 0) TABS[i][1] = relabel[k]; });
+  g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, v: 3 };
   // admin.js may have rendered its first screen before this extension was loaded.
   if (typeof render === "function") render();
 })(window);
