@@ -109,6 +109,148 @@ END $function$;
 REVOKE ALL ON FUNCTION public.notify_provider_balance_if_low(text,numeric,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.notify_provider_balance_if_low(text,numeric,text) TO authenticated;
 
+ALTER TABLE public.provider_alert_state
+  ADD COLUMN IF NOT EXISTS last_price_alert_at timestamptz,
+  ADD COLUMN IF NOT EXISTS last_price_signature text;
+
+CREATE OR REPLACE FUNCTION public.notify_provider_price_drift(
+  p_provider text, p_count integer, p_summary text DEFAULT ''
+)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+DECLARE s public.provider_alert_state%rowtype; provider_label text; should_alert boolean;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_admin() THEN RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501'; END IF;
+  IF coalesce(p_provider,'') !~ '^[a-z0-9_-]{1,30}
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+DECLARE
+  np jsonb := coalesce(new.data->'products','[]'::jsonb);
+  op jsonb := coalesce(old.data->'products','[]'::jsonb);
+  rec record; n integer:=0; nm text; price_count integer:=0; price_lines text[]:=ARRAY[]::text[];
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.has_perm('products') THEN RETURN NULL; END IF;
+  IF np IS NOT DISTINCT FROM op THEN RETURN NULL; END IF;
+  FOR rec IN
+    WITH new_products AS MATERIALIZED (
+      SELECT value->>'id' id,value product FROM jsonb_array_elements(np)
+      WHERE jsonb_typeof(value)='object' AND value->>'id' IS NOT NULL
+    ), old_products AS MATERIALIZED (
+      SELECT value->>'id' id,value product FROM jsonb_array_elements(op)
+      WHERE jsonb_typeof(value)='object' AND value->>'id' IS NOT NULL
+    )
+    SELECT coalesce(nn.id,oo.id) id,oo.product old_product,nn.product new_product
+    FROM old_products oo FULL OUTER JOIN new_products nn ON nn.id=oo.id
+    WHERE oo.product IS DISTINCT FROM nn.product LIMIT 20
+  LOOP
+    IF rec.old_product IS NULL THEN
+      nm:=coalesce(nullif(rec.new_product->>'ar',''),nullif(rec.new_product->>'en',''),rec.id);
+      PERFORM public.log_activity('product_add',rec.id,jsonb_build_object('name',nm));
+    ELSIF rec.new_product IS NULL THEN
+      nm:=coalesce(nullif(rec.old_product->>'ar',''),nullif(rec.old_product->>'en',''),rec.id);
+      PERFORM public.log_activity('product_remove',rec.id,jsonb_build_object('name',nm));
+    ELSE
+      nm:=coalesce(nullif(rec.new_product->>'ar',''),nullif(rec.new_product->>'en',''),rec.id);
+      IF rec.old_product->'p' IS DISTINCT FROM rec.new_product->'p'
+         OR rec.old_product->'d' IS DISTINCT FROM rec.new_product->'d' THEN
+        PERFORM public.log_activity('product_price',rec.id,jsonb_build_object(
+          'name',nm,'p_from',rec.old_product->'p','p_to',rec.new_product->'p',
+          'd_from',rec.old_product->'d','d_to',rec.new_product->'d'));
+        price_count:=price_count+1;
+        IF cardinality(price_lines)<8 THEN
+          price_lines:=array_append(price_lines,nm||': '||coalesce(rec.old_product->>'p','?')||' → '||coalesce(rec.new_product->>'p','?'));
+        END IF;
+      ELSE
+        PERFORM public.log_activity('product_edit',rec.id,jsonb_build_object('name',nm));
+      END IF;
+    END IF;
+    n:=n+1; EXIT WHEN n>=20;
+  END LOOP;
+  IF price_count>0 THEN
+    BEGIN
+      PERFORM public.notify_telegram('📊 تغيّرت أسعار منتجات المتجر بعد النشر (حتى '||price_count||
+        ' تغييرات ضمن سجل التدقيق)'||E'\n'||array_to_string(price_lines,E'\n')||
+        CASE WHEN price_count>cardinality(price_lines) THEN E'\n… وتغييرات أخرى' ELSE '' END);
+    EXCEPTION WHEN OTHERS THEN NULL; END;
+  END IF;
+  RETURN NULL;
+EXCEPTION WHEN OTHERS THEN RETURN NULL;
+END $function$;
+
+CREATE OR REPLACE FUNCTION public.admin_home_stats(p_day_start timestamptz,p_week_start timestamptz)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+DECLARE result jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR (NOT public.is_admin() AND NOT public.has_perm('orders')) THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+  IF p_day_start IS NULL OR p_week_start IS NULL OR p_week_start>p_day_start THEN
+    RAISE EXCEPTION 'invalid_period' USING ERRCODE = '22023';
+  END IF;
+  SELECT jsonb_build_object(
+    'sales_today',coalesce(sum(CASE WHEN o.payment_status='paid' AND o.created_at>=p_day_start
+      THEN o.total/coalesce(nullif((c.data->'rates'->upper(coalesce(nullif(o.currency,''),'USD'))->>0),'')::numeric,1) ELSE 0 END),0),
+    'sales_7d',coalesce(sum(CASE WHEN o.payment_status='paid' AND o.created_at>=p_week_start
+      THEN o.total/coalesce(nullif((c.data->'rates'->upper(coalesce(nullif(o.currency,''),'USD'))->>0),'')::numeric,1) ELSE 0 END),0),
+    'pending_review',
+      count(*) FILTER(WHERE o.payment_status='review')
+      + (SELECT count(*) FROM public.payments p WHERE p.status IN ('proof_submitted','under_review'))
+      + (SELECT count(*) FROM public.wallet_topups w WHERE w.status IN ('pending','review','under_review')),
+    'open_orders',count(*) FILTER(WHERE o.status IN ('new','processing'))
+  ) INTO result FROM public.orders o CROSS JOIN public.store_config c WHERE c.id=1;
+  RETURN result;
+END $function$;
+REVOKE ALL ON FUNCTION public.admin_home_stats(timestamptz,timestamptz) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_home_stats(timestamptz,timestamptz) TO authenticated;
+
+CREATE INDEX IF NOT EXISTS payments_review_queue_idx ON public.payments(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS wallet_topups_review_queue_idx ON public.wallet_topups(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS support_tickets_admin_queue_idx ON public.support_tickets(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS orders_created_at_desc_idx ON public.orders(created_at DESC);
+
+-- Disable a clearly malformed placeholder account without deleting financial history.
+UPDATE public.payment_methods SET enabled=false,updated_at=now()
+WHERE id='pmmvgmi1ib8qm' AND enabled IS DISTINCT FROM false;
+UPDATE public.store_config sc
+SET data=jsonb_set(
+  jsonb_set(sc.data,'{payments}',coalesce((
+    SELECT jsonb_agg(p ORDER BY ord)
+    FROM jsonb_array_elements(coalesce(sc.data->'payments','[]'::jsonb)) WITH ORDINALITY AS x(p,ord)
+    WHERE p->>'id'<>'pmmvgmi1ib8qm'
+  ),'[]'::jsonb),true),
+  '{ts}',to_jsonb(greatest(coalesce(nullif(sc.data->>'ts','')::numeric,0)+1,
+                            floor(extract(epoch FROM clock_timestamp())*1000))),true),
+  updated_at=now()
+WHERE sc.id=1 AND EXISTS(
+  SELECT 1 FROM jsonb_array_elements(coalesce(sc.data->'payments','[]'::jsonb)) p
+  WHERE p->>'id'='pmmvgmi1ib8qm'
+);
+ OR p_count IS NULL OR p_count < 1 OR p_count > 100000 THEN
+    RAISE EXCEPTION 'invalid_price_drift' USING ERRCODE = '22023';
+  END IF;
+  INSERT INTO public.provider_alert_state(provider_id) VALUES(p_provider) ON CONFLICT(provider_id) DO NOTHING;
+  SELECT * INTO s FROM public.provider_alert_state WHERE provider_id=p_provider FOR UPDATE;
+  SELECT CASE WHEN p_provider='main' THEN 'المزوّد الرئيسي' ELSE coalesce(name,p_provider) END
+    INTO provider_label FROM public.smm_providers WHERE id=p_provider;
+  provider_label:=coalesce(provider_label,CASE WHEN p_provider='main' THEN 'المزوّد الرئيسي' ELSE p_provider END);
+  should_alert:=s.last_price_alert_at IS NULL OR s.last_price_alert_at < now()-interval '6 hours';
+  UPDATE public.provider_alert_state
+  SET last_price_alert_at=CASE WHEN should_alert THEN now() ELSE last_price_alert_at END,
+      last_price_signature=md5(coalesce(p_summary,'')||':'||p_count::text), updated_at=now()
+  WHERE provider_id=p_provider;
+  IF should_alert THEN
+    PERFORM public.notify_telegram('📈 تغيّر أسعار لدى المزوّد: '||provider_label||
+      E'\n📦 منتجات متأثرة: '||p_count::text||
+      CASE WHEN coalesce(p_summary,'')<>'' THEN E'\n'||left(p_summary,450) ELSE '' END||
+      E'\nراجع لوحة الإدارة قبل تطبيق الأسعار.');
+  END IF;
+  RETURN should_alert;
+END
+$function$;
+REVOKE ALL ON FUNCTION public.notify_provider_price_drift(text,integer,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.notify_provider_price_drift(text,integer,text) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.config_activity()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $function$
