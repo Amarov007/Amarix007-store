@@ -78,3 +78,4 @@ GRANT EXECUTE ON FUNCTION public.telegram_admin_action(text,text,text,text,text,
 
 -- Stores the pg_net request id for operational verification; never stores bot credentials here.
 ALTER TABLE public.notify_settings ADD COLUMN IF NOT EXISTS telegram_webhook_request_id bigint;
+ALTER TABLE public.notify_settings ADD COLUMN IF NOT EXISTS telegram_webhook_test_request_id bigint;
