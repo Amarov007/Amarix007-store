@@ -16,46 +16,54 @@
   "use strict";
 
   const HUBS = [
-    { id: "games", i: "bolt", ar: "شحن الألعاب", en: "Game Top-up", da: "اشحن ألعابك المفضلة مباشرة — اختر اللعبة وأكمل طلبك", de: "Top up your favourite games — pick a game and order", gold: "pubg_mobile" },
-    { id: "apps", i: "users", ar: "تطبيقات واشتراكات", en: "Apps & Subscriptions", da: "عملات تطبيقات البث والدردشة واشتراكات الذكاء الاصطناعي وأدوات الإبداع", de: "Coins for live & chat apps, AI subscriptions and creative tools", gold: "" }
+    { id: "games", i: "bolt", ar: "شحن الألعاب", en: "Game Top-up", da: "اختر اللعبة والمنطقة والباقة، ثم أدخل معرّف اللاعب قبل الدفع", de: "Choose the game, region and package, then enter your player ID before payment", gold: "pubg_mobile" },
+    { id: "chat", i: "users", ar: "تطبيقات الدردشة والبث", en: "Chat & Live Apps", da: "اشحن عملات تطبيقات البث والدردشة مع إدخال معرّف الحساب المطلوب", de: "Top up live and chat app coins using the required account ID", gold: "" },
+    { id: "ai", i: "spark", ar: "اشتراكات الذكاء الاصطناعي", en: "AI Subscriptions", da: "اشتراكات أدوات الذكاء الاصطناعي وخططها — ستظهر الباقات المتاحة فقط", de: "AI tools and subscription plans — only verified available packages are listed", gold: "" },
+    { id: "apps", i: "phone", ar: "التطبيقات والبطاقات الرقمية", en: "Apps & Digital Cards", da: "اشتراكات التطبيقات والبطاقات الرقمية وأدوات الإبداع", de: "App subscriptions, digital cards and creative tools", gold: "" }
   ];
-  const APP_RE = /\b(bigo|chamet|dazz|capcut|yalla|imo|tiktok|soul\s?chill|weplay|likee|tango|hago|poppo|uplive|live|chat|netflix|spotify|canva|discord)\b/i;
-  const LIVE_RE = /\b(bigo|chamet|dazz|yalla|imo|tiktok|soul\s?chill|weplay|likee|tango|hago|poppo|uplive|live|chat)\b/i;
+  const AI_RE = /\b(chatgpt|openai|claude|gemini|midjourney|perplexity|copilot|cursor|suno|runway|elevenlabs|artificial intelligence|\bai\b|ذكاء اصطناعي|شات جي بي تي|كلود|جيميناي)\b/i;
+  const CHAT_RE = /\b(bigo|chamet|dazz|poppo|likee|tango|weplay|hago|uplive|imo|yalla|soul\s?chill|live|chat|discord|telegram premium|whatsapp)\b/i;
+  const APP_RE = /\b(capcut|netflix|spotify|canva|notion|adobe|microsoft 365|office 365|icloud|google one|premium|subscription|اشتراك|بطاقة رقمية)\b/i;
+  const LIVE_RE = CHAT_RE;
   const REGION_RE = /^(.*?)\s*\(([^()]+)\)\s*$/;
   const BRAND_DIR = "/storage/v1/object/public/store-media/brands/";
 
-  let MEM = { games: [], apps: [] }; // hub id -> member categories (from the last apply)
+  let MEM = Object.fromEntries(HUBS.map((h) => [h.id, []])); // hub id -> member categories
   let OF = {}; // member category id -> hub id
-  let BRANDS = null; // Map slug -> file name (from brands/index.json)
-  let CUR = null; // { id, sub } of the page on screen, to repaint when logos arrive
+  let BRANDS = null;
+  let CUR = null;
 
-  /* ---------- tiny helpers (app.js globals are read at call time: lang, P, pr, money, ic, SB_URL, ex) ---------- */
+  /* ---------- tiny helpers ---------- */
   const L = (ar, en) => (typeof lang !== "undefined" && lang === "en" ? en : ar);
   const esc = (x) => String(x ?? "").replace(/[&<>"']/g, (c) => "&#" + c.charCodeAt(0) + ";");
   const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   const nm = (o) => (typeof lang !== "undefined" && lang === "en" ? o.en || o.ar : o.ar || o.en) || "";
   const hue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
-  const colorOf = (c, seed) => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : `hsl(${hue(seed)} 62% 48%)`);
+  const colorOf = (c, seed) => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : \`hsl(\${hue(seed)} 62% 48%)\`);
   const prods = () => (typeof P !== "undefined" && Array.isArray(P) ? P : []);
   const minPrice = (list) => { let m = Infinity; list.forEach((p) => { const v = pr(p); if (v < m) m = v; }); return m === Infinity ? 0 : m; };
 
-  /* ---------- membership ---------- */
+  /* Category assignment prioritizes recognizable product families before legacy imported hub values. */
   function hubKey(c) {
-    if (!c) return null;
-    if (c.hub === "none") return null; // admin: keep this category standalone
-    if (c.hub === "games" || c.hub === "apps") return c.hub;
+    if (!c || c.ty === "hub") return null;
+    if (c.hub === "none") return null;
+    const label = String(c.id || "") + " " + String(c.ar || "") + " " + String(c.en || "");
+    const members = prods().filter((p) => String(p.c) === String(c.id));
+    const pnames = members.slice(0, 80).map((p) => String(p.ar || "") + " " + String(p.en || "")).join(" ");
+    if (AI_RE.test(label) || AI_RE.test(pnames)) return "ai";
+    if (CHAT_RE.test(label) || CHAT_RE.test(pnames)) return "chat";
+    if (APP_RE.test(label)) return "apps";
     if (c.id === "pubg") return "games";
-    if (c.id === "live" || c.id === "ai") return "apps";
-    if (c.ty === "boost") return null;
-    if (c.ty === "shop") {
-      const members = prods().filter((p) => String(p.c) === String(c.id));
+    if (c.id === "live") return "chat";
+    if (c.id === "ai") return "ai";
+    if (["games", "chat", "ai", "apps"].includes(c.hub)) return c.hub;
+    if (c.ty === "boost" || c.ty === "numbers" || c.ty === "funded" || c.ty === "embed") return null;
+    if (c.ty === "shop" && members.length) {
       const types = new Set(members.map((p) => String(p.ptype || "")).filter(Boolean));
-      // Explicit product types outrank provider fields and category-name heuristics.
-      if (types.size && [...types].every((t) => t === "game_topup")) return "games";
-      if (types.size && [...types].every((t) => t === "app_subscription" || t === "gift_card")) return "apps";
       if (types.size && [...types].every((t) => t === "smm")) return null;
-      if (c.hub === "games" || c.hub === "apps") return c.hub;
-      if (members.some((p) => p.smm_provider || p.smm_service)) return APP_RE.test(String(c.en || "") + " " + String(c.ar || "")) ? "apps" : "games";
+      if (types.size && [...types].every((t) => t === "game_topup")) return "games";
+      if (types.size && [...types].every((t) => t === "app_subscription")) return "apps";
+      if (types.size && [...types].every((t) => t === "gift_card")) return "games";
     }
     return null;
   }
@@ -66,7 +74,7 @@
 
   /* app.js calls this on the visible-category list: members are replaced by one entry per hub (at the position of its first member) */
   function apply(list, all) {
-    MEM = { games: [], apps: [] };
+    MEM = Object.fromEntries(HUBS.map((h) => [h.id, []]));
     OF = {};
     INFO = {};
     const rest = [], pos = {};
@@ -96,8 +104,9 @@
     const out = [];
     MEM[hubId].forEach((c) => {
       const ps = prods().filter((p) => p.c == c.id);
+      if (!ps.length) return;
       const first = ps.find((p) => p.smm_country) || {};
-      out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "apps" ? (LIVE_RE.test(c.en) ? "live" : "tools") : "game", from: minPrice(ps), n: ps.length, sub: L(ps.length + " باقة", ps.length + " packs") });
+      out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "chat" ? "live" : hubId === "ai" ? "ai" : hubId === "apps" ? "tools" : "game", from: minPrice(ps), n: ps.length, sub: L(ps.length + " باقة", ps.length + " packs") });
     });
     /* fold regional variants "Game (ID)" "Game (KH)" … into one family card (needs two or more regions) */
     const fam = {};
@@ -153,13 +162,14 @@
   }
 
   /* ---------- page ---------- */
-  const GROUPS = { live: ["بث ودردشة", "Live & chat"], ai: ["ذكاء اصطناعي", "AI"], tools: ["أدوات", "Tools"] };
+  const GROUPS = { live: ["بث ودردشة", "Live & chat"], ai: ["ذكاء اصطناعي", "AI"], tools: ["أدوات وبطاقات", "Tools & cards"], game: ["الألعاب", "Games"] };
   function body(hubId, sub) {
     const list = items(hubId);
     if (sub) {
       const f = list.find((x) => x.kind === "fam" && x.key === sub);
       if (f) return `<div class="hx-g" id="hx-g">${f.regions.sort((a, b) => a.region.localeCompare(b.region)).map(regionCard).join("")}</div>`;
     }
+    if (!list.length) return `<div class="box hx-none"><h2>${L("نعمل على إضافة الباقات", "Packages are being added")}</h2><p>${L("لا توجد باقات مفعّلة في هذا القسم حالياً. لن نعرض أسعاراً أو منتجات غير مؤكدة. تواصل مع الدعم لطلب اشتراك محدد.", "There are no verified active packages in this section yet. We do not show unverified prices or products. Contact support to request a specific subscription.")}</p><a class="b sm" href="#/support">${L("تواصل مع الدعم", "Contact support")}</a></div>`;
     return `<div class="hx-g" id="hx-g">${list.map(card).join("")}</div>`;
   }
   function page(id, sub) {
