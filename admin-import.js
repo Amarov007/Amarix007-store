@@ -575,9 +575,15 @@
   /* ------------------------------------------------------------------ TOP-UP MANAGER (games & apps) ------------------------------------------------------------------ */
   function topupsView() {
     const list = cats().filter((c) => c.ty === "shop" && ["games", "apps"].includes(hubOfCat(c)));
+    // Build the category index once instead of scanning all products for every category.
+    const byCat = new Map();
+    D.products.forEach((p, i) => {
+      if (!byCat.has(p.c)) byCat.set(p.c, []);
+      byCat.get(p.c).push({ p, i });
+    });
     const mk = (c) => {
       const ci = D.categories.indexOf(c), k = "categories." + ci + ".";
-      const pkgs = D.products.map((p, i) => ({ p, i })).filter((x) => x.p.c === c.id);
+      const pkgs = byCat.get(c.id) || [];
       return `<div class="card"><div class="g2">${F("الاسم (عربي)", k + "ar")}${F("الاسم (إنجليزي)", k + "en", { d: 1 })}
         ${F("القسم الرئيسي", k + "hub", { t: "sel", o: [["games", "شحن ألعاب"], ["apps", "تطبيقات واشتراكات"], ["none", "مستقل"]], re: 1 })}${F("صورة اللعبة / التطبيق", k + "image_url", { t: "img", w: 1 })}</div>
         <h4>الباقات (${pkgs.length})</h4>${pkgs.map(({ p, i }) => pkgRow(p, i)).join("") || '<p class="hint">لا توجد باقات بعد.</p>'}
