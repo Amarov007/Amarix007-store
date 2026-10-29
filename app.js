@@ -28,6 +28,7 @@ const I = {
     '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-6h4v6"/>',
   box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>',
+  gamepad: '<path d="M7 9h10a5 5 0 0 1 4.7 6.7l-1 2.7a2.8 2.8 0 0 1-4.5 1.1L13.8 17h-3.6l-2.4 2.5a2.8 2.8 0 0 1-4.5-1.1l-1-2.7A5 5 0 0 1 7 9z"/><path d="M7 12v4M5 14h4M16 13h.01M18 15h.01"/>',
   bank: '<path d="M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
   globe:
@@ -1286,8 +1287,8 @@ const hue = (s) => {
   return 110 + (h % 60);
 };
 function placeholder(p, c) {
-  const letter = [...plain(p.en || p.ar || "?").trim()][0] || "?";
-  return `<span class="ph" style="--h:${hue(p.id)}">${ic( (c && c.i) || "box", 36 )}<em>${ex(letter.toUpperCase())}</em></span>`;
+  const icon = p.ptype === "game_topup" ? "gamepad" : ((c && c.i) || "box");
+  return `<span class="ph" style="--h:${hue(p.id)}" aria-hidden="true">${ic(icon, 42)}</span>`;
 }
 const art = (p, c) => {
   const im = p.img || (c && /^https:\/\//.test(c.image_url || "") && c.ty != "boost" ? c.image_url : ""); // no own picture: use the game / app icon of its category

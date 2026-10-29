@@ -126,11 +126,20 @@
     for (const k of keys || []) if (k && BRANDS.has(slug(k))) return BRANDS.get(slug(k));
     return "";
   }
+  const fallbackLogo = () => `<svg viewBox="0 0 48 48" width="34" height="34" fill="none" aria-hidden="true"><path d="M14 17h20a8 8 0 0 1 7.6 10.5l-2 6a4.5 4.5 0 0 1-7.4 1.8l-4.2-3.6h-4l-4.2 3.6a4.5 4.5 0 0 1-7.4-1.8l-2-6A8 8 0 0 1 14 17Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 22v8m-4-4h8m10-2h.1m4 5h.1" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>`;
   function logoHtml(it) {
     const url = it.logo || (logoFile(it.keys) && SB_URL + BRAND_DIR + logoFile(it.keys));
-    const letter = esc((String(it.en || it.ar || "?").match(/[A-Za-z0-9]/) || [String(it.ar || "?").charAt(0)])[0].toUpperCase());
-    return `<span class="hx-l${url ? " img" : ""}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" decoding="async">` : letter}</span>`;
+    return `<span class="hx-l${url ? " img" : " hx-fallback"}">${url ? `<img data-hx-logo="1" src="${esc(url)}" alt="" loading="lazy" decoding="async">` : fallbackLogo()}</span>`;
   }
+  // Broken or stale brand URLs must never leave an empty logo tile.
+  document.addEventListener("error", (event) => {
+    const img = event.target;
+    if (img && img.tagName === "IMG" && img.hasAttribute("data-hx-logo")) {
+      img.removeAttribute("data-hx-logo");
+      const tile = img.closest(".hx-l");
+      if (tile) { tile.classList.remove("img"); tile.classList.add("hx-fallback"); tile.innerHTML = fallbackLogo(); }
+    }
+  }, true);
   function card(it) {
     const name = nm(it);
     const price = it.from ? `<span class="hx-p"><small>${L("من", "From")}</small><b class="n">${money(it.from)}</b></span>` : "";
