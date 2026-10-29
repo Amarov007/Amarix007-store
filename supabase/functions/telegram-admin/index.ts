@@ -45,13 +45,13 @@ async function pendingSummary() {
   const errs = [orders.error, payments.error, topups.error, tickets.error].filter(Boolean);
   if (errs.length) throw new Error("تعذّر جلب بعض قوائم المراجعة من قاعدة البيانات.");
   const lines = ["📋 ملخص المراجعة الحالية"];
-  lines.push("", `🛒 الطلبات بانتظار الدفع: ${orders.data?.length ?? 0}`);
+  lines.push("", `🛒 أحدث طلبات بانتظار مراجعة الدفع (حتى 5)`);
   for (const x of orders.data ?? []) lines.push(`• #${x.id} — ${x.status} / ${x.payment_status} — ${x.total} ${x.currency}`);
-  lines.push("", `💳 دفعات v2: ${payments.data?.length ?? 0}`);
+  lines.push("", `💳 أحدث دفعات v2 بانتظار المراجعة (حتى 5)`);
   for (const x of payments.data ?? []) lines.push(`• ${x.id} — ${x.status} — ${x.pay_amount} ${x.pay_currency} (${x.purpose})`);
-  lines.push("", `👛 شحن محافظ: ${topups.data?.length ?? 0}`);
+  lines.push("", `👛 أحدث طلبات شحن محافظ (حتى 5)`);
   for (const x of topups.data ?? []) lines.push(`• #${x.id} — ${x.status} — ${x.amount} ${x.pay_currency}`);
-  lines.push("", `🎫 تذاكر مفتوحة: ${tickets.data?.length ?? 0}`);
+  lines.push("", `🎫 أحدث تذاكر مفتوحة (حتى 5)`);
   for (const x of tickets.data ?? []) lines.push(`• #${x.id} — ${x.subject}`);
   return lines.join("\n");
 }
