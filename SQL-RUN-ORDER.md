@@ -114,3 +114,9 @@ select jobname, schedule, active from cron.job order by jobname;
 7. يبقى `payments_v2.on=false` و`payment_methods.confirm_mode='manual'` افتراضياً. لا تفعّل العلم قبل إكمال إعداد الأسرار والـ cron والواجهة المطابقة. التفعيل يتم من لوحة الإدارة (صلاحية `payments.settings`) وليس من خلال واجهة المتجر.
 
 يُحفظ السيناريو المحافظ للتوقف في `supabase/rollbacks/20261028070000_payments_restructure.sql`. هذا الملف يوقف العلم والجدولة مع حفظ دفتر المال؛ لا يستعيد تلقائياً أجسام RPC القديمة. العودة إلى UI قديمة تتطلب استعادة أجسامها من نسخة موثوقة أولاً، كما هو موضح في `docs/manual-owner-steps.md`.
+
+## إصلاح أداء النشر الحي (29 أكتوبر 2026)
+
+- `supabase-publish-performance-fix.sql`: ترقية قاعدة حية فقط، تتضمن إصلاح المقارنة داخل `config_activity()`، وRPC النشر الذري `publish_store_config()`، وفهارس طوابير الإدارة والمفاتيح الخارجية. طُبّق هذا التغيير مباشرة على مشروع Matgri (pvuobngrybygohendwaz) وتحقّق وجود الدالة والفهارس بعد التطبيق.
+- لا ترفع `statement_timeout` على مستوى المشروع؛ سبب الخطأ المثبت كان المقارنة التربيعية لمصفوفة المنتجات (9,034 منتجاً) داخل trigger. الواجهة تستخدم الآن فروق المنتجات/الإعدادات مع حفظ ذري وفحص timestamp لمنع الكتابة فوق نسخة أحدث.
+- لا تشغّل هذا الملف على قاعدة جديدة قبل `supabase-schema.sql` وبقية ملفات المخطط؛ هو ترقية لقاعدة تحتوي بالفعل على `store_config` و`has_perm` و`log_activity`.
