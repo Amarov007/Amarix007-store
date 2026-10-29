@@ -3369,10 +3369,21 @@ async function homeStats() {
   const box = $("#hs");
   if (!box) return;
   box.innerHTML = '<div class="card"><div class="ld"><span class="spin"></span> جارٍ تحميل الأرقام…</div></div>';
-  let rows = [], bals = [], cache = smmCache(), errs = [];
+  let rows = [], stats = null, bals = [], cache = smmCache(), errs = [];
+  const now = new Date(),
+    d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(),
+    w0 = d0 - 6 * 864e5;
   try {
-    const r = await api("/rest/v1/orders?select=total,currency,payment_status,status,created_at,items&order=created_at.desc&limit=500");
-    if (r.ok) rows = await r.json();
+    const [ordersRes, statsRes] = await Promise.all([
+      api("/rest/v1/orders?select=total,currency,payment_status,status,created_at,items&order=created_at.desc&limit=500"),
+      api("/rest/v1/rpc/admin_home_stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ p_day_start: new Date(d0).toISOString(), p_week_start: new Date(w0).toISOString() }),
+      }),
+    ]);
+    if (ordersRes.ok) rows = await ordersRes.json();
+    if (statsRes.ok) stats = await statsRes.json();
   } catch (e) {}
   if (smmCfg()) {
     const used = smmProvsUsed();
@@ -3380,25 +3391,28 @@ async function homeStats() {
       try {
         if (pv != "main" && !(await siteSupport())) throw new Error(SITES_OLD);
         const j = await fn("smm-order", { action: "balance", provider: pv });
+        await reportProviderBalance(pv, j);
         { const bv = parseFloat(j.balance); if (!isNaN(bv)) bals.push({ id: pv, v: bv, c: j.currency || "USD" }); }
       } catch (e) { errs.push(provName(pv) + ": " + String(e.message || "").slice(0, 80)); }
     }));
     bals.sort((a, b) => used.indexOf(a.id) - used.indexOf(b.id));
     try { cache = await smmFetchRates(false); } catch (e) {}
   }
-  const now = new Date(), d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(), w0 = d0 - 6 * 864e5;
   const paid = rows.filter((o) => o.payment_status == "paid");
   const sum = (a) => a.reduce((t, o) => t + usd(o), 0);
   const tdy = paid.filter((o) => new Date(o.created_at).getTime() >= d0), wk = paid.filter((o) => new Date(o.created_at).getTime() >= w0);
   const rev = (v) => `${v.toFixed(2)} <small>${esc(baseCur())}</small>`;
-  const pend = rows.filter((o) => o.payment_status == "review").length, open = rows.filter((o) => o.status == "new" || o.status == "processing").length;
+  const pend = stats ? +stats.pending_review || 0 : rows.filter((o) => o.payment_status == "review").length;
+  const open = stats ? +stats.open_orders || 0 : rows.filter((o) => o.status == "new" || o.status == "processing").length;
+  const salesToday = stats ? +stats.sales_today || 0 : sum(tdy);
+  const salesWeek = stats ? +stats.sales_7d || 0 : sum(wk);
   const cnt = {};
   paid.forEach((o) => orderItems(o).forEach((i) => { const k = i.id; cnt[k] = cnt[k] || { n: 0, t: i.ar || i.name || i.id }; cnt[k].n += +i.q || 1; }));
   const top = Object.values(cnt).sort((a, b) => b.n - a.n).slice(0, 5);
   const thr = parseFloat(localStorage.getItem("amx_smm_low")) || 5, dr = smmDrift(cache), lowL = bals.filter((b) => b.v < thr), low = lowL.length > 0;
   const kp = (n, l, cl) => `<div class="stat${cl ? " " + cl : ""}"><b>${n}</b><span>${l}</span></div>`;
   box.innerHTML =
-    `<div class="stats">${kp(rev(sum(tdy)), "مبيعات اليوم")}${kp(rev(sum(wk)), "مبيعات 7 أيام")}${kp(pend, "بانتظار مراجعة الدفع", pend ? "hot" : "")}${kp(open, "طلبات مفتوحة")}${bals.map((b) => kp(b.v.toFixed(2) + " <small>" + esc(b.c) + "</small>", bals.length > 1 || b.id != "main" ? "رصيدك لدى " + esc(provName(b.id)) : "رصيدك لدى المزوّد", b.v < thr ? "hot" : "")).join("")}</div>` +
+    `<div class="stats">${kp(rev(salesToday), "مبيعات اليوم")}${kp(rev(salesWeek), "مبيعات 7 أيام")}${kp(pend, "بانتظار مراجعة الدفع", pend ? "hot" : "")}${kp(open, "طلبات مفتوحة")}${bals.map((b) => kp(b.v.toFixed(2) + " <small>" + esc(b.c) + "</small>", bals.length > 1 || b.id != "main" ? "رصيدك لدى " + esc(provName(b.id)) : "رصيدك لدى المزوّد", b.v < thr ? "hot" : "")).join("")}</div>` +
     (low ? `<div class="card" style="border-color:#f87171"><b>⚠ رصيد المزوّد منخفض (${lowL.map((b) => esc(provName(b.id))).join("، ")}).</b> الطلبات ستفشل عند نفاد الرصيد، اشحنه قبل استقبال طلبات جديدة.</div>` : "") +
     (errs.length && smmCfg() ? `<div class="card hint warn">تعذّر قراءة رصيد المزوّد: ${esc(errs.join(" | "))}</div>` : "") +
     (dr.up.length || dr.gone.length
