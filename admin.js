@@ -645,7 +645,7 @@ const VIEW = {
             (!q || (p.ar + " " + p.en + " " + p.id).toLowerCase().includes(q))
         );
     const shown = L.slice(0, prodShow);
-    return `<div class="card"><h2>المنتجات (${D.products.length})</h2><p class="hint">عرض ${shown.length} من ${L.length} نتيجة مطابقة. تُحمّل النتائج على دفعات لتجنب تعليق لوحة التحكم.</p><div class="sw"><input class="inp" id="pq" placeholder="ابحث بالاسم أو المعرّف…" value="${esc(pq)}"><button class="b" data-a="add" data-k="products">+ منتج</button><button class="b b2" data-a="ppin">📌 المثبّتة في الرئيسية (${D.products.filter((x) => +x.pin > 0).length})${ppin ? " ✓" : ""}</button></div> ${shown.map(([p, i]) => `<div class="it"><span class="thm">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" decoding="async">` : ic("box")}</span><div class="im"><b>${esc(p.ar)}</b><small>${esc(catName(p.c))} · ${p.k == "link" ? "🔗 رابط للزيارة" : p.p}${p.dup ? " · 🙈 مكرر مخفي" : ""}${+p.pin > 0 ? " · 📌 " + p.pin : ""}</small></div><button class="b b2 sm" data-a="pin" data-i="${i}" title="تثبيت في الرئيسية">${+p.pin > 0 ? "📌" : "📍"}</button><button class="b b2 sm" data-a="edit" data-i="${i}">تعديل</button><button class="b bd2 sm" data-a="del" data-k="products" data-i="${i}">حذف</button></div>`).join("")} ${L.length > shown.length ? `<div class="acts"><button class="b b2" data-a="more-products">تحميل ${Math.min(100, L.length - shown.length)} منتج إضافي (${L.length - shown.length} متبقٍ)</button></div>` : ""}</div>`;
+    return `<div class="card"><h2>المنتجات (${D.products.length})</h2><p class="hint">عرض ${shown.length} من ${L.length} نتيجة مطابقة. تُحمّل النتائج على دفعات لتجنب تعليق لوحة التحكم.</p><div class="sw"><input class="inp" id="pq" placeholder="ابحث بالاسم أو المعرّف…" value="${esc(pq)}"><button class="b" data-a="add" data-k="products">+ منتج</button><button class="b b2" data-a="ppin">📌 المثبّتة في الرئيسية (${D.products.filter((x) => +x.pin > 0).length})${ppin ? " ✓" : ""}</button></div> ${shown.map(([p, i]) => `<div class="it"><span class="thm">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" decoding="async">` : ic("box")}</span><div class="im"><b>${esc(p.ar)}</b><small>${esc(catName(p.c))} · ${p.k == "link" ? "🔗 رابط للزيارة" : p.p}${p.dup ? " · 🙈 مكرر مخفي" : ""}${+p.pin > 0 ? " · 📌 " + p.pin : ""}</small></div><button class="b b2 sm" data-a="pin" data-i="${i}" title="تثبيت في الرئيسية">${+p.pin > 0 ? "📌" : "📍"}</button><button class="b b2 sm" data-a="edit" data-i="${i}">تعديل</button><button class="b bd2 sm" data-a="del" data-k="products" data-i="${i}">حذف</button></div>`).join("")} ${L.length > shown.length && shown.length < 300 ? `<div class="acts"><button class="b b2" data-a="more-products">تحميل ${Math.min(100, L.length - shown.length, 300 - shown.length)} منتج إضافي (${L.length - shown.length} متبقٍ)</button></div>` : L.length > shown.length ? `<p class="hint">وصلت إلى الحد الآمن للعرض (300 منتج). استخدم البحث للوصول إلى بقية المنتجات.</p>` : ""}</div>`;
   },
   embeds() {
     const opts = D.categories.filter((x) => x.ty != "hub").map((x) => [x.id, x.ar]);
@@ -1260,7 +1260,7 @@ document.addEventListener("click", (e) => {
     return render();
   }
   if (a == "more-products") {
-    prodShow += 100;
+    prodShow = Math.min(300, prodShow + 100);
     return render();
   }
   if (a == "pin") {
