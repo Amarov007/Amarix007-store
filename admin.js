@@ -379,10 +379,13 @@ const proofBlock = (o) =>
     ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(o.payment_proof)}">عرض الإثبات</button></div>`
     : "";
 async function proofLink(btn) {
-  const path = btn.dataset.path;
+  const path = String(btn.dataset.path || "").replace(/^\\/+/, "");
+  const bucket = String(btn.dataset.bkt || "payment-proofs");
   busy(btn, true);
   try {
-    const r = await api("/storage/v1/object/sign/" + (btn.dataset.bkt || "payment-proofs") + "/" + path.split("/").map(encodeURIComponent).join("/"), {
+    if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) throw new Error("مسار الإثبات غير صالح");
+    const encoded = path.split("/").map((part) => encodeURIComponent(decodeURIComponentSafe(part))).join("/");
+    const r = await api("/storage/v1/object/sign/" + encodeURIComponent(bucket) + "/" + encoded, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expiresIn: 300 }),
@@ -390,17 +393,33 @@ async function proofLink(btn) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.signedURL) throw new Error(j.message || j.error || "HTTP " + r.status);
     const u = /^https?:/i.test(j.signedURL) ? j.signedURL : SB_URL + "/storage/v1" + (j.signedURL[0] == "/" ? "" : "/") + j.signedURL;
-    const a = document.createElement("a");
-    a.href = u;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.className = "b sm";
-    a.textContent = "فتح الصورة (الرابط صالح 5 دقائق)";
-    btn.replaceWith(a);
+    showProofPreview(u);
+    busy(btn, false);
   } catch (e) {
     busy(btn, false);
-    toast("تعذّر إنشاء رابط الإثبات — " + String(e.message || "").slice(0, 80), "e");
+    toast("تعذّرت معاينة الإثبات — " + String(e.message || "").slice(0, 100), "e");
   }
+}
+function decodeURIComponentSafe(v) { try { return decodeURIComponent(v); } catch { return v; } }
+function showProofPreview(url) {
+  let modal = document.getElementById("amx-proof-preview");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "amx-proof-preview";
+    modal.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(8,9,14,.88);display:flex;align-items:center;justify-content:center;padding:16px";
+    modal.innerHTML = '<section style="background:var(--card,#191a23);border:1px solid #555;border-radius:16px;max-width:900px;width:100%;max-height:92dvh;overflow:auto;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px"><b>معاينة إثبات الدفع</b><button type="button" class="b b2 sm" data-proof-close>إغلاق</button></div><div data-proof-image style="text-align:center"><span>جارٍ تحميل الصورة…</span></div><a data-proof-open target="_blank" rel="noopener noreferrer" class="b b2 sm" style="display:inline-block;margin-top:10px">فتح الصورة في نافذة جديدة</a></section>';
+    modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-proof-close]")) modal.remove(); });
+    document.body.appendChild(modal);
+  }
+  const slot = modal.querySelector("[data-proof-image]");
+  slot.innerHTML = "";
+  const img = document.createElement("img");
+  img.alt = "إثبات الدفع";
+  img.style.cssText = "display:block;max-width:100%;max-height:68dvh;object-fit:contain;margin:auto;border-radius:8px";
+  img.onload = () => { slot.textContent = ""; slot.appendChild(img); };
+  img.onerror = () => { slot.textContent = "تعذّر عرض الصورة. استخدم زر فتح الصورة في نافذة جديدة."; };
+  img.src = url;
+  modal.querySelector("[data-proof-open]").href = url;
 }
 
 /* Category filters (category.f): groups with options; the storefront matches an option's text inside the product's tags / specs / names / description */
@@ -1196,7 +1215,7 @@ document.addEventListener("click", (e) => {
   if (a === "p2-save-fx") return (async()=>{const v=Number($("#p2-fx")?.value); if(!(v>0))return toast("أدخل سعراً موجباً","e"); try{await p2Rpc("fx_rate_set",{p_pair:"SYP/USDT",p_rate:v});toast("تم حفظ سعر الصرف؛ الدفعات القديمة لا تتغير.");}catch(err){toast("فشل السعر: "+err.message,"e");}})();
   if (a === "p2-reconcile") return (async()=>{try{const q=await p2Rpc("payments_reconcile",{});$("#p2-reconcile").textContent=JSON.stringify(q,null,2); }catch(err){toast("فشلت المطابقة: "+err.message,"e");}})();
   if (a === "p2-wallet-reconcile") return (async()=>{try{const q=await p2Rpc("wallet_reconcile",{});$("#p2-reconcile").textContent=JSON.stringify(q,null,2); }catch(err){toast("فشلت المطابقة: "+err.message,"e");}})();
-  if (a === "p2-proof") return (async()=>{try{const r=await api("/storage/v1/object/sign/payment-proofs/"+d.path.split("/").map(encodeURIComponent).join("/"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({expiresIn:300})});if(!r.ok)throw new Error(await r.text());const q=await r.json();const url=SB_URL+(q.signedURL.startsWith("/")?q.signedURL:"/storage/v1/"+q.signedURL);window.open(url,"_blank","noopener,noreferrer");}catch(err){toast("تعذّر فتح الإثبات: "+err.message,"e");}})();
+  if (a === "p2-proof") { const fake = { dataset: { path: d.path, bkt: "payment-proofs" }, innerHTML: b.innerHTML, disabled: b.disabled }; return proofLink(fake); }
   if (a == "logout") {
     try {
       localStorage.removeItem("amx_sb");
