@@ -1558,20 +1558,41 @@ function totals() {
     : 0;
   return { sub, disc, total: Math.max(0, sub - disc) };
 }
-function addToCart(id, n = 1) {
+function addToCart(id, n = 1, accountValue = "") {
   if (isVisit(prod(id))) return; // visit-only items are never ordered
   const pp = prod(id);
   if (pp && pp.oos === true) { toast(lang == "ar" ? "هذا المنتج غير متاح حالياً" : "This product is currently unavailable", "er"); return; }
   n = Math.max(1, Math.min(QCAP, Math.floor(+n) || 1));
   if (pp && qLimited(pp)) n = qClamp(pp, n);
   const x = cart.find((c) => c.id == id);
-  x ? (x.q = Math.min(QCAP, x.q + n)) : cart.push({ id, q: n });
+  if (x) { x.q = Math.min(QCAP, x.q + n); if (String(accountValue || "").trim()) x.l = String(accountValue).trim(); }
+  else cart.push({ id, q: n, ...(String(accountValue || "").trim() ? { l: String(accountValue).trim() } : {}) });
   if (pp && qLimited(pp)) {
     const y = cart.find((c) => c.id == id);
     if (y && y.q > qMax(pp)) y.q = qMax(pp);
   }
   save();
   nav();
+}
+
+function addFromProduct(id, n = 1) {
+  const p = prod(id);
+  let accountValue = "";
+  if (p && apiInput(p)) {
+    const field = [...document.querySelectorAll('[data-a="product-id"]')].find((el) => el.dataset.id === String(id));
+    if (field) {
+      accountValue = String(field.value || "").trim();
+      if (!inputOk(accountValue)) {
+        field.setAttribute("aria-invalid", "true");
+        field.focus();
+        toast(lang === "ar" ? "أدخل معرّف اللاعب أو بيانات الحساب المطلوبة قبل الإضافة" : "Enter the required player ID or account details before adding this item", "wn");
+        return false;
+      }
+      field.removeAttribute("aria-invalid");
+    }
+  }
+  addToCart(id, n, accountValue);
+  return true;
 }
 
 /* Clipboard with a fallback for browsers/contexts where navigator.clipboard is unavailable */
@@ -2357,11 +2378,13 @@ function prodPage(id) {
   const dk = p.t != null && p.t !== "" && [0, 1, 2, 3].includes(+p.t) ? +p.t : -1;
   const badge = dk >= 0 ? `<div class="dlv">${ic("bolt", 13)} ${t("deliv")}: ${t("dl" + dk)}</div>` : "";
   const qty = boost ? qtyBox(p) : "";
+  const savedAccount = (cart.find((x) => x.id == p.id) || {}).l || "";
+  const accountField = apiInput(p) ? `<div class="box account-id-box"><label class="fld"><span>${ex(reqHint(p))} *</span><input class="inp" type="text" data-a="product-id" data-id="${ex(p.id)}" value="${ex(savedAccount)}" placeholder="${ex(reqHint(p))}" autocomplete="off" maxlength="120" required aria-required="true" dir="ltr"></label><p class="hint">${lang == "ar" ? "تأكد من المعرّف قبل الدفع؛ لا تشارك كلمة مرور حسابك." : "Double-check the ID before payment. Never share your account password."}</p></div>` : "";
   /* boost description: only text that already exists in the data (the other language when this one is empty) */
   const ds = p.ds && (p.ds[lang] || (boost ? p.ds.ar || p.ds.en : ""));
   const rel = boost ? [] : P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
   const back = boost ? `<a class="b b2 sm sb-back" href="#/boost">${ic("chev", 14)} ${lang == "ar" ? "العودة إلى منصة الرشق" : "Back to the Boost panel"}</a>` : "";
-  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
+  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty}${accountField} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
 }
 
 /* Static pages: FAQ and policies */
@@ -4105,7 +4128,7 @@ document.addEventListener("click", async (e) => {
   const a = b.dataset.a,
     id = b.dataset.id;
   if (a == "add") {
-    addToCart(id, +b.dataset.n || 1);
+    if (!addFromProduct(id, +b.dataset.n || 1)) return;
     toast(t("added"));
   } else if (a == "ntab") {
     NS.tab = b.dataset.t == "free" ? "free" : "paid";
@@ -4128,7 +4151,7 @@ document.addEventListener("click", async (e) => {
     render();
     scrollTo(0, 0);
   } else if (a == "buy") {
-    addToCart(id, +b.dataset.n || 1);
+    if (!addFromProduct(id, +b.dataset.n || 1)) return;
     qbOpen();
   } else if (a == "qb-x") {
     qbClose();
