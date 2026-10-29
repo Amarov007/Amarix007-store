@@ -20,17 +20,11 @@ SET data = jsonb_set(
           jsonb_set(p,'{smm_input}','"text"'::jsonb,true),
           '{req}','["player_id"]'::jsonb,true
         )
-        WHEN p->>'c'='cmvpwlz5nx9d'
+        WHEN p->>'c' IN ('cmvpwlz559mg','cmvpwlz5jak3','cmvpwlz5nx9d','cmvpwlz5hziq','cmvpwlz5hd6o')
           AND coalesce(p->>'smm_service','') NOT IN ('','0')
         THEN jsonb_set(
           jsonb_set(p,'{smm_input}','"text"'::jsonb,true),
-          '{req}','["player_id"]'::jsonb,true
-        )
-        WHEN p->>'c'='cmvpwlz5hziq'
-          AND coalesce(p->>'smm_service','') NOT IN ('','0')
-        THEN jsonb_set(
-          jsonb_set(p,'{smm_input}','"text"'::jsonb,true),
-          '{req}','["email"]'::jsonb,true
+          '{req}','["user_id"]'::jsonb,true
         )
         ELSE p
       END ORDER BY ord
