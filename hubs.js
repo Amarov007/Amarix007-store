@@ -1,5 +1,5 @@
 /* AMARIX007 — hubs.js (v1)
-   Two master sections ("hubs") that replace dozens of flat tabs, same idea as the Numbers and Boost panels:
+   Master sections ("hubs") that replace dozens of flat tabs, same idea as the Numbers and Boost panels:
      #/g/games   شحن الألعاب               PUBG + every game top-up category (regional variants are folded into one card)
      #/g/apps    تطبيقات واشتراكات          live / chat apps, AI subscriptions, CapCut …
      #/g/games/<family>                    the regions of one game (EAFC Mobile -> ID / KH / MY / SG)
@@ -7,8 +7,8 @@
    so provider sync, carts and old links keep working. The hubs only change how the strip, the home grid and the drawer list them.
 
    Membership (first match wins, all optional overrides live on the category object in store_config):
-     category.hub = "games" | "apps"     explicit
-     id pubg                            -> games      ids live / ai -> apps
+     category.hub = "games" | "chat" | "ai" | "apps"     explicit
+     id pubg                            -> games      chat / AI / apps are classified separately
      type shop + products with smm_provider -> apps if the name looks like a live / chat / creative app, else games
    Brand logos: category.image_url, else  <storage>/store-media/brands/<file>  listed in brands/index.json
    (an array of file names such as "pubg_mobile.webp"), else a coloured letter tile. */
