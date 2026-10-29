@@ -615,7 +615,7 @@
         <td><select class="inp sm" data-ic="sset" data-i="${i}" data-f="rf">${[[0, "—"], [30, "30 يوم"], [60, "60 يوم"], [90, "90 يوم"], [365, "365 يوم"], [-1, "مدى الحياة"]].map(([v, l]) => opt(v, l, p.rf || 0)).join("")}</select></td>
         <td><input type="checkbox" data-ic="sset" data-i="${i}" data-f="dr"${p.dr ? " checked" : ""} aria-label="drip-feed"></td>
         <td><input type="checkbox" data-ic="sset" data-i="${i}" data-f="active"${p.hid || p.oos ? "" : " checked"} aria-label="نشط"></td>
-        <td><button class="b b2 sm" type="button" data-ic="open-edit" data-i="${i}">تعديل</button></td></tr>`;
+        <td><div class="acts" style="gap:4px"><button class="b b2 sm" type="button" data-ic="open-edit" data-i="${i}">تعديل</button><button class="b bd2 sm" type="button" data-ic="sdel" data-i="${i}" title="حذف الخدمة المستوردة">حذف</button></div></td></tr>`;
     };
     return `<div class="card"><h2>إدارة خدمات الرشق (SMM)</h2><p class="hint">هذه الصفحة للرشق فقط: كل صف هو خدمة مرتبطة بمزوّد ورقم خدمة محددين. استخدم فلاتر المزوّد والقسم والبحث للوصول السريع. تعديل «سعر الألف» يحدّث سعر الوحدة تلقائياً؛ لا تستورد خدمات جديدة من هنا.</p>
       <div class="ic-bar"><input class="inp" type="search" placeholder="بحث باسم الخدمة أو رقمها" data-ic="mf" data-f="q" value="${esc(MF.q)}"><select class="inp" data-ic="mf" data-f="prov">${opt("", "كل مزوّدي الرشق", MF.prov)}${provs.map((k) => opt(k, k === "main" ? "المزوّد الرئيسي" : provName(k), MF.prov)).join("")}</select><select class="inp" data-ic="mf" data-f="cat">${opt("", "كل الأقسام", MF.cat)}${cats().filter((c) => c.ty === "boost" || D.products.some((p) => p.c === c.id && p.ptype === "smm")).map((c) => opt(c.id, c.ar || c.en || c.id, MF.cat)).join("")}</select></div>
@@ -719,6 +719,17 @@
       case "psel-none": SEL.clear(); return refreshList();
       case "pmore": PF.n += 100; return refreshList();
       case "smore": MF.n += 60; return render();
+      case "sdel": {
+        const p = D.products[i];
+        if (!p || (p.ptype ? p.ptype !== "smm" : SV().typeOf(p) !== "smm")) return toast("هذا المنتج ليس خدمة رشق", "e");
+        const provider = SV().providerOf(p);
+        if (!confirm(`حذف خدمة الرشق «${p.ar || p.en || p.id}» من المتجر؟\\nالمزوّد: ${provider === "main" ? "المزوّد الرئيسي" : provName(provider)}\\nرقم الخدمة: ${p.smm_service || "—"}\\nسيُحذف المنتج من الكتالوج بعد النشر، ولن يُحذف من موقع المزوّد.`)) return;
+        D.products.splice(i, 1);
+        SEL.delete(p.id);
+        save();
+        toast("حُذفت الخدمة من قائمة المتجر. اضغط «نشر» لتطبيق الحذف.");
+        return render();
+      }
       case "open-edit": tab = "products"; ed = i; return render();
       case "pkg-add": {
         const c = D.categories.find((k) => k.id === b.dataset.c);
