@@ -2931,12 +2931,30 @@ async function smmClearLegacyKeys(btn) {
     busy(btn, false);
   }
 }
+async function reportProviderBalance(provider, result) {
+  const balance = Number(result && result.balance);
+  if (!Number.isFinite(balance) || balance < 0) return;
+  try {
+    await api("/rest/v1/rpc/notify_provider_balance_if_low", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_provider: String(provider || "main").toLowerCase(),
+        p_balance: balance,
+        p_currency: String((result && result.currency) || "").slice(0, 12),
+      }),
+    });
+  } catch {
+    // Alert delivery is secondary; never fail the provider connectivity test.
+  }
+}
 async function provTest(btn) {
   const id = btn.dataset.id, box = btn.closest("[data-pbox]"), out = box && box.querySelector("[data-pout]");
   busy(btn, true);
   try {
     if (!(await siteSupport())) throw new Error(SITES_OLD);
     const j = await fn("smm-order", { action: "balance", provider: id });
+    await reportProviderBalance(id, j);
     if (out) out.innerHTML = '✓ الاتصال ناجح — الرصيد: <b dir="ltr">' + esc(j.balance) + " " + esc(j.currency || "") + "</b>";
   } catch (e) {
     if (out) out.innerHTML = "✗ " + esc(e.message);
@@ -3398,6 +3416,7 @@ async function smmAction(btn, kind) {
     if (kind == "smm-test") {
       if (pv != "main" && !(await siteSupport())) throw new Error(SITES_OLD);
       const j = await fn("smm-order", { action: "balance", provider: pv });
+      await reportProviderBalance(pv, j);
       smmOut(
         "✓ الاتصال ناجح (" + esc(provName(pv)) + ') — الرصيد: <b dir="ltr">' +
           esc(j.balance) +
