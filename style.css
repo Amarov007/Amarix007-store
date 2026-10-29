@@ -4113,3 +4113,35 @@ body.qb-open{overflow:hidden}
 /* Non-orderable catalog placeholders (e.g. PUBG UC before a verified provider offer exists). */
 .hx-coming{opacity:.86;cursor:not-allowed;filter:saturate(.78)}
 .hx-coming .hx-bd{pointer-events:none}
+
+
+/* Premium price frame: clear, consistent pricing across product cards and featured tiles. */
+.pr-p b.n,
+.pr .n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 1px solid color-mix(in srgb, var(--ac) 48%, var(--bd, #454657));
+  border-radius: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ac) 13%, var(--card)), color-mix(in srgb, var(--ac) 5%, var(--bg)));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent), 0 2px 8px color-mix(in srgb, var(--ac) 9%, transparent);
+  color: var(--tx);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.pr-p bdi,
+.pr .n bdi { font-weight: 850; }
+.pr-p b.n { font-size: 12px; }
+.pr .n { font-size: 15px; }
+.pr-p b.n small,
+.pr .n small { font-size: 10px; font-weight: 700; opacity: .82; }
+@media (max-width: 380px) {
+  .pr-p b.n { padding: 4px 8px; font-size: 11px; }
+}
