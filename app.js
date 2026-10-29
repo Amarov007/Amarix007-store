@@ -854,8 +854,8 @@ function setCfg(cfg) {
     se: ex(b.se),
   })).filter((b) => b.img || !(isGenericTitle(b.ar) && isGenericTitle(b.en))); // untouched placeholder banners without a picture are hidden
   CP = CFG.coupons && typeof CFG.coupons == "object" ? CFG.coupons : {}; // only the coupons the server chose to publish; the rest are checked through check_coupon()
-  CV = C.filter((c) => P.some((p) => p.c == c.id) || (c.ty == "numbers" && freeOf(c).length) || E.some((e) => e.c == c.id && embedOk(e)) || catEmbedOk(c)); // sections with nothing to show are hidden from the strip and the home grid (data is untouched)
-  if (window.AMXHub) CV = AMXHub.apply(CV, C); // hubs.js: games / apps are folded into two master sections (members keep their ids and routes)
+  CV = C.filter((c) => P.some((p) => p.c == c.id) || (c.ty == "numbers" && freeOf(c).length) || E.some((e) => e.c == c.id && embedOk(e)) || catEmbedOk(c) || c.id === "ai-subscriptions"); // sections with nothing to show are hidden from the strip and the home grid (data is untouched)
+  if (window.AMXHub) CV = AMXHub.apply(CV, C); // hubs.js: games, chat apps, AI subscriptions and digital apps are folded into master sections (members keep their ids and routes)
   /* The strip, home grid and drawer must never show the same section twice: drop repeated ids, entries without any name, and standalone
      categories that carry the same name as a master section (games / apps). Data is untouched; only the lists are cleaned. */
   {
