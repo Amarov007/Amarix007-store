@@ -3131,6 +3131,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
   const waWin = viaWhatsApp ? window.open("", "_blank") : null; // opened synchronously so popup blockers allow it
   setBusy(btn, true);
   let id = orderId(); // temporary: the database assigns the real sequential number (AMX-1001, AMX-1002, ...)
+  let orderCreated = false, paymentFlowDone = false;
   try {
     const row = {
       id,
@@ -3175,6 +3176,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
       throw Object.assign(new Error("session"), { session: true });
     }
     if (!r.ok) throw new Error(await r.text());
+    orderCreated = true;
     try {
       const j = await r.json(); // the real order number assigned by the server
       if (j && j[0] && j[0].id) id = j[0].id;
@@ -3192,6 +3194,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
         paymentV2 = { id: String(pay.id), status: String(pay.status || "awaiting_payment") };
       }
     }
+    paymentFlowDone = true;
     lastOrder = { id, total: tt.total, method: useWallet ? "wallet" : payMethod, wpaid: wOk, wok: walletEligibilityCached(lines), paymentV2 };
     if (viaWhatsApp) openWhatsApp(buildWhatsAppText(id, lines, tt), waWin);
     cart = [];
@@ -3201,6 +3204,35 @@ async function placeOrder(btn, viaWhatsApp = false) {
     beep("ok");
     location.hash = "#/done/" + id;
   } catch (err) {
+    // If order insertion succeeded but payment creation failed, recover an idempotently-created payment
+    // before safely cancelling the otherwise orphaned unpaid order.
+    if (orderCreated && !paymentFlowDone && !viaWhatsApp && window.AMXPay) {
+      let recovered = null;
+      try { recovered = await window.AMXPay.statusForOrder(id); } catch {}
+      if (recovered && recovered.id) {
+        lastOrder = {
+          id, total: tt.total, method: useWallet ? "wallet" : payMethod,
+          wpaid: useWallet && recovered.status === "captured",
+          wok: walletEligibilityCached(lines),
+          paymentV2: { id: String(recovered.id), status: String(recovered.status || "awaiting_payment") },
+        };
+        cart = [];
+        coupon = "";
+        save();
+        nav();
+        location.hash = "#/done/" + id;
+        toast(lang == "ar" ? "تم استعادة حالة الدفع لهذا الطلب" : "Recovered payment status for this order", "wn");
+        return;
+      }
+      try {
+        await sb("/rest/v1/rpc/cancel_unpaid_order", {
+          method: "POST",
+          body: { p_order_id: String(id) },
+        });
+      } catch (cleanupErr) {
+        console.warn("[AMARIX] safe unpaid-order cleanup failed", cleanupErr);
+      }
+    }
     if (waWin) waWin.close();
     console.error("[AMARIX] order failed", err);
     if (err.session) {
