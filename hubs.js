@@ -104,9 +104,9 @@
     const out = [];
     MEM[hubId].forEach((c) => {
       const ps = prods().filter((p) => p.c == c.id);
-      if (!ps.length) return;
+      if (!ps.length && !(hubId === "games" && c.id === "pubg-mobile-uc")) return;
       const first = ps.find((p) => p.smm_country) || {};
-      out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "chat" ? "live" : hubId === "ai" ? "ai" : hubId === "apps" ? "tools" : "game", from: minPrice(ps), n: ps.length, sub: L(ps.length + " باقة", ps.length + " packs") });
+      out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "chat" ? "live" : hubId === "ai" ? "ai" : hubId === "apps" ? "tools" : "game", from: minPrice(ps), n: ps.length, badge: ps.length ? "" : L("قريباً","Coming soon"), sub: ps.length ? L(ps.length + " باقة", ps.length + " packs") : L("يلزم ربط مزوّد الشدات أولاً","Provider connection required") });
     });
     /* fold regional variants "Game (ID)" "Game (KH)" … into one family card (needs two or more regions) */
     const fam = {};
@@ -151,6 +151,7 @@
   }, true);
   function card(it) {
     const name = nm(it);
+    if (it.n === 0) return `<div class="hx-c hx-coming" aria-disabled="true" data-n="${esc((it.en + " " + it.ar).toLowerCase())}" style="--bc:${colorOf(it.color, it.en)}"><i class="hx-bd gold">${esc(it.badge || L("قريباً","Coming soon"))}</i>${logoHtml(it)}<span class="hx-t"><b><bdi>${esc(name)}</bdi></b><small>${esc(it.sub || "")}</small></span></div>`;
     const price = it.from ? `<span class="hx-p"><small>${L("من", "From")}</small><b class="n">${money(it.from)}</b></span>` : "";
     const badge = it.badge ? `<i class="hx-bd gold">${esc(it.badge)}</i>` : it.kind === "fam" ? `<i class="hx-bd">${esc(it.sub)}</i>` : "";
     return `<a class="hx-c${badge ? " has-bd" : ""}" href="${esc(it.href)}" data-n="${esc((it.en + " " + it.ar).toLowerCase())}" data-g="${esc(it.grp || "")}" style="--bc:${colorOf(it.color, it.en)}">${badge}${logoHtml(it)}<span class="hx-t"><b><bdi>${esc(name)}</bdi></b><small>${esc(it.kind === "fam" ? L("اختر المنطقة", "Choose region") : it.sub || "")}</small></span>${price}</a>`;
