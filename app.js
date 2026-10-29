@@ -2003,7 +2003,7 @@ function drawerRender() {
     <div class="dr-h">${A ? "القائمة" : "Menu"}</div>
     ${big("#/", "home", t("home"))}
     ${big("#/orders", "box", t("ord"))}
-    ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${n}</span>` : "")}
+    ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${fmtN(n)}</span>` : "")}
     ${big("#/fav", "heart", t("fav"))}
     ${big("#/account", user ? "user" : "out", user ? t("acc") : t("login"))}
     ${user ? big("#/partner", "gift", A ? "برنامج الشركاء" : "Partner program") : ""}
