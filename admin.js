@@ -1890,8 +1890,11 @@ function buildPublishDiff(productsOnly = false) {
   return { patch, upserts, deletes, order: orderChanged ? afterOrder : null, count: upserts.length + deletes.length };
 }
 async function savePublishDiff(productsOnly = false) {
+  // Cancel the debounced local-draft write so it cannot re-mark a successful publish as dirty.
+  clearTimeout(tm);
+  tm = null;
   const diff = buildPublishDiff(productsOnly);
-  if (!diff.count && !Object.keys(diff.patch).length) {
+  if (!diff.count && !Object.keys(diff.patch).length && !diff.order) {
     dirty = false;
     badge();
     try { localStorage.removeItem("amx_draft"); } catch (e) {}
