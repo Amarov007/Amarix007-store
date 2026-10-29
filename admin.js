@@ -60,6 +60,7 @@ let D = clone(PUB),
   IS_ADMIN = null,
   STAFF = null; // STAFF: مصفوفة صلاحيات الموظف المفعّل (null = ليس موظفاً)
 let BASE_TS = 0,
+  BASE_DATA = null,
   CFG_OK = false,
   API_LOADED = false; // BASE_TS: version of store_config when this page loaded; CFG_OK: config really came from the server; API_LOADED: api_settings really loaded
 /* Only USDT (base, rate 1) and SYP exist. Older configs (SAR base + AED/EUR/...) are converted: SYP per 1 USDT = SYP rate / USD rate. Product prices are read as USDT. */
@@ -1839,6 +1840,7 @@ async function loadCfg() {
   delete D.api; // never trust/keep secrets coming from the public config row
   fix();
   BASE_TS = +D.ts || 0;
+  BASE_DATA = CFG_OK ? clone(pubData()) : null;
 }
 /* الموظف: يقرأ الإعدادات العامة (بلا كوبونات سرية) ويحفظ المنتجات فقط عبر دالة مخصصة */
 async function loadCfgStaff() {
@@ -1860,6 +1862,68 @@ async function loadCfgStaff() {
   delete D.api;
   fix();
   BASE_TS = +D.ts || 0;
+  BASE_DATA = clone(pubData());
+}
+function buildPublishDiff(productsOnly = false) {
+  if (!BASE_DATA) throw new Error("تعذّر تحميل النسخة الأساسية من الخادم؛ حدّث الصفحة قبل النشر");
+  const current = pubData();
+  const baseProducts = Array.isArray(BASE_DATA.products) ? BASE_DATA.products : [];
+  const nextProducts = Array.isArray(current.products) ? current.products : [];
+  const before = new Map(baseProducts.filter(p => p && p.id != null).map(p => [String(p.id), p]));
+  const after = new Map(nextProducts.filter(p => p && p.id != null).map(p => [String(p.id), p]));
+  const upserts = [];
+  const deletes = [];
+  for (const [id, p] of after) {
+    if (!before.has(id) || JSON.stringify(before.get(id)) !== JSON.stringify(p)) upserts.push(p);
+  }
+  for (const id of before.keys()) if (!after.has(id)) deletes.push(id);
+  const beforeOrder = baseProducts.map(p => String(p && p.id || ""));
+  const afterOrder = nextProducts.map(p => String(p && p.id || ""));
+  const orderChanged = beforeOrder.length !== afterOrder.length || beforeOrder.some((id, i) => id !== afterOrder[i]);
+  const patch = {};
+  if (!productsOnly) {
+    for (const key of Object.keys(current)) {
+      if (["products", "ts", "api"].includes(key)) continue;
+      if (JSON.stringify(BASE_DATA[key]) !== JSON.stringify(current[key])) patch[key] = current[key];
+    }
+  }
+  return { patch, upserts, deletes, order: orderChanged ? afterOrder : null, count: upserts.length + deletes.length };
+}
+async function savePublishDiff(productsOnly = false) {
+  const diff = buildPublishDiff(productsOnly);
+  if (!diff.count && !Object.keys(diff.patch).length) {
+    dirty = false;
+    badge();
+    try { localStorage.removeItem("amx_draft"); } catch (e) {}
+    toast("لا توجد تغييرات جديدة للنشر");
+    return;
+  }
+  // Keep one atomic server transaction: chunking separate transactions would expose partially published catalogs.
+  // Only changed product records and changed top-level config sections cross the network.
+  const r = await api("/rest/v1/rpc/publish_store_config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      p_base_ts: BASE_TS,
+      p_patch: diff.patch,
+      p_product_upserts: diff.upserts,
+      p_product_delete_ids: diff.deletes,
+      p_product_order: diff.order,
+    }),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    if (/stale|40001/.test(t)) throw new Error("تم تعديل المتجر من جلسة أخرى؛ حدّث الصفحة وادمج تعديلاتك قبل إعادة النشر");
+    throw new Error(t.slice(0, 220));
+  }
+  const ts = await r.json();
+  D.ts = Number(ts);
+  BASE_TS = Number(ts);
+  BASE_DATA = clone(pubData());
+  dirty = false;
+  badge();
+  try { localStorage.removeItem("amx_draft"); } catch (e) {}
+  toast(`تم النشر بنجاح · ${diff.upserts.length} منتج مضاف/محدّث · ${diff.deletes.length} محذوف`);
 }
 async function publishStaff(btn) {
   if (!CFG_OK || !STAFF.includes("products")) {
@@ -1869,74 +1933,25 @@ async function publishStaff(btn) {
   if (!confirm("نشر تعديلات المنتجات الآن؟")) return;
   busy(btn, true);
   try {
-    const r = await api("/rest/v1/rpc/staff_save_products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ p_products: D.products, p_base_ts: BASE_TS }),
-    });
-    if (!r.ok) {
-      const t = await r.text();
-      if (/stale/.test(t)) return toast("تم تعديل المتجر من مكان آخر — حدّث الصفحة ثم أعد التعديل", "e");
-      throw new Error(t.slice(0, 120));
-    }
-    const ts = await r.json();
-    D.ts = ts;
-    BASE_TS = ts;
-    dirty = false;
-    badge();
-    toast("تم النشر");
+    await savePublishDiff(true);
   } catch (e) {
-    toast("فشل النشر: " + (e.message || "").slice(0, 80), "e");
+    toast("فشل النشر: " + (e.message || "").slice(0, 140), "e");
   } finally {
     busy(btn, false);
   }
 }
 async function publish(btn) {
   if (isStaffOnly()) return publishStaff(btn);
-  // Never publish a copy that did not come from the server (it would overwrite the live store with stale embedded data)
-  if (!CFG_OK) {
-    toast(
-      "تعذّر تحميل المتجر من الخادم — حدّث الصفحة قبل النشر حتى لا تُكتب بيانات قديمة",
-      "e"
-    );
+  if (!CFG_OK || !BASE_DATA) {
+    toast("تعذّر تحميل المتجر من الخادم — حدّث الصفحة قبل النشر حتى لا تُكتب بيانات قديمة", "e");
     return;
   }
   if (!confirm("نشر التعديلات الآن؟")) return;
   busy(btn, true);
   try {
-    // If the store changed elsewhere (another tab, import, SQL) after this page loaded, do not overwrite it silently
-    const c = await api("/rest/v1/store_config?id=eq.1&select=ts:data->>ts");
-    if (c.ok) {
-      const row = (await c.json())[0],
-        srv = +(row && row.ts) || 0;
-      if (
-        srv > BASE_TS &&
-        !confirm(
-          "⚠ تم تعديل المتجر من مكان آخر بعد فتح هذه الصفحة. النشر الآن سيكتب فوق التعديلات الأحدث (منتجات / أسعار). الأفضل إلغاء ثم تحديث الصفحة. هل تريد الكتابة فوقها رغم ذلك؟"
-        )
-      )
-        return;
-    }
-    D.ts = Date.now();
-    const r = await api("/rest/v1/store_config", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify({
-        id: 1,
-        data: pubData(),
-        updated_at: new Date().toISOString(),
-      }),
-    });
-    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
-    BASE_TS = D.ts;
-    dirty = false;
-    badge();
-    toast("تم النشر");
+    await savePublishDiff(false);
   } catch (e) {
-    toast("فشل النشر: " + (e.message || "").slice(0, 80), "e");
+    toast("فشل النشر: " + (e.message || "").slice(0, 160), "e");
   } finally {
     busy(btn, false);
   }
