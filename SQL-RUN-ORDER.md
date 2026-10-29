@@ -130,3 +130,7 @@ select jobname, schedule, active from cron.job order by jobname;
 - لا ترفع `statement_timeout`؛ السبب الجذري كان فحصاً تربيعياً لـ 9,034 منتجاً داخل تريغر النشر. دالة النشر الجديدة تحفظ التعديلات ذرياً وتمنع الكتابة فوق نسخة أحدث.
 - تنبيه Telegram يعتمد على إعدادات `notify_settings` الحالية. تنبيه رصيد المزود يُفحص عند فتح لوحة الإدارة/فحص الرصيد، وتنبيه الأسعار عند اكتشاف الانحراف في لوحة الإدارة؛ ليسا فحصاً مجدولاً مستقلاً على مدار الساعة.
 - لا يوجد webhook تفاعلي للبوت منشور في المشروع الحالي؛ الإشعارات الحالية أحادية الاتجاه، ولم تُمنح أزرار Telegram صلاحية تغيير الطلبات أو اعتماد الأموال دون ربط هوية أدمن موثوقة.
+
+- `supabase/migrations/20261029082000_secure_telegram_admin_webhook.sql`: RPC مقيد بـ service_role فقط، secret عشوائي مخزّن في `notify_settings`، وربط إجراءات البوت بهوية الدردشة الخاصة الوحيدة. تم نشر Edge Function `telegram-admin` وتسجيل webhook في Telegram؛ استجابة Telegram كانت HTTP 200 و`ok=true` (`Webhook was set`).
+- أوامر البوت: `/pending`, `/orders`, `/order ID STATUS CONFIRM`, `/ticket ID CONFIRM REPLY`, `/ticket_status ID STATUS CONFIRM`, `/topup_approve ID CONFIRM [AMOUNT]`, `/topup_reject ID CONFIRM [REASON]`, `/payment_prepare UUID`, ثم `/payment_approve UUID TOKEN AMOUNT CURRENCY CONFIRM [NOTE]`. كل تعديل يتطلب كلمة CONFIRM، وإجراءات الدفع تستخدم RPC المالية الحالية مع تحقق الإيصال والمبلغ والمراجع المزدوجة.
+- البوت يقبل الأوامر من الدردشة الخاصة المحددة فقط؛ إذا أُضيف أدمن ثانٍ إلى جدول `admins`، تتوقف إجراءات البوت عن العمل عمداً حتى يُضاف ربط صريح لهوية Telegram بكل حساب أدمن.
