@@ -91,7 +91,7 @@
       .map((h) => {
         const r = (all || []).find((c) => c.id === "hub_" + h.id && c.ty === "hub");
         INFO[h.id] = pseudo(h, r);
-        return { e: INFO[h.id], k: r ? ix(r.id) : Math.min(...MEM[h.id].map((c) => ix(c.id))) };
+        return { e: INFO[h.id], k: r ? Math.min(ix(r.id), Math.min(...MEM[h.id].map((c) => ix(c.id)))) : Math.min(...MEM[h.id].map((c) => ix(c.id))) };
       })
       .sort((a, b) => a.k - b.k)
       .forEach((m) => { let at = out.findIndex((c) => ix(c.id) > m.k); if (at < 0) at = out.length; out.splice(at, 0, m.e); });
