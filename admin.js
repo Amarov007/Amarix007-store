@@ -617,7 +617,7 @@ const VIEW = {
     );
   },
   categories() {
-    const hubOpts = () => [["", "تلقائي (حسب نوع المنتجات)"], ...["games", "apps"].map((h) => [h, (D.categories.find((x) => x.id == "hub_" + h) || {}).ar || h]), ["none", "مستقل (بدون قسم رئيسي)"]];
+    const hubOpts = () => [["", "تلقائي (حسب نوع المنتجات)"], ...["games", "chat", "ai", "apps"].map((h) => [h, (D.categories.find((x) => x.id == "hub_" + h) || ({games:"شحن الألعاب",chat:"تطبيقات الدردشة والبث",ai:"اشتراكات الذكاء الاصطناعي",apps:"التطبيقات والبطاقات الرقمية"}[h]))]), ["none", "مستقل (بدون قسم رئيسي)"]];
     return (
       `<div class="card"><h2>الأقسام</h2><div class="acts"><button class="b" data-a="add" data-k="categories">+ قسم جديد</button><button class="b b2" data-a="add-numbers-cat">+ قسم الأرقام (مجانية ومدفوعة)</button></div></div>` +
       D.categories
