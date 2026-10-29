@@ -39,7 +39,7 @@
   const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   const nm = (o) => (typeof lang !== "undefined" && lang === "en" ? o.en || o.ar : o.ar || o.en) || "";
   const hue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
-  const colorOf = (c, seed) => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : \`hsl(\${hue(seed)} 62% 48%)\`);
+  const colorOf = (c, seed) => (/^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : `hsl(${hue(seed)} 62% 48%)`);
   const prods = () => (typeof P !== "undefined" && Array.isArray(P) ? P : []);
   const minPrice = (list) => { let m = Infinity; list.forEach((p) => { const v = pr(p); if (v < m) m = v; }); return m === Infinity ? 0 : m; };
 
