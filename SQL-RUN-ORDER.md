@@ -144,6 +144,8 @@ select jobname, schedule, active from cron.job order by jobname;
 - `20261029104500_correct_chat_app_account_id_labels.sql`: يضمن أن Bigo Live وChamet وDazz Live وCapCut وCall of Duty Mobile تطلب `user_id` بالاسم الصحيح، بدلاً من خلطه بمعرّف لاعب أو بريد إلكتروني.
 - `20261029110000_require_ids_for_single_field_fazer_topups.sql`: يفعّل إدخال المعرّف المناسب حسب توثيق FazerCards في الباقات التي تتطلب حقلاً واحداً (Player ID / User ID / Unique ID / Account ID / Role ID). المنتجات التي تتطلب عدة حقول مستقلة لم تُحوّل إلى نموذج أحادي غير صحيح.
 - `20261029111500_hide_password_based_auto_login_topups.sql`: يخفي مؤقتاً باقات Arknight: Endfield التي تتطلب بريد الحساب وكلمة المرور، إلى حين وجود تكامل آمن لا يجمع كلمات مرور العملاء.
+- `20261029113000_hide_multi_field_topups_until_structured_checkout.sql`: يخفي مؤقتاً باقات FazerCards التي تحتاج أكثر من حقل مستقل (مثل User ID + Server/Platform/Zone) لأن واجهة الطلب الحالية تقبل مدخلاً واحداً فقط؛ يمنع طلبات ناقصة بدلاً من إرسال بيانات غير صحيحة.
+
 
 
 
