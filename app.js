@@ -1322,28 +1322,31 @@ const payKey = (m) => {
 };
 function payLogo(m, size = 44) {
   const st = `width:${size}px;height:${size}px`;
+  // Use the real uploaded logo first; payment v2 exposes config fields on each method.
+  const logo = String(m.logo || m.logo_url || m.image_url || "").trim();
+  if (/^(https:\/\/|data:image\/)/i.test(logo))
+    return `<span class="pl pl-img" style="${st};background:#fff;overflow:hidden;display:inline-flex;align-items:center;justify-content:center"><img src="${ex(logo)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:contain;padding:3px"></span>`;
+  const nmRaw = plain(m.en || m.ar || pmReadable(m) || "");
+  const nm = nmRaw.replace(/[^A-Za-z0-9؀-ۿ ]/g, "").trim();
+  const key = (String(m.id || "") + " " + nmRaw).toLowerCase();
+  const official = [
+    [/\b(binance|bnb)\b/, "https://cdn.simpleicons.org/binance/F0B90B"],
+    [/\b(usdt|tether)\b/, "https://cdn.simpleicons.org/tether/26A17B"],
+    [/\bvisa\b/, "https://cdn.simpleicons.org/visa/1A1F71"],
+    [/\bmastercard\b/, "https://cdn.simpleicons.org/mastercard/EB001B"],
+    [/\bpaypal\b/, "https://cdn.simpleicons.org/paypal/003087"],
+    [/\bapple pay\b/, "https://cdn.simpleicons.org/applepay/000000"],
+    [/\bgoogle pay\b/, "https://cdn.simpleicons.org/googlepay/4285F4"],
+  ].find(([re]) => re.test(key));
+  if (official)
+    return `<span class="pl pl-img" style="${st};background:#fff;overflow:hidden;display:inline-flex;align-items:center;justify-content:center"><img src="${official[1]}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:contain;padding:6px"></span>`;
   const g = PAYG[payKey(m)] || PAYG[m.icon];
   if (g)
-    return `<span class="pl" style="${st};background:${g.bg};color:${ g.fg }"><svg viewBox="1.5 1.5 21 21" width="${size * 0.66}" height="${ size * 0.66 }" fill="currentColor" aria-hidden="true">${g.g}</svg></span>`;
-  const nm = plain(m.en || m.ar || pmReadable(m) || "")
-    .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
-    .trim();
+    return `<span class="pl" style="${st};background:${g.bg};color:${g.fg}"><svg viewBox="1.5 1.5 21 21" width="${size * 0.66}" height="${size * 0.66}" fill="currentColor" aria-hidden="true">${g.g}</svg></span>`;
   if (!nm)
-    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff">${ic("card", size * 0.5)}</span>`;
-  const ini = ex(
-    [
-      ...plain(m.en || m.ar || pmReadable(m) || "?")
-        .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join(""),
-    ]
-      .join("")
-      .toUpperCase() || "?"
-  );
-  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff"><b>${ini}</b></span>`;
+    return `<span class="pl" style="${st};background:${safeColor(m.color) || "#191A23"};color:#fff">${ic("card", size * 0.5)}</span>`;
+  const ini = ex(nm.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?");
+  return `<span class="pl" style="${st};background:${safeColor(m.color) || "#191A23"};color:#fff"><b>${ini}</b></span>`;
 }
 
 /* ---------- 6. Supabase client (anon key + user JWT) ---------- */
@@ -1527,7 +1530,7 @@ function cleanCart() {
 }
 const cartLines = () =>
   cart.map((x) => ({ x, p: prod(x.id) })).filter((l) => l.p && !isVisit(l.p));
-const cartCount = () => cartLines().reduce((s, l) => s + l.x.q, 0);
+const cartCount = () => cartLines().length; // badge counts cart lines, never SMM units/views
 
 /* Coupons are no longer published in full: the server confirms a code on request (public.check_coupon) and the order trigger recomputes the discount anyway */
 async function checkCoupon(code) {
@@ -1955,7 +1958,7 @@ function nav() {
   v.innerHTML = items
     .map(
       ([l, i, k]) =>
-        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + n + "</span>" : "" }</a>`
+        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + fmtN(n) + "</span>" : "" }</a>`
     )
     .join("");
   v.querySelectorAll("a").forEach((e) =>
@@ -2000,7 +2003,7 @@ function drawerRender() {
     <div class="dr-h">${A ? "القائمة" : "Menu"}</div>
     ${big("#/", "home", t("home"))}
     ${big("#/orders", "box", t("ord"))}
-    ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${n}</span>` : "")}
+    ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${fmtN(n)}</span>` : "")}
     ${big("#/fav", "heart", t("fav"))}
     ${big("#/account", user ? "user" : "out", user ? t("acc") : t("login"))}
     ${user ? big("#/partner", "gift", A ? "برنامج الشركاء" : "Partner program") : ""}
@@ -2384,7 +2387,7 @@ function cartPage() {
     cp = cpOf(coupon);
   const rows = lines
     .map(
-      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">${ic("x", 16)}</button></div></div>`
+      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n" dir="ltr">${fmtN(x.q)}</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">${ic("x", 16)}</button></div></div>`
     )
     .join("");
   const couponBox = cp
@@ -2935,25 +2938,38 @@ function partnerPage() {
     `${howBox(true)}<form class="box ref" id="aff-form" novalidate>${title()}<p class="sb">${A ? "انضم كشريك واكسب عمولة على كل طلب مدفوع عبر رابطك الخاص. أدخل معرّف Binance Pay أو عنوان محفظتك لاستلام الأرباح." : "Join as a partner and earn a commission on every paid order through your own link. Enter your Binance Pay ID or wallet address to receive payouts."}</p>` +
     (st == "rejected" ? `<p class="sb">${A ? "لم يتم قبول طلبك السابق، يمكنك التقديم مرة أخرى." : "Your previous application was not approved — you can apply again."}</p>` : "") +
     `<label class="fld"><span>${A ? "معرّف الدفع لاستلام الأرباح" : "Payout ID"}</span><input class="inp" id="aff-pay" name="pay" dir="ltr" maxlength="120" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" aria-describedby="aff-er" placeholder="${A ? "معرّف Binance Pay أو عنوان المحفظة" : "Binance Pay ID or wallet address"}"><small class="pt-h">${A ? "تحقق منه جيداً؛ سنرسل الأرباح إليه." : "Double-check it; payouts are sent to it."}</small></label>` +
+    `<label class="fld"><span>${A ? "نوع المنصة أو القناة" : "Platform or channel"}</span><select class="inp" id="aff-channel" name="channel"><option value="telegram">Telegram</option><option value="youtube">YouTube</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="x">X</option><option value="website">Website</option><option value="other">${A ? "أخرى" : "Other"}</option></select></label>` +
+    `<label class="fld"><span>${A ? "رابط قناتك أو حسابك" : "Your channel or profile URL"}</span><input class="inp" id="aff-url" name="channel_url" type="url" dir="ltr" maxlength="200" required placeholder="https://..." aria-describedby="aff-er"></label>` +
+    `<label class="fld"><span>${A ? "حجم الجمهور" : "Audience size"}</span><select class="inp" id="aff-audience" name="audience"><option value="lt1k">${A ? "أقل من 1,000" : "Under 1,000"}</option><option value="1k-10k">1,000–10,000</option><option value="10k-50k">10,000–50,000</option><option value="gt50k">${A ? "أكثر من 50,000" : "Over 50,000"}</option></select></label>` +
+    `<label class="fld"><span>${A ? "خطة الترويج (اختياري)" : "Promotion plan (optional)"}</span><textarea class="inp" id="aff-pitch" name="pitch" maxlength="400" rows="3"></textarea></label>` +
     `<p class="err" id="aff-er" role="alert"></p><button class="b block" type="submit">${A ? "قدّم طلب الانضمام" : "Apply to join"}</button></form>${back}`
   );
 }
 async function applyAffiliate(b) {
   const A = lang == "ar",
     inp = $("#aff-pay"),
+    urlInp = $("#aff-url"),
+    channelInp = $("#aff-channel"),
+    audienceInp = $("#aff-audience"),
+    pitchInp = $("#aff-pitch"),
     er = $("#aff-er"),
     v = ((inp && inp.value) || "").trim().replace(/\s+/g, " "),
+    channelUrl = ((urlInp && urlInp.value) || "").trim(),
+    channelType = ((channelInp && channelInp.value) || "other").trim(),
+    audience = ((audienceInp && audienceInp.value) || "lt1k").trim(),
+    pitch = ((pitchInp && pitchInp.value) || "").trim().slice(0, 400),
     fail = (m) => {
       if (er) er.textContent = m;
       else toast(m, "er");
       if (inp) inp.focus();
     };
   if (er) er.textContent = "";
-  if (v.length < 6) return fail(A ? "المعرّف أو العنوان قصير جداً (6 أحرف على الأقل)." : "That looks too short (at least 6 characters).");
+  if (v.length < 6) return fail(A ? "معرّف الدفع قصير جداً (6 أحرف على الأقل)." : "Payout ID is too short (at least 6 characters).");
+  if (!/^https:\/\/[^\s]+\.[^\s]+$/i.test(channelUrl)) return fail(A ? "أدخل رابط القناة كاملاً ويبدأ بـ https://" : "Enter a complete channel URL starting with https://");
   if (!refInfo || !refInfo.loaded || (refInfo.status && refInfo.status != "none" && refInfo.status != "rejected")) return loadPartner(true);
   setBusy(b, true);
   try {
-    const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v } });
+    const r = await sb("/rest/v1/rpc/apply_affiliate", { method: "POST", body: { p_payout: v, p_channel_type: channelType, p_channel_url: channelUrl, p_audience: audience, p_pitch: pitch } });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
       /* an application already exists (double tap, another device): just show the real status */
@@ -3115,6 +3131,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
   const waWin = viaWhatsApp ? window.open("", "_blank") : null; // opened synchronously so popup blockers allow it
   setBusy(btn, true);
   let id = orderId(); // temporary: the database assigns the real sequential number (AMX-1001, AMX-1002, ...)
+  let orderCreated = false, paymentFlowDone = false;
   try {
     const row = {
       id,
@@ -3159,6 +3176,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
       throw Object.assign(new Error("session"), { session: true });
     }
     if (!r.ok) throw new Error(await r.text());
+    orderCreated = true;
     try {
       const j = await r.json(); // the real order number assigned by the server
       if (j && j[0] && j[0].id) id = j[0].id;
@@ -3176,6 +3194,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
         paymentV2 = { id: String(pay.id), status: String(pay.status || "awaiting_payment") };
       }
     }
+    paymentFlowDone = true;
     lastOrder = { id, total: tt.total, method: useWallet ? "wallet" : payMethod, wpaid: wOk, wok: walletEligibilityCached(lines), paymentV2 };
     if (viaWhatsApp) openWhatsApp(buildWhatsAppText(id, lines, tt), waWin);
     cart = [];
@@ -3185,6 +3204,35 @@ async function placeOrder(btn, viaWhatsApp = false) {
     beep("ok");
     location.hash = "#/done/" + id;
   } catch (err) {
+    // If order insertion succeeded but payment creation failed, recover an idempotently-created payment
+    // before safely cancelling the otherwise orphaned unpaid order.
+    if (orderCreated && !paymentFlowDone && !viaWhatsApp && window.AMXPay) {
+      let recovered = null;
+      try { recovered = await window.AMXPay.statusForOrder(id); } catch {}
+      if (recovered && recovered.id) {
+        lastOrder = {
+          id, total: tt.total, method: useWallet ? "wallet" : payMethod,
+          wpaid: useWallet && recovered.status === "captured",
+          wok: walletEligibilityCached(lines),
+          paymentV2: { id: String(recovered.id), status: String(recovered.status || "awaiting_payment") },
+        };
+        cart = [];
+        coupon = "";
+        save();
+        nav();
+        location.hash = "#/done/" + id;
+        toast(lang == "ar" ? "تم استعادة حالة الدفع لهذا الطلب" : "Recovered payment status for this order", "wn");
+        return;
+      }
+      try {
+        await sb("/rest/v1/rpc/cancel_unpaid_order", {
+          method: "POST",
+          body: { p_order_id: String(id) },
+        });
+      } catch (cleanupErr) {
+        console.warn("[AMARIX] safe unpaid-order cleanup failed", cleanupErr);
+      }
+    }
     if (waWin) waWin.close();
     console.error("[AMARIX] order failed", err);
     if (err.session) {
