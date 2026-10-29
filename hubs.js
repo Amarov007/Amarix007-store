@@ -175,7 +175,7 @@
   }
   function page(id, sub) {
     const h = INFO[id] || HUBS.find((x) => x.id === id);
-    if (!h || (!MEM[id] || !MEM[id].length) && !(id === "ai" && h.id === "ai")) return `<div class="box hx-none">${L("هذا القسم غير متاح حالياً.", "This section is not available right now.")} <a class="b sm" href="#/">${L("الرئيسية", "Home")}</a></div>`;
+    if (!h || (!MEM[id] || !MEM[id].length) && id !== "ai") return `<div class="box hx-none">${L("هذا القسم غير متاح حالياً.", "This section is not available right now.")} <a class="b sm" href="#/">${L("الرئيسية", "Home")}</a></div>`;
     CUR = { id, sub: sub || "" };
     const list = items(id), fam = sub && list.find((x) => x.kind === "fam" && x.key === sub);
     const head = `<div class="box row sb-hero hx-hero"><span class="tile big${h.image_url ? " img" : ""}">${typeof ico === "function" ? ico(h, 30) : ic(h.i, 30)}</span><div style="flex:1"><h1>${esc(fam ? nm(fam) : h[typeof lang !== "undefined" ? lang : "ar"])}</h1><p class="pd">${esc(fam ? L("اختر منطقة حسابك", "Choose your account region") : lang === "en" ? h.de : h.da)}</p></div></div>`;
