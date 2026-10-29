@@ -181,7 +181,10 @@ BEGIN
       THEN o.total/coalesce(nullif((c.data->'rates'->upper(coalesce(nullif(o.currency,''),'USD'))->>0),'')::numeric,1) ELSE 0 END),0),
     'sales_7d',coalesce(sum(CASE WHEN o.payment_status='paid' AND o.created_at>=p_week_start
       THEN o.total/coalesce(nullif((c.data->'rates'->upper(coalesce(nullif(o.currency,''),'USD'))->>0),'')::numeric,1) ELSE 0 END),0),
-    'pending_review',count(*) FILTER(WHERE o.payment_status='review'),
+    'pending_review',
+      count(*) FILTER(WHERE o.payment_status='review')
+      + (SELECT count(*) FROM public.payments p WHERE p.status IN ('proof_submitted','under_review'))
+      + (SELECT count(*) FROM public.wallet_topups w WHERE w.status IN ('pending','review','under_review')),
     'open_orders',count(*) FILTER(WHERE o.status IN ('new','processing'))
   ) INTO result FROM public.orders o CROSS JOIN public.store_config c WHERE c.id=1;
   RETURN result;
