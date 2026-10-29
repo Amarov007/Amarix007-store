@@ -66,6 +66,11 @@ const I = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
   wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1.2"/>',
   card: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/>',
+  star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z" fill="currentColor"/>',
+  bell: '<path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/>',
+  belloff: '<path d="M6 17V11a6 6 0 0 1 9-5.2M18 11v6l1.5 2H8"/><path d="M10 21h4M3 3l18 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  shield2: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
 };
 const ic = (name, size = 20) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ I[name] || I.box }</svg>`;
@@ -111,6 +116,16 @@ const PAYG = {
     bg: "#F0B90B",
     fg: "#1E2329",
     g: '<path d="m12 3.2 2.6 2.6-1.5 1.5L12 6.2l-1.1 1.1-1.5-1.5zM6.2 9l1.5 1.5L6.2 12l1.5 1.5L6.2 15 3.2 12zM17.8 9l3 3-3 3-1.5-1.5L17.8 12l-1.5-1.5zM12 9.9l2.1 2.1-2.1 2.1-2.1-2.1zM9.4 16.2l1.5 1.5L12 18.8l1.1-1.1 1.5-1.5 1.5 1.5-2.6 2.6L12 21l-.4-.7-2.2-2.6z"/>',
+  },
+  syriatel: {
+    bg: "#D71920",
+    fg: "#fff",
+    g: '<path d="M12 18.4a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2z"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M7.9 12.6a5.8 5.8 0 0 1 8.2 0M4.9 9.6a10 10 0 0 1 14.2 0"/>',
+  },
+  sham: {
+    bg: "#1E4FD8",
+    fg: "#fff",
+    g: '<circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.8 9.4c-.5-1-1.5-1.5-2.8-1.5-1.5 0-2.6.8-2.6 2 0 3 5.6 1.4 5.6 4.3 0 1.2-1.2 2-2.9 2-1.4 0-2.5-.6-3-1.7"/>',
   },
   usdt: {
     bg: "#26A17B",
@@ -1077,7 +1092,7 @@ const ratingHtml = (p) => {
     n = real ? +st.rc : +p.n || 0;
   const stars =
     n > 0
-      ? `<div class="rt">★ ${r.toFixed(1)} <small>(${ex(n)})</small></div>${real ? "" : `<div class="rt-n">${t("ratenote")}</div>`}`
+      ? `<div class="rt">${ic("star", 14)} ${r.toFixed(1)} <small>(${ex(n)})</small></div>${real ? "" : `<div class="rt-n">${t("ratenote")}</div>`}`
       : "";
   const sold = st && +st.s > 0 ? `<div class="rt-n sold">${ex(t("soldn").replace("{n}", st.s))}</div>` : "";
   const best = +p.bs > 0 && +p.bs <= 3 && st && +st.s > 0 ? `<span class="best">${t("best")}</span>` : ""; // only with real paid sales
@@ -1301,11 +1316,13 @@ function socialLink([code, url, logo], label) {
   const inner = logo ? `<img src="${ex(logo)}" alt="" loading="lazy" decoding="async">` : brandSvg(b.g, 22);
   return `<a class="sl" style="background:${logo ? "#fff" : b.bg}" href="${ex( href )}" target="_blank" rel="noopener" aria-label="${ex( label || code )}">${inner}</a>`;
 }
+const payKey = (m) => {
+  const k = [m.id, m.icon, m.en, m.ar, m.name].join(" ").toLowerCase();
+  return /binance|بايننس/.test(k) ? "binance" : /usdt|tether|bep20/.test(k) ? "usdt" : /syriatel|سيريتل|سيرياتيل/.test(k) ? "syriatel" : /sham|شام/.test(k) ? "sham" : "";
+};
 function payLogo(m, size = 44) {
   const st = `width:${size}px;height:${size}px`;
-  if (m.logo)
-    return `<span class="pl" style="${st};background:#fff"><img src="${ex( m.logo )}" alt="" loading="lazy" decoding="async"></span>`;
-  const g = PAYG[m.icon];
+  const g = PAYG[payKey(m)] || PAYG[m.icon];
   if (g)
     return `<span class="pl" style="${st};background:${g.bg};color:${ g.fg }"><svg viewBox="1.5 1.5 21 21" width="${size * 0.66}" height="${ size * 0.66 }" fill="currentColor" aria-hidden="true">${g.g}</svg></span>`;
   const nm = plain(m.en || m.ar || pmReadable(m) || "")
@@ -1408,6 +1425,7 @@ window.AMXPayTransport = {
   rpc: (name, args = {}, auth = true) => sb("/rest/v1/rpc/" + encodeURIComponent(name), { method: "POST", body: args, auth }),
   edge: (name, args = {}) => sb("/functions/v1/" + encodeURIComponent(name), { method: "POST", body: args, auth: true }),
   user: () => user,
+  payLogo: (m, size) => payLogo(m, size),
   token: () => getToken(),
   proofBlob: (file) => proofBlob(file),
   putProof: (token, path, blob) => putProof(token, path, blob),
@@ -1468,9 +1486,9 @@ async function loadMyReviews() {
 function rateRow(o, i, st) {
   if (st != "done" || !i || !i.id) return "";
   const mine = MYREV[o.id + "|" + i.id];
-  if (mine) return `<div class="rv-row"><small>${t("rv_done")} ${"★".repeat(mine)}</small></div>`;
+  if (mine) return `<div class="rv-row"><small>${t("rv_done")} ${ic("star", 12).repeat(mine)}</small></div>`;
   return `<div class="rv-row"><small>${t("rv_rate")}</small> ${[1, 2, 3, 4, 5]
-    .map((v) => `<button class="rv-s" data-a="rate" data-o="${ex(o.id)}" data-p="${ex(i.id)}" data-v="${v}" aria-label="${v}">★</button>`)
+    .map((v) => `<button class="rv-s" data-a="rate" data-o="${ex(o.id)}" data-p="${ex(i.id)}" data-v="${v}" aria-label="${v}">${ic("star", 22)}</button>`)
     .join("")}</div>`;
 }
 async function rateItem(b) {
@@ -2366,24 +2384,20 @@ function cartPage() {
     cp = cpOf(coupon);
   const rows = lines
     .map(
-      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">✕</button></div></div>`
+      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex( p.id )}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t( "acclink" )} *" required aria-required="true" dir="ltr">` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n">${ x.q }</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">${ic("x", 16)}</button></div></div>`
     )
     .join("");
   const couponBox = cp
     ? `<div class="cpn-on"><span>${ic("check", 14)} ${t( "cpnon" )}: <b dir="ltr">${ex(coupon)}</b></span><button data-a="cpnrm">${t( "cpnrm" )}</button></div>`
     : `<div class="cpn"><input class="inp" id="cpn" dir="ltr" placeholder="${t( "cc" )}" autocomplete="off"><button class="b b2" data-a="coupon">${t( "ap" )}</button></div>`;
-  const wSec = user && walletOn() && !wl.setup ? "main" : null;
-  const wKey = walletItemsKey(lines);
-  const wElig = walletEligibility.key === wKey ? walletEligibility.value : null; // null = still checking
-  if (wSec && wElig === null) {
-    void walletEligibleFor(lines).then(() => {
-      if (wKey === walletItemsKey(cartLines()) && /^#\/cart(?:$|\?)/.test(location.hash)) render();
-    });
-  }
-  if (payMethod == "wallet" && (!wSec || wElig === false)) payMethod = "";
-  const payBox = PM.length || wSec
-    ? `<div class="box"><h3 style="margin-bottom:10px">${ic("card", 16)} ${t( "paychoose" )}</h3> <div class="pchips" role="radiogroup">${walletChip(wSec, wElig)}${PM.map( (m) => `<button type="button" role="radio" aria-checked="${ m.id == payMethod }" class="pchip${ m.id == payMethod ? " on" : "" }" data-a="pay" data-id="${ex(m.id)}">${payLogo(m, 34)}<span>${pmName( m )}</span><i>${ic("check", 14)}</i></button>` ).join("")}</div>${walletHint(wSec, T_.total)}${payMethod != "wallet" ? pmLimitHint(pmOf(payMethod), T_.total) : ""}</div>`
-    : "";
+  /* The wallet is the only way to pay for orders; transfer methods (Syriatel, Sham Cash, Binance Pay, USDT) only top up the wallet. */
+  payMethod = "wallet";
+  const AW = lang == "ar", wBal = walletBal(), wLow = user && walletReady() && wBal + 0.005 < T_.total;
+  const payBox = !walletOn() || wl.setup
+    ? `<div class="box"><p class="pd">${AW ? "الدفع غير متاح حالياً: المحفظة قيد التجهيز." : "Checkout is unavailable right now: the wallet is being set up."}</p></div>`
+    : !user
+      ? `<div class="box wpay"><h3>${ic("wallet", 16)} ${AW ? "الدفع من المحفظة" : "Pay from wallet"}</h3><p class="pd">${AW ? "سجّل الدخول لاستخدام رصيد محفظتك وإتمام الطلب." : "Sign in to use your wallet balance and place the order."}</p><a class="b b2 block" href="#/login">${AW ? "تسجيل الدخول" : "Sign in"}</a></div>`
+      : `<div class="box wpay"><h3>${ic("wallet", 16)} ${AW ? "الدفع من المحفظة" : "Pay from wallet"}</h3><div class="wpay-row"><span class="wpay-ic">${ic("wallet", 22)}</span><div><small>${AW ? "رصيدك الحالي" : "Your balance"}</small><b class="n">${walletReady() ? money(wBal) : "…"}</b></div><a class="b b2 sm" href="#/wallet">${ic("plus", 14)} ${AW ? "شحن المحفظة" : "Top up"}</a></div>${wLow ? `<p class="wpay-low">${ic("warn", 14)} ${AW ? "رصيدك لا يكفي لهذا الطلب. اشحن محفظتك ثم عُد لإتمامه." : "Your balance is not enough for this order. Top up, then come back."}</p>` : ""}</div>`;
   return (
     rows +
     payBox +
@@ -2744,7 +2758,7 @@ async function walletPayOrder(btn, id) {
     if (!window.AMXPay) throw new Error("payments_v2_ui_unavailable");
     await window.AMXPay.payWithWallet(id, window.AMXPay.idempotencyKey(`wallet-order:${id}`));
     walletPaid[id] = true;
-    toast(lang == "ar" ? "تم الدفع من المحفظة ✓" : "Paid from your wallet ✓");
+    toast(lang == "ar" ? "تم الدفع من المحفظة" : "Paid from your wallet");
     beep("ok");
     await loadWallet(true);
     render();
@@ -2910,7 +2924,7 @@ function partnerPage() {
   if (st == "pending")
     return (
       `<section class="box ref"><div class="pt-top">${title([A ? "قيد المراجعة" : "Under review", "wt"])}${refreshBtn}</div><ol class="pt-steps">` +
-      `<li class="ok"><i>✓</i><span>${A ? "استلمنا طلبك" : "We received your application"}</span></li>` +
+      `<li class="ok"><i>${ic("check", 14)}</i><span>${A ? "استلمنا طلبك" : "We received your application"}</span></li>` +
       `<li class="now"><i>2</i><span>${A ? "الفريق يراجع الطلب" : "The team is reviewing it"}</span></li>` +
       `<li><i>3</i><span>${A ? "يظهر رابطك هنا فور الموافقة" : "Your link appears here once approved"}</span></li></ol>` +
       (partnerErr ? `<div class="pt-warn" role="status">${ic("warn", 14)}<span>${A ? "تعذّر التحقق من الحالة الآن." : "Couldn't check the status right now."}</span></div>` : "") +
@@ -2952,7 +2966,7 @@ async function applyAffiliate(b) {
     }
     refInfo.status = "pending";
     partnerAt = 0;
-    toast(A ? "تم إرسال طلبك ✓" : "Application sent ✓");
+    toast(A ? "تم إرسال طلبك" : "Application sent");
     render();
     scrollTo(0, 0);
   } catch {
@@ -3049,14 +3063,17 @@ async function placeOrder(btn, viaWhatsApp = false) {
     render();
     return toast(`${t("qinval")} (${t("qminl")}: ${fmtN(qMin(badQ.p))})`, "wn");
   }
-  const walletServerEligible = payMethod == "wallet" ? await walletEligibleFor(lines, true) : walletEligibilityCached(lines);
-  const useWallet = !viaWhatsApp && !!user && payMethod == "wallet" && walletOn() && walletServerEligible;
-  if (payMethod == "wallet" && !useWallet && !viaWhatsApp) {
-    payMethod = "";
-    save();
-    render();
-    return toast(t("paypick"), "wn");
+  payMethod = "wallet";
+  if (!user) {
+    returnTo = "#/cart";
+    toast(t("lreq"), "wn");
+    location.hash = "#/login";
+    return;
   }
+  if (!walletOn() || wl.setup) return toast(lang == "ar" ? "الدفع غير متاح حالياً: المحفظة غير مفعّلة." : "Checkout is unavailable: the wallet is not enabled.", "wn");
+  const walletServerEligible = await walletEligibleFor(lines, true);
+  const useWallet = !viaWhatsApp && !!user && payMethod == "wallet" && walletOn() && walletServerEligible;
+  if (!useWallet && !viaWhatsApp) return toast(lang == "ar" ? "تعذّر الدفع من المحفظة لهذا الطلب. أعد المحاولة أو تواصل مع الدعم." : "Could not pay this order from the wallet. Try again or contact support.", "er");
   if (!viaWhatsApp && !useWallet && PM.length && !payMethod) return toast(t("paypick"), "wn");
   if (!viaWhatsApp) {
     if (!window.AMXPay) return toast(lang == "ar" ? "نظام الدفع الجديد غير محمّل؛ لم يُنشأ الطلب." : "Payment module unavailable; no order was created.", "er");
@@ -3069,13 +3086,21 @@ async function placeOrder(btn, viaWhatsApp = false) {
     }
   }
   const tt = totals();
+  if (!(+tt.total.toFixed(2) >= 0.01)) {
+    /* the server rejects zero-value payments; stop before an unpayable order row is created */
+    return toast(lang == "ar" ? "قيمة الطلب أقل من الحد الأدنى للدفع (0.01). زد الكمية ثم أعد المحاولة." : "The order total is below the minimum payable amount (0.01). Increase the quantity and try again.", "wn");
+  }
   if (!viaWhatsApp && !useWallet) {
     const le = pmLimitErr(pmOf(payMethod), tt.total);
     if (le) return toast(le, "wn");
   }
   if (useWallet) {
     if (!wl.loaded) await loadWallet(true);
-    if (walletReady() && walletBal("main") + 0.005 < tt.total) return toast(lang == "ar" ? "رصيدك غير كافٍ — اشحن المحفظة أولاً" : "Your balance is not enough — top up the wallet first", "wn");
+    if (walletReady() && walletBal("main") + 0.005 < tt.total) {
+      toast(lang == "ar" ? "رصيدك غير كافٍ — اشحن المحفظة أولاً" : "Your balance is not enough — top up the wallet first", "wn");
+      location.hash = "#/wallet";
+      return;
+    }
   }
 
   if (!user) {
@@ -3414,7 +3439,7 @@ const isNumItem = (i) => {
   return !!p && apiMode(p) && !!c && c.ty == "numbers";
 };
 function nmSteps(n) {
-  return `<div class="nm-st">${NM_STEPS.map((x, i) => `<span class="${i < n ? "on" : i == n ? "cur" : ""}">${i < n ? "✓ " : ""}${sbT(x[0], x[1])}</span>`).join("")}</div>`;
+  return `<div class="nm-st">${NM_STEPS.map((x, i) => `<span class="${i < n ? "on" : i == n ? "cur" : ""}">${i < n ? ic("check", 12) + " " : ""}${sbT(x[0], x[1])}</span>`).join("")}</div>`;
 }
 function nmCard(o, r) {
   const d = r.delivery || {},
@@ -3431,7 +3456,7 @@ function nmCard(o, r) {
   const pill = {
     fail: sbT("تعذّر التنفيذ", "Failed"),
     cancel: sbT("أُلغي", "Cancelled"),
-    got: sbT("✓ وصل الكود", "✓ Code received"),
+    got: sbT("وصل الكود", "Code received"),
     wait: sbT("بانتظار الكود", "Waiting for code"),
   }[st];
   const top = `<div class="nm-top">${svc ? nmBadge(svc, 20) : ""}<div><b>${ex(svc || (p ? p[lang] || p.ar : ""))}</b><small>${m && m.flag ? m.flag + " " : ""}${ex(cty)}</small></div><span class="nm-pill">${pill}</span></div>`;
@@ -3474,7 +3499,7 @@ function apiBlock(o) {
         : stt == "Canceled"
         ? A ? "أُلغي هذا البند — تواصل مع الدعم" : "This item was cancelled — contact support"
         : stt == "Completed"
-        ? A ? "✓ تم التسليم" : "✓ Delivered"
+        ? A ? "تم التسليم" : "Delivered"
         : A ? "⏳ قيد التنفيذ" : "⏳ In progress";
       return `<div class="dlv-i"><small>${ex(p ? plain(p[lang] || p.ar || p.en) : r.item_id)}</small>${rows}${d.text ? `<p class="dlv-t">${ex(d.text)}</p>` : ""}<div class="dlv-s">${msg}</div></div>`;
     }).join("") +
@@ -3523,7 +3548,7 @@ async function apiAuto(rows, seq, n = 0) {
     nmTick();
   }
   if (got) {
-    toast(sbT("وصل كود التفعيل ✓", "Your code has arrived ✓"));
+    toast(sbT("وصل كود التفعيل", "Your code has arrived"));
     try {
       beep("ok");
       navigator.vibrate && navigator.vibrate([120, 60, 120]);
@@ -4981,9 +5006,9 @@ function sbFull(p, m) {
   return `<div class="sb-full"><small>${sbT("الاسم الكامل للخدمة", "Full service name")}</small><p dir="auto">${ex(s.full)}</p>${sbChips(m)}</div>`;
 }
 const SB_FT = [
-  ["refill", "♻ تعويض", "♻ Refill"],
-  ["nodrop", "🛡 ثابت", "🛡 Non-drop"],
-  ["fast", "⚡ سريع", "⚡ Fast"],
+  ["refill", "تعويض", "Refill"],
+  ["nodrop", "ثابت", "Non-drop"],
+  ["fast", "سريع", "Fast"],
   ["new", "🆕 جديد", "🆕 New"],
 ];
 const sbPl = (id) => SBP.find((r) => r[0] == id) || SBO;
@@ -5602,7 +5627,7 @@ function qbEl() {
   e.className = "qb";
   e.setAttribute("aria-hidden", "true");
   const A = lang == "ar";
-  e.innerHTML = `<div class="qb-ov" data-a="qb-x"></div><div class="qb-s" role="dialog" aria-modal="true" aria-label="${A ? "إتمام الشراء" : "Checkout"}"><div class="qb-h"><b>${A ? "إتمام الشراء" : "Checkout"}</b><button type="button" class="ib" data-a="qb-x" aria-label="${A ? "إغلاق" : "Close"}">✕</button></div><ol class="qb-st"><li>${A ? "المنتج" : "Item"}</li><li>${A ? "الدفع" : "Payment"}</li><li>${A ? "التأكيد" : "Confirm"}</li></ol><div class="qb-b" id="qb-b"></div><button type="button" class="qb-more" data-a="qb-cart">${A ? "فتح السلة كاملة" : "Open full cart"}</button></div>`;
+  e.innerHTML = `<div class="qb-ov" data-a="qb-x"></div><div class="qb-s" role="dialog" aria-modal="true" aria-label="${A ? "إتمام الشراء" : "Checkout"}"><div class="qb-h"><b>${A ? "إتمام الشراء" : "Checkout"}</b><button type="button" class="ib" data-a="qb-x" aria-label="${A ? "إغلاق" : "Close"}">${ic("x", 16)}</button></div><ol class="qb-st"><li>${A ? "المنتج" : "Item"}</li><li>${A ? "الدفع" : "Payment"}</li><li>${A ? "التأكيد" : "Confirm"}</li></ol><div class="qb-b" id="qb-b"></div><button type="button" class="qb-more" data-a="qb-cart">${A ? "فتح السلة كاملة" : "Open full cart"}</button></div>`;
   document.body.appendChild(e);
   return e;
 }
@@ -5808,14 +5833,14 @@ function pushNeeded() {
 }
 function pushGatePage() {
   const denied = Notification.permission === "denied";
-  return `<div class="box au done"><div class="okc">${ic("bolt", 34)}</div><h1>${t("pg_t")}</h1><p class="pd">${t("pg_d")}</p>${denied ? `<p class="ord-note">🔕 ${t("pg_blk")}</p>` : ""}<div class="acts">${denied ? `<button class="b" data-a="push-re">${t("pg_re")}</button>` : `<button class="b" data-a="push-on">${t("pg_btn")}</button>`}</div></div>`;
+  return `<div class="box au done"><div class="okc">${ic("bolt", 34)}</div><h1>${t("pg_t")}</h1><p class="pd">${t("pg_d")}</p>${denied ? `<p class="ord-note">${ic("belloff", 14)} ${t("pg_blk")}</p>` : ""}<div class="acts">${denied ? `<button class="b" data-a="push-re">${t("pg_re")}</button>` : `<button class="b" data-a="push-on">${t("pg_btn")}</button>`}</div></div>`;
 }
 function pushBox(compact) {
   if (!user || !pushReady()) return "";
   const p = Notification.permission;
-  if (p === "granted") return compact || ls.get("amx_push") !== "1" ? "" : `<p class="ord-note ok">🔔 ${t("push_active")}</p>`;
-  if (p === "denied") return compact ? "" : `<p class="ord-note">🔕 ${t("push_blocked")}</p>`;
-  return `<div class="box row" style="display:flex;gap:12px;align-items:center;justify-content:space-between"><div style="min-width:0"><b>🔔 ${t("push_t")}</b><small style="display:block">${t("push_d")}</small></div><button type="button" class="b sm" data-a="push-on">${t("push_btn")}</button></div>`;
+  if (p === "granted") return compact || ls.get("amx_push") !== "1" ? "" : `<p class="ord-note ok">${ic("bell", 14)} ${t("push_active")}</p>`;
+  if (p === "denied") return compact ? "" : `<p class="ord-note">${ic("belloff", 14)} ${t("push_blocked")}</p>`;
+  return `<div class="box row" style="display:flex;gap:12px;align-items:center;justify-content:space-between"><div style="min-width:0"><b>${ic("bell", 14)} ${t("push_t")}</b><small style="display:block">${t("push_d")}</small></div><button type="button" class="b sm" data-a="push-on">${t("push_btn")}</button></div>`;
 }
 /* A tap on a notification while the app is open: the service worker asks the page to go to that screen */
 if ("serviceWorker" in navigator)

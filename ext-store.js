@@ -196,7 +196,7 @@
     } else {
       body = `<label class="xfld"><span>${esc(s.id_label)}</span><input id="x-uid" class="inp" data-x="uid" dir="ltr" autocomplete="off" maxlength="40" placeholder="${esc(s.id_label)}" value="${esc(M.uid)}"><small>${esc(s.id_hint)}</small></label><div class="xlab">اختر الباقة</div><div class="xpks" role="radiogroup" aria-label="الباقات">${s.packages.map((q) => pkBtn(s, q, M.pkg === q.id)).join("")}</div>`;
     }
-    return `<div class="xm-h">${logo(s)}<div><b id="xm-t">${esc(s.ar)}</b><small>${esc(ai ? "اشتراك رقمي" : "شحن مباشر")}</small></div><button type="button" class="ib" data-x="close" aria-label="إغلاق">✕</button></div><div class="xm-b">${body}</div><div class="xm-f" id="xm-f">${footHtml(s, p)}</div>`;
+    return `<div class="xm-h">${logo(s)}<div><b id="xm-t">${esc(s.ar)}</b><small>${esc(ai ? "اشتراك رقمي" : "شحن مباشر")}</small></div><button type="button" class="ib" data-x="close" aria-label="إغلاق"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="xm-b">${body}</div><div class="xm-f" id="xm-f">${footHtml(s, p)}</div>`;
   }
   const footHtml = (s, p) =>
     `<div class="xf-t"><small>${p ? esc(pkgTitle(s, p)) : "الإجمالي"}</small><b class="n">${p ? $m(p) : "—"}</b></div><button type="button" class="b" data-x="order"${ready() ? "" : " disabled"}>${ic("bolt", 16)} ${s.category === "ai" ? "اشترك الآن" : "اشحن الآن"}</button>`;

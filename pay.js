@@ -261,7 +261,6 @@ async function renderPayment(paymentId, { silent = false } = {}) {
   }
   const meta = (await getConfig()).methods?.find(m => m.id === ins?.method) || {};
   const methodName = tx(meta.config?.ar || meta.ar || ins?.method || "طريقة الدفع", meta.config?.en || meta.en || ins?.method || "Payment method");
-  const logo = meta.config?.logo || meta.config?.logo_url || "";
   const end = ts(ins?.expires_at || p.expires_at);
   const rate = Number(ins?.fx_rate ?? p.fx_rate ?? 1);
   const needsProof = ins?.requires_proof !== false;
@@ -305,7 +304,7 @@ async function renderPayment(paymentId, { silent = false } = {}) {
     <div class="pay-top"><span class="pay-pill s-${esc(state)}">${esc(statusText(state))}</span>${live && Number.isFinite(end) ? `<span class="pay-timer${expired ? " off" : ""}">${ICON.clock}<span>${tx("ينتهي خلال", "Expires in")}</span> <bdi id="amx-pay-countdown" dir="ltr">${countdown(end)}</bdi></span>` : ""}</div>
     <div class="pay-hero"><small>${tx("المبلغ المطلوب", "Amount due")}</small><bdi class="pay-amt" dir="ltr">${amount(ins?.pay_amount ?? p.pay_amount, ins?.pay_currency || p.pay_currency)}</bdi>${showBase ? `<span class="pay-base">${tx("المبلغ الأساسي", "Base amount")}: <bdi dir="ltr">${amount(ins?.amount_base ?? p.amount_base, "USDT")}</bdi></span>` : ""}${showFx ? `<span class="pay-base">${tx("سعر الصرف المثبّت", "Locked FX rate")}: <bdi dir="ltr">1 USDT = ${esc(rate)}</bdi></span>` : ""}</div>
     ${steps(done, current)}
-    ${ins ? `<section class="pay-card"><div class="pay-method">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ""}<h3>${esc(methodName)}</h3></div>${account}${text}</section>` : ""}
+    ${ins ? `<section class="pay-card"><div class="pay-method">${T()?.payLogo ? T().payLogo({ id: ins.method, ar: meta.config?.ar, en: meta.config?.en, icon: meta.config?.icon }, 40) : ""}<h3>${esc(methodName)}</h3></div>${account}${text}</section>` : ""}
     ${expired ? `<p class="pay-note warn">${tx("انتهت مهلة هذه الدفعة. أنشئ طلباً جديداً للمتابعة.", "This payment has expired. Create a new order to continue.")}</p>` : ""}
     ${proofBlock}${refBlock}${actions}${review}${refund}
     <p class="pay-note">${tx("لا يتم تأكيد الدفع لمجرد رفع صورة. تنتقل الدفعة للمراجعة ثم يُتحقق من وصول المبلغ.", "Uploading a receipt does not confirm payment. The transfer is reviewed and verified first.")}</p>`);

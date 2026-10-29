@@ -4008,7 +4008,7 @@ body.qb-open{overflow:hidden}
 /* method card */
 .pay-card{border:1px solid var(--bd);background:var(--card);border-radius:18px;padding:14px;margin:0 0 14px}
 .pay-method{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.pay-method img{width:38px;height:38px;border-radius:10px;object-fit:contain;background:#fff;border:1px solid var(--bd)}
+
 .pay-method h3{margin:0;font-size:1.02rem}
 .pay-acc{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-radius:14px;background:var(--bg);border:1px dashed var(--bd)}
 .pay-acc>div{min-width:0}
@@ -4070,3 +4070,12 @@ body.qb-open{overflow:hidden}
 .pay{grid-template-columns:1fr!important}
 .pchip[disabled]{opacity:.5;cursor:not-allowed}
 .pchip .wl-sub{display:block;font-size:.72rem;color:var(--mu);font-weight:400}
+
+/* wallet-only checkout */
+.wpay-row{display:flex;align-items:center;gap:12px}
+.wpay-row>div{flex:1;min-width:0}
+.wpay-row small{display:block;color:var(--mu);font-size:.8rem}
+.wpay-row b{font-size:1.25rem}
+.wpay-ic{flex:none;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--cta);color:var(--cta-tx)}
+.wpay-low{display:flex;gap:8px;align-items:flex-start;margin:12px 0 0;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--wn) 12%,var(--bg));color:var(--wn);font-size:.88rem;line-height:1.6}
+.rt svg,.rv-row svg{vertical-align:-2px;color:#f5b301}
