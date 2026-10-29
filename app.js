@@ -1026,7 +1026,7 @@ const needsLink = (p) => {
   return isSmmType(p) && !apiMode(p) && ((c && c.ty == "boost") || hasSmm(p));
 };
 /* what the buyer must type for an API product (set per product in the admin: req = player_id / server_id / email / phone) */
-const REQ_L = { player_id: ["معرّف اللاعب (Player ID)", "Player ID"], user_id: ["معرّف المستخدم (User ID)", "User ID"], server_id: ["رقم السيرفر (Server ID)", "Server ID"], email: ["البريد الإلكتروني", "Email"], phone: ["رقم الهاتف", "Phone"] };
+const REQ_L = { player_id: ["معرّف اللاعب (Player ID)", "Player ID"], user_id: ["معرّف المستخدم (User ID)", "User ID"], unique_id: ["المعرّف الفريد (Unique ID)", "Unique ID"], account_id: ["معرّف الحساب (Account ID)", "Account ID"], role_id: ["معرّف الشخصية (Role ID)", "Role ID"], server_id: ["رقم السيرفر (Server ID)", "Server ID"], email: ["البريد الإلكتروني", "Email"], phone: ["رقم الهاتف", "Phone"] };
 const reqHint = (p) => {
   const r = Array.isArray(p.req) ? p.req.filter((k) => REQ_L[k]) : [];
   if (!r.length) return lang == "ar" ? "المعرّف أو الإيميل" : "ID or email";
