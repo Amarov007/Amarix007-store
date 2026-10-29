@@ -36,6 +36,7 @@
     ["smm", "رشق متابعين (SMM)"],
     ["games", "شحن ألعاب"],
     ["apps", "تطبيقات واشتراكات"],
+    ["numbers", "أرقام التفعيل"],
     ["sync", "مزامنة الأسعار"],
   ];
   const REQ_OPTS = [
@@ -86,6 +87,7 @@
     return type === "smm" ? Math.max(0.000001, r6(v)) : Math.max(0.01, r2(v));
   }
   function classifyService(x, kind) {
+    if (kind === "smsactivate") return "app_subscription";
     return SV().typeOf({ name: x.name, category: x.category, provider_kind: kind || "smm", smm_input: x.type === "Number" ? "none" : undefined });
   }
   function build(x, o) {
@@ -163,13 +165,13 @@
   try { IC.mk = num(localStorage.getItem("amx_ic_mk"), 30); } catch (e) {}
   const kindOf = (id) => (id === "main" ? "smm" : (typeof PROV_KIND != "undefined" && PROV_KIND[id]) || "smm");
   const provList = () => {
-    const want = IC.mode === "smm" ? "smm" : "custom";
+    const want = IC.mode === "smm" ? "smm" : IC.mode === "numbers" ? "smsactivate" : "custom";
     const out = [];
     if (want === "smm") out.push(["main", provName("main")]);
     Object.keys(PROV_NAME).forEach((id) => { if (kindOf(id) === want) out.push([id, PROV_NAME[id] + " (" + id + ")"]); });
     return out;
   };
-  const defTarget = () => (IC.mode === "sync" ? "" : IC.mode); // mode = the default target hub, changeable below
+  const defTarget = () => (IC.mode === "sync" ? "" : IC.mode === "numbers" ? "apps" : IC.mode); // mode = the default target hub, changeable below
 
   /* ------------------------------------------------------------------ IMPORT CENTER (view) ------------------------------------------------------------------ */
   function modeBar() {
@@ -186,6 +188,7 @@
     if (!IC.prov && provs.length === 1) IC.prov = provs[0][0];
     if (!IC.target) IC.target = defTarget();
     const custom = kindOf(IC.prov) === "custom";
+    const numbers = IC.mode === "numbers";
     const noProv = !provs.length
       ? `<p class="hint warn">لا يوجد مزوّد من هذا النوع. ${IC.mode === "smm" ? "" : "أضف مزوّداً من نوع «مخصّص» (مثل FazerCards) من تبويب إعدادات APIs ثم فعّله وضع مفتاحه."}</p>` : "";
     const catSel = custom && IC.catList.length
@@ -193,7 +196,7 @@
     return `<div class="card"><h3>1) المصدر والقسم المستهدف</h3>${noProv}<div class="g2" style="align-items:end">
       <label class="fld"><span>المزوّد</span><select class="inp" data-ic="prov">${opt("", "— اختر المزوّد —", IC.prov)}${provs.map(([k, n]) => opt(k, n, IC.prov)).join("")}</select></label>
       <label class="fld"><span>القسم المستهدف (إلزامي قبل الجلب)</span><select class="inp" data-ic="target">${opt("auto", "تلقائي — تصنيف ذكي لكل منتج", IC.target)}${HUB_OPTS.map(([k, l]) => opt(k, l, IC.target)).join("")}</select></label>
-      ${catSel}
+      ${numbers ? '<p class="hint">سيُجلب كتالوج الأرقام والأسعار والتوفر من مزوّد الأرقام المحدد. تُنشأ المنتجات تحت «تطبيقات واشتراكات» مع حفظ رمز الخدمة والدولة لاستخدامهما عند الطلب.</p>' : catSel}
       <label class="fld"><span>نسبة الربح الافتراضية %</span><input class="inp" type="number" min="0" step="1" dir="ltr" data-ic="mk" value="${esc(IC.mk)}"></label></div>
       <p class="hint">«تلقائي» يوزّع كل منتج على الألعاب أو التطبيقات أو الرشق حسب اسمه ومزوّده. اختيار قسم محدد يوجّه كل ما يُجلب إليه (مع إمكانية تغيير أي صف في المعاينة).</p>
       <div class="acts"><button class="b" type="button" data-ic="fetch"${IC.busy ? " disabled" : ""}>${IC.busy ? "جارٍ الجلب…" : "جلب الخدمات للمعاينة"}</button>${custom ? '<button class="b b2" type="button" data-ic="loadcats">تحميل فئات المزوّد</button>' : ""}</div>
@@ -280,8 +283,16 @@
     IC.busy = true; IC.msg = ""; render();
     try {
       if (pv !== "main" && !(await siteSupport())) throw new Error(SITES_OLD);
-      const j = await fn("smm-order", { action: "services", provider: pv, ...(IC.cat && IC.cat !== "*" ? { category: IC.cat } : {}) });
-      const source = Array.isArray(j) ? j : (Array.isArray(j && j.services) ? j.services : Array.isArray(j && j.data) ? j.data : Array.isArray(j && j.results) ? j.results : []);
+      const j = IC.mode === "numbers"
+        ? await fn("smm-order", { action: "numbers_catalog", provider: pv })
+        : await fn("smm-order", { action: "services", provider: pv, ...(IC.cat && IC.cat !== "*" ? { category: IC.cat } : {}) });
+      const source = IC.mode === "numbers"
+        ? (Array.isArray(j.offers) ? j.offers.map((o) => {
+            const sn = (j.services || []).find((x) => String(x.code) === String(o.s));
+            const cn = (j.countries || []).find((x) => String(x.id) === String(o.c));
+            return { id: String(o.s) + "_" + String(o.c), service: String(o.s), country: String(o.c), name: String(sn?.name || o.s) + " — " + String(cn?.name || o.c), category: "أرقام التفعيل · " + String(cn?.name || o.c), rate: Number(o.p), amount: o.n, type: "Number", available: o.n == null || Number(o.n) > 0 };
+          }) : [])
+        : Array.isArray(j) ? j : (Array.isArray(j && j.services) ? j.services : Array.isArray(j && j.data) ? j.data : Array.isArray(j && j.results) ? j.results : []);
       const list = source.map((x) => {
         const id = x.id ?? x.service ?? x.service_id ?? x.offer_id ?? x.product_id;
         const name = x.name ?? x.title ?? x.product_name ?? x.offer_name ?? x.service_name;
