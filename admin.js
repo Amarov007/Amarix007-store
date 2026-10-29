@@ -153,7 +153,7 @@ const TABS = [
   ["wallets", "المحافظ"],
   ["staff", "الموظفون"],
   ["activity", "سجل النشاط"],
-  ["apis", "إعدادات APIs"],
+  ["apis", "مزوّدو API"],
   ["affiliates", "الشركاء (Affiliate)"],
   ["orders", "الطلبات"],
   ["invoices", "الفواتير"],
@@ -189,7 +189,7 @@ const TG = [
   ["المبيعات", ["orders","invoices","payments","wallets","coupons","affiliates","users"]],
   ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
   ["التواصل والدعم", ["tickets","social"]],
-  ["أدوات متقدمة", ["apis","stats","staff","activity","push"]]
+  ["أدوات متقدمة", ["stats","staff","activity","push"]]
 ];
 const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
 /* ---------- الموظفون: ما يراه كل حساب ---------- */
@@ -695,7 +695,7 @@ const VIEW = {
     return `<div class="card"><h2>البحث بالـ UID</h2><div class="sw"><input class="inp" id="uid-q" dir="ltr" inputmode="numeric" maxlength="12" placeholder="UID مثال: 12345678" autocomplete="off"><button class="b" type="button" data-a="uid-find">🔍 بحث</button></div><div id="uid-res" style="margin-top:12px"></div></div><div class="card"><h2>المستخدمين المسجلين</h2><div id="users-list">${loadingHTML}</div></div>`;
   },
   apis() {
-    return `<div class="card"><h2>إعدادات الربط البرمجي (APIs)</h2><p class="hint">قيمة مفتاح SMM لا تُقرأ إلى المتصفح ولا تُحفظ من هذه الشاشة. أضف القيمة في Supabase → Edge Function Secrets، ثم أدخل اسم السر فقط هنا. حقول بوابة الدفع القديمة مخفية لأنها غير موصولة في واجهة المتجر الجديدة؛ ولا تحذف قيم AI القديمة قبل تحديث/اختبار دالة ai-support.</p><form id="api-form" autocomplete="off"><div class="g2">${F("SMM API URL (المزوّد الرئيسي)", "api.smm_url", { d: 1 })}${F("اسم Edge Secret للمفتاح (مثلاً SMM_API_KEY)", "api.smm_secret_name", { d: 1 })}${F("مسار API اختياري (مثلاً /api/v1 أو /custom.php)", "api.smm_path", { d: 1 })}</div>${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1 })}<div class="acts"><button class="b" data-a="save-api" type="button">حفظ الإعدادات</button><button class="b bd2" data-a="smm-clear-legacy-keys" type="button">حذف مفاتيح SMM القديمة من قاعدة البيانات</button></div><p class="hint warn">لا تضغط الحذف إلا بعد إضافة Edge Secrets واختبار اتصال كل موقع أدناه بنجاح. الإجراء نهائي بالنسبة لمفاتيح SMM المخزنة في الجداول.</p></form></div> ${provBox()}<div class="card"><h2>اختبار موقع الرشق (SMM)</h2><p class="hint">يعمل عبر دالة smm-order في Supabase؛ قيمة المفتاح تبقى في Edge Secret باسم السر الذي أدخلته. احفظ الإعدادات أولاً ثم افحص الاتصال أو اعرض الخدمات.</p><label class="fld"><span>موقع الرشق</span><select class="inp" id="smm-prov">${provSel()}</select></label> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="card" style="margin-top:12px"><h3>إدارة المنتجات من مكان واحد</h3><p class="hint">تم توحيد الاستيراد والمعاينة والتصنيف وتحديث الأسعار داخل مركز الاستيراد. اختر مزوّدك هناك، وحدد نوع خدماته والقسم التابع له، ثم راجع النتائج واحفظ المحدد وانشر. لن تحتاج إلى استخدام أدوات استيراد متفرقة من هذه الصفحة.</p><div class="acts"><button class="b" type="button" data-tab="import">فتح مركز الاستيراد الموحد ←</button><button class="b b2" type="button" data-a="smm-services">عرض خدمات المزوّد</button></div><div id="smm-out" class="hint" style="margin-top:8px;max-height:240px;overflow:auto"></div></div></div>`;
+    return `<div class="card"><h2>مزوّدو API والاتصال</h2><p class="hint">هذه الصفحة مسؤولة عن إعداد الاتصال فقط: رابط API، نوع المزوّد، واسم السر. لا تستورد المنتجات من هنا. بعد اختبار الاتصال انتقل إلى «استيراد ومزامنة الخدمات» لجلب الخدمات ومعاينتها، أو إلى «إدارة الرشق» لتعديل خدمات الرشق فقط. مفاتيح API السرية يجب أن تكون في Supabase Edge Function Secrets.</p><form id="api-form" autocomplete="off"><div class="g2">${F("رابط API الرئيسي لخدمات الرشق فقط", "api.smm_url", { d: 1 })}${F("اسم Edge Secret لمفتاح الرشق الرئيسي", "api.smm_secret_name", { d: 1 })}${F("مسار API اختياري للرشق", "api.smm_path", { d: 1 })}</div>${F("AI System Prompt (رسالة توجيه المساعد)", "api.ai_system_prompt", { t: "area", w: 1 })}<div class="acts"><button class="b" data-a="save-api" type="button">حفظ الإعدادات</button><button class="b bd2" data-a="smm-clear-legacy-keys" type="button">حذف مفاتيح SMM القديمة من قاعدة البيانات</button></div><p class="hint warn">لا تضغط الحذف إلا بعد إضافة Edge Secrets واختبار اتصال كل موقع أدناه بنجاح. الإجراء نهائي بالنسبة لمفاتيح SMM المخزنة في الجداول.</p></form></div> ${provBox()}<div class="card"><h2>اختبار اتصال المزوّد</h2><p class="hint">اختر المزوّد المطلوب لاختبار الاتصال أو عرض كتالوجه. اختبار الاتصال لا يستورد منتجات ولا يغيّر الأسعار. نوع الخدمات ومكان استيرادها يحددان في مركز الاستيراد.</p><label class="fld"><span>المزوّد المراد اختباره</span><select class="inp" id="smm-prov">${provSel()}</select></label> <div class="acts"><button class="b" data-a="smm-test" type="button">فحص الاتصال والرصيد</button><button class="b b2" data-a="smm-services" type="button">عرض الخدمات</button></div><div class="card" style="margin-top:12px"><h3>الخطوة التالية</h3><p class="hint">بعد نجاح الاختبار، افتح مركز الاستيراد لجلب الخدمات ومعاينة النوع والقسم والمزوّد قبل الحفظ. لإدارة كميات وأسعار خدمات الرشق الموجودة فقط، استخدم صفحة «إدارة الرشق».</p><div class="acts"><button class="b" type="button" data-tab="import">استيراد ومزامنة الخدمات ←</button><button class="b b2" type="button" data-tab="smmmgr">إدارة خدمات الرشق</button></div><div id="smm-out" class="hint" style="margin-top:8px;max-height:240px;overflow:auto"></div></div></div>`;
   },
   affiliates() {
     setTimeout(() => { loadAffiliates(); loadAffReport(); loadAffTiers(); }, 50);
@@ -2862,8 +2862,8 @@ function provRow(x) {
 }
 function provBox() {
   const rows = PROV_LOADED ? (PROVS.length ? PROVS.map(provRow).join("") : '<p class="hint">لا توجد مواقع إضافية بعد.</p>') : '<div class="ld"><span class="spin"></span> جارٍ التحميل…</div>';
-  return `<div class="card" id="prov-box"><h2>مواقع رشق إضافية</h2>` +
-    `<p class="hint">أضف أي عدد من المزوّدين: مواقع رشق (واجهة API القياسية v2) أو مواقع أرقام تفعيل أو أي API آخر لشحن الألعاب والاشتراكات (انظر الشرح أدناه). المزوّد الرئيسي أعلاه لا يتغيّر ويبقى معرّفه <b>main</b>. كل منتج رشق يُربط بموقعه عند الاستيراد، ويُرسَل طلبه إلى موقعه تلقائياً (وطلب واحد قد يحوي منتجات من مواقع مختلفة). حقل هذا النموذج يحفظ اسم Edge Secret فقط؛ قيمة المفتاح تُضاف في Supabase Secrets ولا تُقرأ من قاعدة البيانات. «فحص الاتصال» يختبر السر الفعلي، فاحفظ الاسم وأضف السر أولاً.</p>` +
+  return `<div class="card" id="prov-box"><h2>مواقع ومزوّدو API إضافيون</h2>` +
+    `<p class="hint">أضف كل API كمزوّد مستقل وحدد نوعه بدقة: رشق متابعين، أرقام تفعيل، أو API مخصّص للألعاب/التطبيقات. لكل مزوّد رابط ومفتاح/اسم Secret وإعداداته وحالته واختباره. لا يعني وجود API أن خدماته ستُضاف تلقائياً إلى المتجر؛ الاستيراد يتم من مركز الاستيراد مع تحديد النوع والقسم قبل الحفظ.</p>` +
     provHelp() + rows +
     `<div class="card" style="background:var(--bg)" data-pbox="__new"><h3>إضافة موقع جديد</h3>` +
     `<div class="g2"><label class="fld"><span>المعرّف (إنجليزي صغير بلا مسافات)</span><input class="inp" dir="ltr" data-pv="id" placeholder="s2" maxlength="30" autocomplete="off"></label>` +
