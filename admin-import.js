@@ -1,12 +1,11 @@
 /* =====================================================================================================================
    AMARIX007 — admin-import.js (v1)         Loaded AFTER admin.js (see admin.html). Uses its globals: D, $, esc, save, toast, busy, fn, render …
    ---------------------------------------------------------------------------------------------------------------------
-   Adds four screens to the admin panel, all Arabic / RTL:
-     import   مركز الاستيراد والمزامنة   fetch from a provider -> PREVIEW TABLE -> edit type / category / margin per row -> save
-                                         modes: رشق (SMM) | شحن ألعاب | تطبيقات واشتراكات | مزامنة الأسعار
-     products المنتجات (replaces the plain list)   strict filters + bulk actions (move category, price / margin, hide, availability, delivery, delete)
-     topups   الألعاب والتطبيقات         create / edit game & app hubs, many packages per game, required fields, auto / manual delivery
-     smmmgr   إدارة الرشق                min / max quantity, price per 1000, refill / drip-feed badges, provider service id
+   Adds dedicated admin screens, all Arabic / RTL:
+     import   استيراد ومزامنة الخدمات   provider-specific preview, type/category mapping and price sync
+     products المنتجات                 searchable catalog with bulk actions
+     topups   إدارة الألعاب والتطبيقات  game/app package management
+     smmmgr   إدارة خدمات الرشق         SMM-only quantities, per-1000 pricing and provider service IDs
 
    THE BUG THIS FILE FIXES — "everything lands in رشق المتابعين":
      the old importer (admin.js smmList / smmWipe) silently fell back to the first category of type "boost" when no target was chosen, and
@@ -599,13 +598,13 @@
   }
 
   /* ------------------------------------------------------------------ SMM MANAGER ------------------------------------------------------------------ */
-  const MF = { q: "", prov: "", n: 60 };
+  const MF = { q: "", prov: "", cat: "", n: 60 };
   function smmmgrView() {
     const sv = SV();
     let a = D.products.map((p, i) => ({ p, i })).filter(({ p }) => (p.ptype ? p.ptype === "smm" : sv.typeOf(p) === "smm" && (p.smm_service || (D.categories.find((c) => c.id === p.c) || {}).ty === "boost")));
     const provs = [...new Set(a.map((x) => sv.providerOf(x.p)))].sort();
     const q = norm(MF.q);
-    a = a.filter(({ p }) => (!MF.prov || sv.providerOf(p) === MF.prov) && (!q || norm((p.ar || "") + " " + (p.en || "") + " " + (p.smm_service || "")).includes(q)));
+    a = a.filter(({ p }) => (!MF.prov || sv.providerOf(p) === MF.prov) && (!MF.cat || p.c === MF.cat) && (!q || norm((p.ar || "") + " " + (p.en || "") + " " + (p.smm_service || "") + " " + (p.smm_cat || "")).includes(q)));
     const shown = a.slice(0, MF.n);
     const row = ({ p, i }) => {
       const u = +p.smm_qty > 0 ? +p.smm_qty : 1, per1000 = ((+p.p || 0) * 1000) / u;
@@ -618,8 +617,8 @@
         <td><input type="checkbox" data-ic="sset" data-i="${i}" data-f="active"${p.hid || p.oos ? "" : " checked"} aria-label="نشط"></td>
         <td><button class="b b2 sm" type="button" data-ic="open-edit" data-i="${i}">تعديل</button></td></tr>`;
     };
-    return `<div class="card"><h2>إدارة الرشق</h2><p class="hint">تحكّم بالحد الأدنى والأقصى للكمية (بالوحدات) وسعر الألف وشارات التعويض / التقطير (Drip-feed) ورقم الخدمة عند المزوّد. تعديل «سعر الألف» يغيّر سعر الوحدة تلقائياً.</p>
-      <div class="ic-bar"><input class="inp" type="search" placeholder="بحث" data-ic="mf" data-f="q" value="${esc(MF.q)}"><select class="inp" data-ic="mf" data-f="prov">${opt("", "كل المزوّدين", MF.prov)}${provs.map((k) => opt(k, k === "main" ? "المزوّد الرئيسي" : provName(k), MF.prov)).join("")}</select></div>
+    return `<div class="card"><h2>إدارة خدمات الرشق (SMM)</h2><p class="hint">هذه الصفحة للرشق فقط: كل صف هو خدمة مرتبطة بمزوّد ورقم خدمة محددين. استخدم فلاتر المزوّد والقسم والبحث للوصول السريع. تعديل «سعر الألف» يحدّث سعر الوحدة تلقائياً؛ لا تستورد خدمات جديدة من هنا.</p>
+      <div class="ic-bar"><input class="inp" type="search" placeholder="بحث باسم الخدمة أو رقمها" data-ic="mf" data-f="q" value="${esc(MF.q)}"><select class="inp" data-ic="mf" data-f="prov">${opt("", "كل مزوّدي الرشق", MF.prov)}${provs.map((k) => opt(k, k === "main" ? "المزوّد الرئيسي" : provName(k), MF.prov)).join("")}</select><select class="inp" data-ic="mf" data-f="cat">${opt("", "كل الأقسام", MF.cat)}${cats().filter((c) => c.ty === "boost" || D.products.some((p) => p.c === c.id && p.ptype === "smm")).map((c) => opt(c.id, c.ar || c.en || c.id, MF.cat)).join("")}</select></div>
       <div class="ic-cnt">${a.length} خدمة رشق</div><div class="tbw"><table class="tb ic-tb"><thead><tr><th>الخدمة</th><th>رقم الخدمة</th><th>سعر الألف $</th><th>أقل كمية</th><th>أعلى كمية</th><th>تعويض</th><th>Drip</th><th>نشط</th><th></th></tr></thead><tbody>${shown.map(row).join("") || '<tr><td colspan="9">لا خدمات رشق</td></tr>'}</tbody></table></div>
       ${a.length > shown.length ? `<div class="acts"><button class="b b2" type="button" data-ic="smore">عرض المزيد (${a.length - shown.length})</button></div>` : ""}</div>`;
   }
@@ -754,12 +753,16 @@
   VIEW.products = productsView;
   VIEW.topups = topupsView;
   VIEW.smmmgr = smmmgrView;
-  [["import", "مركز الاستيراد والمزامنة"], ["topups", "الألعاب والتطبيقات"], ["smmmgr", "إدارة الرشق"]].forEach((t) => { if (!TABS.some((x) => x[0] === t[0])) TABS.push(t); });
+  [["import", "استيراد ومزامنة الخدمات"], ["topups", "إدارة الألعاب والتطبيقات"], ["smmmgr", "إدارة خدمات الرشق"]].forEach((t) => { if (!TABS.some((x) => x[0] === t[0])) TABS.push(t); });
   TI.import = '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>';
   TI.topups = '<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>';
   TI.smmmgr = '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>';
-  const grp = TG.find((x) => x[0] === "المتجر");
-  if (grp) { const at = Math.max(0, grp[1].indexOf("products")); grp[1].splice(at, 0, "import", "topups", "smmmgr"); }
+  const storeGrp = TG.find((x) => x[0] === "المتجر");
+  if (storeGrp) storeGrp[1] = storeGrp[1].filter((k) => !["import", "topups", "smmmgr"].includes(k));
+  const advancedGrp = TG.find((x) => x[0] === "أدوات متقدمة");
+  if (advancedGrp) advancedGrp[1] = advancedGrp[1].filter((k) => k !== "apis");
+  const providerGrp = ["إدارة الخدمات والربط", ["apis", "import", "smmmgr", "topups"]];
+  if (!TG.some((x) => x[0] === providerGrp[0])) TG.splice(Math.max(0, TG.findIndex((x) => x[0] === "أدوات متقدمة")), 0, providerGrp);
 
   g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, v: 2 };
   // admin.js may have rendered its first screen before this extension was loaded.
