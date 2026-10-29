@@ -379,8 +379,11 @@ const proofBlock = (o) =>
     ? `<div class="od-m">إثبات الدفع: <button class="b b2 sm" data-a="proof-link" data-path="${esc(o.payment_proof)}">عرض الإثبات</button></div>`
     : "";
 async function proofLink(btn) {
-  const path = String(btn.dataset.path || "").replace(/^\\/+/, "");
+  let path = String(btn.dataset.path || "").trim().replace(/^\\/+/, "");
   const bucket = String(btn.dataset.bkt || "payment-proofs");
+  // Older rows may store a bucket-prefixed key or a full Supabase object URL.
+  path = path.replace(/^https?:\\/\\/[^/]+\\/storage\\/v1\\/object\\/(?:sign|public)\\//i, "");
+  if (path.startsWith(bucket + "/")) path = path.slice(bucket.length + 1);
   busy(btn, true);
   try {
     if (!path || path.split("/").some((part) => !part || part === "." || part === "..")) throw new Error("مسار الإثبات غير صالح");
