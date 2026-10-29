@@ -26,4 +26,4 @@ jobs:
         with:
           deno-version: v2.x
       - name: Check deployed SMM Edge Function
-        run: deno check supabase/functions/smm-order/index.ts
+        run: deno check --node-modules-dir=none supabase/functions/smm-order/index.ts
