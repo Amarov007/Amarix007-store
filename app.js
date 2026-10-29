@@ -2042,6 +2042,16 @@ function drToggle(open) {
   }
 }
 addEventListener("hashchange", () => document.body.classList.contains("dr-open") && drToggle(false));
+/* Clear stale top-up-limit notices when leaving the wallet flow; navigating back without uploading proof must not leave an old warning on screen. */
+addEventListener("hashchange", () => {
+  const el = $("#ts");
+  if (!el) return;
+  const msg = (el.textContent || "").trim();
+  if (/لديك طلبات شحن معلّقة كثيرة|لديك طلبات شحن معلقة كثيرة|You have too many open top-ups/i.test(msg)) {
+    el.className = "";
+    clearTimeout(toastTimer);
+  }
+});
 document.addEventListener("keydown", (e) => {
   if (e.key == "Escape" && document.body.classList.contains("dr-open")) drToggle(false);
 });

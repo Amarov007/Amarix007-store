@@ -186,8 +186,8 @@ const TI = {
 const TG = [
   ["المبيعات", ["orders","invoices","payments","wallets","coupons","affiliates","users"]],
   ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
-  ["التواصل والدعم", ["tickets","push","social"]],
-  ["النظام", ["apis","stats","staff","activity"]]
+  ["التواصل والدعم", ["tickets","social"]],
+  ["أدوات متقدمة", ["apis","stats","staff","activity","push"]]
 ];
 const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
 /* ---------- الموظفون: ما يراه كل حساب ---------- */
@@ -196,7 +196,15 @@ const isStaffOnly = () => IS_ADMIN === false && Array.isArray(STAFF);
 const canTab = (k) => !isStaffOnly() || (!!TAB_PERM[k] && STAFF.includes(TAB_PERM[k]));
 const sideNav = () => {
   const nm = Object.fromEntries(TABS);
-  return TG.map(([g, ks]) => `<div class="sg"><span class="sgl">${g}</span>${ks.filter((k) => nm[k] && canTab(k)).map((k) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("")}</div>`).join("");
+  return TG.map(([g, ks]) => {
+    const links = ks.filter((k) => nm[k] && canTab(k)).map((k) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("");
+    if (!links) return "";
+    if (g === "أدوات متقدمة") {
+      const active = ks.includes(tab);
+      return `<details class="sg sg-advanced" ${active ? "open" : ""}><summary class="sgl">${g}</summary>${links}</details>`;
+    }
+    return `<div class="sg"><span class="sgl">${g}</span>${links}</div>`;
+  }).join("");
 };
 const SOCIAL = [
   ["whatsapp", "wa", "واتساب", "https://wa.me/9665XXXXXXXX"],
