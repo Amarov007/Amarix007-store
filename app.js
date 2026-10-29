@@ -2372,21 +2372,22 @@ function cartPage() {
   const couponBox = cp
     ? `<div class="cpn-on"><span>${ic("check", 14)} ${t( "cpnon" )}: <b dir="ltr">${ex(coupon)}</b></span><button data-a="cpnrm">${t( "cpnrm" )}</button></div>`
     : `<div class="cpn"><input class="inp" id="cpn" dir="ltr" placeholder="${t( "cc" )}" autocomplete="off"><button class="b b2" data-a="coupon">${t( "ap" )}</button></div>`;
-  const wSec = user && walletOn() && walletEligibilityCached(lines) ? "main" : null;
-  if (user && walletOn() && !wSec) {
-    const key = walletItemsKey(lines);
-    void walletEligibleFor(lines).then((eligible) => {
-      if (eligible && key === walletItemsKey(cartLines()) && /^#\/cart(?:$|\?)/.test(location.hash)) render();
+  const wSec = user && walletOn() && !wl.setup ? "main" : null;
+  const wKey = walletItemsKey(lines);
+  const wElig = walletEligibility.key === wKey ? walletEligibility.value : null; // null = still checking
+  if (wSec && wElig === null) {
+    void walletEligibleFor(lines).then(() => {
+      if (wKey === walletItemsKey(cartLines()) && /^#\/cart(?:$|\?)/.test(location.hash)) render();
     });
   }
-  if (payMethod == "wallet" && !wSec) payMethod = "";
+  if (payMethod == "wallet" && (!wSec || wElig === false)) payMethod = "";
   const payBox = PM.length || wSec
-    ? `<div class="box"><h3 style="margin-bottom:10px">${ic("card", 16)} ${t( "paychoose" )}</h3> <div class="pchips" role="radiogroup">${walletChip(wSec)}${PM.map( (m) => `<button type="button" role="radio" aria-checked="${ m.id == payMethod }" class="pchip${ m.id == payMethod ? " on" : "" }" data-a="pay" data-id="${ex(m.id)}">${payLogo(m, 34)}<span>${pmName( m )}</span><i>${ic("check", 14)}</i></button>` ).join("")}</div>${walletHint(wSec, T_.total)}${payMethod != "wallet" ? pmLimitHint(pmOf(payMethod), T_.total) : ""}</div>`
+    ? `<div class="box"><h3 style="margin-bottom:10px">${ic("card", 16)} ${t( "paychoose" )}</h3> <div class="pchips" role="radiogroup">${walletChip(wSec, wElig)}${PM.map( (m) => `<button type="button" role="radio" aria-checked="${ m.id == payMethod }" class="pchip${ m.id == payMethod ? " on" : "" }" data-a="pay" data-id="${ex(m.id)}">${payLogo(m, 34)}<span>${pmName( m )}</span><i>${ic("check", 14)}</i></button>` ).join("")}</div>${walletHint(wSec, T_.total)}${payMethod != "wallet" ? pmLimitHint(pmOf(payMethod), T_.total) : ""}</div>`
     : "";
   return (
     rows +
     payBox +
-    `<div class="box"> ${couponBox} <div class="sum"> <div class="row"><span>${t("sub")}</span><b class="n">${money( T_.sub )}</b></div> ${ T_.disc > 0 ? `<div class="row disc"><span>${t( "dis" )}</span><b class="n">− ${money(T_.disc)}</b></div>` : "" } <div class="row tot"><span>${t("tot")}</span><b class="n">${money( T_.total )}</b></div>${convRow(T_.total)} </div> <div class="pay"> <button class="b" data-a="co">${ic("check", 16)} ${t("co")}</button> <button class="b wa" data-a="wa">${brandSvg(BR.wa.g, 16)} ${t( "waorder" )}</button> </div><p class="hint">${t("wahint")}</p></div>`
+    `<div class="box"> ${couponBox} <div class="sum"> <div class="row"><span>${t("sub")}</span><b class="n">${money( T_.sub )}</b></div> ${ T_.disc > 0 ? `<div class="row disc"><span>${t( "dis" )}</span><b class="n">− ${money(T_.disc)}</b></div>` : "" } <div class="row tot"><span>${t("tot")}</span><b class="n">${money( T_.total )}</b></div>${convRow(T_.total)} </div> <div class="pay"> <button class="b" data-a="co">${ic("check", 16)} ${t("co")}</button> </div></div>`
   );
 }
 
@@ -2593,9 +2594,9 @@ const walletAltBox = (id) => {
   const A = lang == "ar";
   return `<div class="wl-pay"><p class="pd">${ic("wallet", 14)} ${A ? "أو ادفع هذا الطلب فوراً من رصيد محفظتك بدل التحويل" : "Or pay this order instantly from your wallet balance instead of transferring"}${walletReady() ? ` · ${A ? "رصيدك" : "Balance"}: ${money(walletBal())}` : ""}</p><div class="acts"><button class="b b2" data-a="wl-pay" data-id="${ex(id)}">${ic("wallet", 16)} ${A ? "ادفع من المحفظة" : "Pay from wallet"}</button><a class="b b2" href="#/wallet">${A ? "شحن المحفظة" : "Top up"}</a></div></div>`;
 };
-const walletChip = (sec) =>
+const walletChip = (sec, elig = true) =>
   sec
-    ? `<button type="button" role="radio" aria-checked="${payMethod == "wallet"}" class="pchip${payMethod == "wallet" ? " on" : ""}" data-a="pay" data-id="wallet"><span class="wl-ic">${ic("wallet", 20)}</span><span>${lang == "ar" ? "المحفظة" : "Wallet"}${walletReady() ? `<small class="wl-cb">${money(walletBal(sec))}</small>` : ""}</span><i>${ic("check", 14)}</i></button>`
+    ? `<button type="button" role="radio" aria-checked="${payMethod == "wallet"}"${elig === false ? " disabled" : ""} class="pchip${payMethod == "wallet" ? " on" : ""}" data-a="pay" data-id="wallet"><span class="wl-ic">${ic("wallet", 20)}</span><span>${lang == "ar" ? "المحفظة" : "Wallet"}${walletReady() ? `<small class="wl-cb">${money(walletBal(sec))}</small>` : ""}${elig === false ? `<small class="wl-sub">${lang == "ar" ? "غير متاحة لهذا الطلب" : "Not available for this order"}</small>` : ""}</span><i>${ic("check", 14)}</i></button>`
     : "";
 const walletHint = (sec, total) =>
   sec && payMethod == "wallet" && walletReady() && walletBal(sec) + 0.005 < total
