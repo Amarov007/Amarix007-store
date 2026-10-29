@@ -208,15 +208,17 @@ Deno.serve(async (req: Request) => {
           out = { err: { error: !cfg?.smm_api_url ? "SMM API URL is not configured in api_settings" : `SMM API key missing: set the Edge Function secret ${mainSecretName} in Supabase, or configure the legacy database key`, status: 400 } };
         } else {
           let mainBase = normBase(cfg.smm_api_url);
+          let mainUrlInvalid = false;
           if (String(cfg.smm_api_path || "").trim()) {
             const mainUrl = safeUrl(String(cfg.smm_api_url));
             if (!mainUrl) {
               out = { err: { error: "SMM API URL must be https and a public host", status: 400 } };
+              mainUrlInvalid = true;
             } else {
               mainBase = new URL(String(cfg.smm_api_path).trim(), mainUrl.toString().replace(/\/?$/, "/")).toString();
             }
           }
-          if (!out?.err) out = {
+          if (!mainUrlInvalid) out = {
             site: {
               id, name: MAIN, kind: "smm", base: mainBase,
               key: mainKey, enabled: true, cfg: {},
