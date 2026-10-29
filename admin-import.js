@@ -574,12 +574,22 @@
 
   /* ------------------------------------------------------------------ TOP-UP MANAGER (games & apps) ------------------------------------------------------------------ */
   function topupsView() {
-    const list = cats().filter((c) => c.ty === "shop" && ["games", "apps"].includes(hubOfCat(c)));
-    // Build the category index once instead of scanning all products for every category.
+    // Build category/product indexes once. The previous hubOfCat fallback scanned all products
+    // for each category, which made the games screen slow on a 9k-item catalog.
     const byCat = new Map();
     D.products.forEach((p, i) => {
       if (!byCat.has(p.c)) byCat.set(p.c, []);
       byCat.get(p.c).push({ p, i });
+    });
+    const list = cats().filter((c) => {
+      if (c.ty !== "shop") return false;
+      if (c.hub === "games" || c.hub === "apps") return true;
+      if (c.hub === "none" || c.ty === "boost" || c.ty === "hub") return false;
+      const ps = byCat.get(c.id) || [];
+      if (!ps.length) return false;
+      const n = { games: 0, apps: 0, smm: 0 };
+      ps.forEach(({ p }) => { const h = SV().hubOf(p); if (h && n[h] != null) n[h]++; });
+      return n.apps > n.games ? true : n.games > 0;
     });
     const mk = (c) => {
       const ci = D.categories.indexOf(c), k = "categories." + ci + ".";
