@@ -25,6 +25,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Check deployed SMM Edge Function
-        run: deno check --node-modules-dir=none supabase/functions/smm-order/index.ts
+      - name: Check deployed Edge Functions
+        run: |
+          deno check --node-modules-dir=none supabase/functions/smm-order/index.ts
           deno check --node-modules-dir=none supabase/functions/telegram-admin/index.ts
