@@ -1321,29 +1321,32 @@ const payKey = (m) => {
   return /binance|بايننس/.test(k) ? "binance" : /usdt|tether|bep20/.test(k) ? "usdt" : /syriatel|سيريتل|سيرياتيل/.test(k) ? "syriatel" : /sham|شام/.test(k) ? "sham" : "";
 };
 function payLogo(m, size = 44) {
-  const st = `width:${size}px;height:${size}px`;
+  const st = \`width:\${size}px;height:\${size}px\`;
+  // Use the real uploaded logo first; payment v2 exposes config fields on each method.
+  const logo = String(m.logo || m.logo_url || m.image_url || "").trim();
+  if (/^(https:\/\/|data:image\/)/i.test(logo))
+    return \`<span class="pl pl-img" style="\${st};background:#fff;overflow:hidden;display:inline-flex;align-items:center;justify-content:center"><img src="\${ex(logo)}" alt="\${ex(pmName(m))}" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:contain;padding:3px"></span>\`;
+  const nmRaw = plain(m.en || m.ar || pmReadable(m) || "");
+  const nm = nmRaw.replace(/[^A-Za-z0-9؀-ۿ ]/g, "").trim();
+  const key = (String(m.id || "") + " " + nmRaw).toLowerCase();
+  const official = [
+    [/\b(binance|bnb)\b/, "https://cdn.simpleicons.org/binance/F0B90B"],
+    [/\b(usdt|tether)\b/, "https://cdn.simpleicons.org/tether/26A17B"],
+    [/\bvisa\b/, "https://cdn.simpleicons.org/visa/1A1F71"],
+    [/\bmastercard\b/, "https://cdn.simpleicons.org/mastercard/EB001B"],
+    [/\bpaypal\b/, "https://cdn.simpleicons.org/paypal/003087"],
+    [/\bapple pay\b/, "https://cdn.simpleicons.org/applepay/000000"],
+    [/\bgoogle pay\b/, "https://cdn.simpleicons.org/googlepay/4285F4"],
+  ].find(([re]) => re.test(key));
+  if (official)
+    return \`<span class="pl pl-img" style="\${st};background:#fff;overflow:hidden;display:inline-flex;align-items:center;justify-content:center"><img src="\${official[1]}" alt="\${ex(pmName(m))}" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:contain;padding:6px"></span>\`;
   const g = PAYG[payKey(m)] || PAYG[m.icon];
   if (g)
-    return `<span class="pl" style="${st};background:${g.bg};color:${ g.fg }"><svg viewBox="1.5 1.5 21 21" width="${size * 0.66}" height="${ size * 0.66 }" fill="currentColor" aria-hidden="true">${g.g}</svg></span>`;
-  const nm = plain(m.en || m.ar || pmReadable(m) || "")
-    .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
-    .trim();
+    return \`<span class="pl" style="\${st};background:\${g.bg};color:\${g.fg}"><svg viewBox="1.5 1.5 21 21" width="\${size * 0.66}" height="\${size * 0.66}" fill="currentColor" aria-hidden="true">\${g.g}</svg></span>\`;
   if (!nm)
-    return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff">${ic("card", size * 0.5)}</span>`;
-  const ini = ex(
-    [
-      ...plain(m.en || m.ar || pmReadable(m) || "?")
-        .replace(/[^A-Za-z0-9؀-ۿ ]/g, "")
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join(""),
-    ]
-      .join("")
-      .toUpperCase() || "?"
-  );
-  return `<span class="pl" style="${st};background:${ safeColor(m.color) || "#191A23" };color:#fff"><b>${ini}</b></span>`;
+    return \`<span class="pl" style="\${st};background:\${safeColor(m.color) || "#191A23"};color:#fff">\${ic("card", size * 0.5)}</span>\`;
+  const ini = ex(nm.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?");
+  return \`<span class="pl" style="\${st};background:\${safeColor(m.color) || "#191A23"};color:#fff"><b>\${ini}</b></span>\`;
 }
 
 /* ---------- 6. Supabase client (anon key + user JWT) ---------- */
@@ -1527,7 +1530,7 @@ function cleanCart() {
 }
 const cartLines = () =>
   cart.map((x) => ({ x, p: prod(x.id) })).filter((l) => l.p && !isVisit(l.p));
-const cartCount = () => cartLines().reduce((s, l) => s + l.x.q, 0);
+const cartCount = () => cartLines().length; // badge counts cart lines, never SMM units/views
 
 /* Coupons are no longer published in full: the server confirms a code on request (public.check_coupon) and the order trigger recomputes the discount anyway */
 async function checkCoupon(code) {
@@ -1955,7 +1958,7 @@ function nav() {
   v.innerHTML = items
     .map(
       ([l, i, k]) =>
-        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + n + "</span>" : "" }</a>`
+        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + fmtN(n) + "</span>" : "" }</a>`
     )
     .join("");
   v.querySelectorAll("a").forEach((e) =>
