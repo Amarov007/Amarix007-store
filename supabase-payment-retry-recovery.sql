@@ -62,3 +62,51 @@ begin
   return jsonb_build_object('id', r.id, 'status', r.status, 'pay_amount', r.pay_amount, 'pay_currency', r.pay_currency, 'fx_rate', r.fx_rate, 'expires_at', r.expires_at);
 end
 $function$;
+
+
+-- Apply the same recovery rules to manual wallet top-ups (the path used by AMXPay.createTopup).
+create or replace function public.payment_create_topup(p_amount numeric, p_method text, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  uid uuid := auth.uid(); cfg jsonb; w jsonb; m public.payment_methods%rowtype; ex public.payments%rowtype;
+  amt numeric; mn numeric; mx numeric; dmx numeric; rate numeric := 1; quoted_amount numeric; pid uuid;
+  r public.payments%rowtype; exp_min integer; stale record;
+begin
+  if uid is null then raise exception 'not_allowed'; end if;
+  if not public.payments_v2_on() then raise exception 'payments_disabled'; end if;
+  if p_key is null or length(p_key) not between 8 and 80 then raise exception 'invalid_key'; end if;
+  select * into ex from public.payments where user_id = uid and idempotency_key = p_key;
+  if found then return jsonb_build_object('id', ex.id, 'status', ex.status, 'pay_amount', ex.pay_amount, 'pay_currency', ex.pay_currency, 'expires_at', ex.expires_at, 'replayed', true); end if;
+  for stale in select id from public.payments where user_id = uid and purpose = 'wallet_topup' and status in ('awaiting_payment','proof_submitted') and expires_at < now() order by expires_at asc limit 20 for update loop
+    begin perform public.transition_payment(stale.id, 'expired', 'timeout'); exception when others then null; end;
+  end loop;
+  if not public.rl_hit('paytopup:' || uid::text, 30, 3600) then raise exception 'rate_limited'; end if;
+  select data into cfg from public.store_config where id = 1;
+  w := coalesce(cfg->'wallet', '{}'::jsonb);
+  if coalesce(w->>'on', 'true') = 'false' then raise exception 'wallet_disabled'; end if;
+  mn := greatest(coalesce(nullif(w->>'min', '')::numeric, 1), 0.5); mx := coalesce(nullif(w->>'max', '')::numeric, 1000); dmx := coalesce(nullif(w->>'daily_max', '')::numeric, 0);
+  amt := round(coalesce(p_amount, 0), 2);
+  if amt < mn then raise exception 'below_min'; end if;
+  if mx > 0 and amt > mx then raise exception 'above_max'; end if;
+  if dmx > 0 and amt + coalesce((select sum(amount_base) from public.payments where user_id = uid and purpose = 'wallet_topup' and status not in ('rejected','cancelled','expired') and created_at > now() - interval '24 hours'), 0) > dmx then raise exception 'above_daily'; end if;
+  select * into m from public.payment_methods where id = p_method;
+  if not found or not m.enabled or m.kind <> 'manual' then raise exception 'method_disabled'; end if;
+  if m.min_base is not null and amt < m.min_base then raise exception 'below_min'; end if;
+  if m.max_base is not null and m.max_base > 0 and amt > m.max_base then raise exception 'above_max'; end if;
+  if (select count(*) from public.payments where user_id = uid and purpose = 'wallet_topup' and status in ('awaiting_payment','proof_submitted','under_review')) >= 10 then raise exception 'too_many_pending'; end if;
+  if m.currency = 'SYP' then rate := public.fx_current(); end if;
+  quoted_amount := public.payment_round(m.currency, amt * rate);
+  if m.min_amount is not null and quoted_amount < m.min_amount then raise exception 'below_min_currency'; end if;
+  if m.max_amount is not null and m.max_amount > 0 and quoted_amount > m.max_amount then raise exception 'above_max_currency'; end if;
+  exp_min := least(m.expiry_minutes, public.payments_cfg_num('expiry_minutes', m.expiry_minutes)::int);
+  insert into public.payments (user_id, purpose, method_id, amount_base, pay_currency, pay_amount, fx_rate, idempotency_key, expires_at)
+  values (uid, 'wallet_topup', m.id, amt, m.currency, quoted_amount, rate, p_key, now() + make_interval(mins => exp_min)) returning id into pid;
+  insert into public.payment_events (payment_id, from_status, to_status, actor) values (pid, null, 'created', uid);
+  r := public.transition_payment(pid, 'awaiting_payment', null);
+  return jsonb_build_object('id', r.id, 'status', r.status, 'pay_amount', r.pay_amount, 'pay_currency', r.pay_currency, 'fx_rate', r.fx_rate, 'expires_at', r.expires_at);
+end
+$function$;
