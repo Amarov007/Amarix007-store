@@ -326,7 +326,8 @@
           if (!list.length) throw new Error("لم يُرجع المزوّد خدمات قابلة للاستيراد أو أسعاراً صالحة");
           let count = 0;
           for (const x of list) {
-            const type = classifyService(x, kind);
+            let type = classifyService(x, kind);
+            if (kind === "custom" && type === "gift_card" && p.id === "fazer" && !/gift\s?card|voucher|\bpin\b|بطاقة|قسيمة|كود/i.test(x.name + " " + x.category)) type = "game_topup";
             const hub = kind === "smsactivate" ? "numbers" : HUB_OF_TYPE[type] || "apps";
             const brand = SV().brandOf({ name: x.name, category: x.category, ptype: type });
             const cid = ensureCat(hub, brand, x, cache);
@@ -343,6 +344,7 @@
       save();
       IC.msg = "اكتمل الجلب: أضيف " + added + " منتج، وتجاوزنا " + skipped + " مكرراً. " + stats.map((x) => x.name + " (" + x.count + "/" + x.received + ")").join(" · ") + (failures.length ? " | تعذّر: " + failures.join(" | ") : "");
       toast("اكتمل الاستيراد: " + added + " خدمة جديدة" + (failures.length ? " مع " + failures.length + " أخطاء مزوّد" : ""));
+      if (added && typeof autoImages === "function") setTimeout(() => autoImages(), 500);
     } finally {
       IC.busy = false; render();
     }
@@ -455,7 +457,7 @@
       return imgPick(term, (await r.json()).results);
     } finally { clearTimeout(tm); }
   }
-  const imgTargets = () => D.categories.filter((c) => c.ty === "shop" && !c.image_url && ["games", "apps"].includes(hubOfCat(c)) && imgTerm(c).length > 1);
+  const imgTargets = () => D.categories.filter((c) => c.ty === "shop" && !c.image_url && ["games", "apps", "numbers"].includes(hubOfCat(c)) && imgTerm(c).length > 1);
   const imgStatus = (t) => { IMG.msg = t; const el = $("#ic-imgst"); if (el) el.textContent = t; };
   async function autoImages() {
     if (IMG.busy) return;
