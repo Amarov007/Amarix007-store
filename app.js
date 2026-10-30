@@ -6007,23 +6007,48 @@ if ("serviceWorker" in navigator)
     if (m && m.type === "amx-nav" && /^#\/[a-z]+$/.test(m.hash || "")) location.hash = m.hash;
   });
 
-/* Catalog API: fetch product rows in bounded pages so public_config stays small. */
-const CATALOG_PAGE_SIZE = 150;
+/* Catalog API: resilient, low-request pagination. */
+const CATALOG_PAGE_SIZE = 1000;
+const CATALOG_RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 524]);
+const catalogPause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function catalogRpc(name, body) {
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const r = await fetch(SB_URL + "/rest/v1/rpc/" + name, {
+        method: "POST",
+        headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!r.ok) {
+        const err = new Error("catalog_" + name + "_http_" + r.status);
+        if (!CATALOG_RETRYABLE.has(r.status) || attempt === 3) throw err;
+        lastError = err;
+        const retryAfter = Number(r.headers.get("Retry-After"));
+        await catalogPause(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 8000) : 700 * (2 ** attempt));
+        continue;
+      }
+      const page = await r.json();
+      if (!page || !Array.isArray(page.items)) throw new Error("catalog_" + name + "_invalid");
+      return page;
+    } catch (err) {
+      lastError = err;
+      if (attempt === 3) break;
+      await catalogPause(700 * (2 ** attempt));
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error("catalog_" + name + "_failed");
+}
 async function fetchCatalogPage(offset) {
-  const r = await sb("/rest/v1/rpc/catalog_products_page", {
-    method: "POST", body: { p_offset: offset, p_limit: CATALOG_PAGE_SIZE }, auth: false,
-  });
-  if (!r.ok) throw new Error("catalog_page_http_" + r.status);
-  const page = await r.json();
-  if (!page || !Array.isArray(page.items)) throw new Error("catalog_page_invalid");
-  return page;
+  return catalogRpc("catalog_products_page", { p_offset: offset, p_limit: CATALOG_PAGE_SIZE });
 }
 async function fetchNumberProducts() {
-  const r = await sb("/rest/v1/rpc/catalog_number_products_page", { method: "POST", body: { p_limit: 500 }, auth: false });
-  if (!r.ok) throw new Error("catalog_numbers_http_" + r.status);
-  const page = await r.json();
-  if (!page || !Array.isArray(page.items)) throw new Error("catalog_numbers_invalid");
-  return page;
+  return catalogRpc("catalog_number_products_page", { p_limit: 500 });
 }
 let catalogLoading = false;
 async function loadCatalogRemainder(meta, initial, total, seeded = []) {
@@ -6031,24 +6056,28 @@ async function loadCatalogRemainder(meta, initial, total, seeded = []) {
   const known = new Set(products.map((p) => String(p.id)));
   catalogLoading = true;
   let offset = initial.length;
-  while (offset < total) {
-    const offsets = [];
-    for (let n = 0; n < 4 && offset < total; n++, offset += CATALOG_PAGE_SIZE) offsets.push(offset);
-    try {
-      const pages = await Promise.all(offsets.map(fetchCatalogPage));
+  try {
+    while (offset < total) {
+      const page = await fetchCatalogPage(offset);
+      if (!page.items.length) break;
       let added = 0;
-      pages.forEach((page) => { if (Array.isArray(page.items)) page.items.forEach((p) => { const id = String(p.id); if (!known.has(id)) { known.add(id); products.push(p); added++; } }); });
-      if (!added) break;
+      page.items.forEach((p) => {
+        const id = String(p.id);
+        if (!known.has(id)) { known.add(id); products.push(p); added++; }
+      });
+      offset += page.items.length;
+      if (!added && page.items.length < CATALOG_PAGE_SIZE) break;
       const next = { ...meta, products: products.slice(), products_total: total };
       setCfg(withDefaults(next));
-      if (location.hash.startsWith("#/c/") && cat(decodeURIComponent(location.hash.split("/")[2] || ""))?.ty === "numbers") render();
       ls.set("amx_remote", next);
-    } catch (err) {
-      console.warn("[AMARIX] remaining catalogue batch failed", offsets[0], err);
-      break;
     }
+  } catch (err) {
+    console.warn("[AMARIX] catalogue pagination paused; cached products retained", offset, err);
+  } finally {
+    catalogLoading = false;
+    if (location.hash === "#/" || location.hash === "") render();
+    else if (location.hash.startsWith("#/c/") && cat(decodeURIComponent(location.hash.split("/")[2] || ""))?.ty === "numbers") render();
   }
-  catalogLoading = false;
 }
 /* ---------- 15. Boot ---------- */
 /* A config published by an older admin may lack newer sections (payments, partner, social…): fall back to the embedded ones */
@@ -6128,8 +6157,12 @@ async function boot() {
       } else {
         /* Load the first general page and the activation-number catalogue in parallel.
            Number products live in separate country categories and otherwise appear only near the end of the full catalogue. */
-        const [first, numberPage] = await Promise.all([fetchCatalogPage(0), fetchNumberProducts()]);
-        const numberItems = numberPage.items || [];
+        /* The general page must succeed independently: a temporary failure in the number-only endpoint must never blank the entire shop. */
+        const [firstResult, numberResult] = await Promise.allSettled([fetchCatalogPage(0), fetchNumberProducts()]);
+        if (firstResult.status !== "fulfilled") throw firstResult.reason;
+        const first = firstResult.value;
+        const numberItems = numberResult.status === "fulfilled" ? numberResult.value.items : [];
+        if (numberResult.status !== "fulfilled") console.warn("[AMARIX] activation-number endpoint temporarily unavailable", numberResult.reason);
         const products = [...new Map([...first.items, ...numberItems].map((p) => [String(p.id), p])).values()];
         const total = Number(first.total || d.products_total || products.length);
         const meta = { ...d, products_total: total };
