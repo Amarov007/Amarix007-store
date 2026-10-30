@@ -6,42 +6,105 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: replace-store-files
+  cancel-in-progress: false
+
 jobs:
   replace:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Wipe old files and extract ZIP
+      - name: Validate and stage ZIP safely
+        shell: bash
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -iname "*.zip" | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found!"
+          set -euo pipefail
+          mapfile -t ZIP_FILES < <(find . -maxdepth 1 -type f -iname "*.zip" -print)
+          if [ "${#ZIP_FILES[@]}" -ne 1 ]; then
+            echo "Expected exactly one ZIP archive at repository root; found ${#ZIP_FILES[@]}."
             exit 1
           fi
-          echo "Found ZIP file: $ZIP_FILE"
-          cp "$ZIP_FILE" /tmp/archive.zip
-          if [ -f CNAME ]; then cp CNAME /tmp/CNAME_backup; fi
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
-          mkdir -p /tmp/extracted
-          unzip -q -o /tmp/archive.zip -d /tmp/extracted
-          rm -rf /tmp/extracted/__MACOSX
-          DIR_COUNT=$(find /tmp/extracted -mindepth 1 -maxdepth 1 | wc -l)
-          FIRST_ITEM=$(find /tmp/extracted -mindepth 1 -maxdepth 1 | head -n 1)
-          if [ "$DIR_COUNT" -eq 1 ] && [ -d "$FIRST_ITEM" ]; then
-            rm -rf "$FIRST_ITEM/.github"
-            cp -rf "$FIRST_ITEM"/. .
-          else
-            rm -rf /tmp/extracted/.github
-            cp -rf /tmp/extracted/. .
-          fi
-          rm -rf /tmp/extracted /tmp/archive.zip
-          if [ -f /tmp/CNAME_backup ] && [ ! -f CNAME ]; then
-            cp /tmp/CNAME_backup CNAME
-          fi
+          export ZIP_FILE="${ZIP_FILES[0]}"
+          python3 <<'PY'
+          import os, stat, zipfile
+          from pathlib import Path, PurePosixPath
+
+          archive = Path(os.environ["ZIP_FILE"])
+          staging = Path("/tmp/amarix-store-staging")
+          extracted = Path("/tmp/amarix-store-extracted")
+          for p in (staging, extracted):
+              if p.exists():
+                  import shutil
+                  shutil.rmtree(p)
+              p.mkdir(parents=True)
+
+          with zipfile.ZipFile(archive) as zf:
+              entries = []
+              for info in zf.infolist():
+                  raw = info.filename
+                  if not raw or raw.startswith(("/", "\\")) or "\\" in raw:
+                      raise SystemExit(f"Unsafe archive path: {raw!r}")
+                  rel = PurePosixPath(raw)
+                  if any(part in ("", ".", "..") for part in rel.parts):
+                      raise SystemExit(f"Unsafe archive path: {raw!r}")
+                  if (info.external_attr >> 16) & 0o170000 == stat.S_IFLNK:
+                      raise SystemExit(f"Symlinks are not allowed: {raw!r}")
+                  if rel.parts and rel.parts[0] == "__MACOSX":
+                      continue
+                  entries.append((info, rel))
+
+              if not entries:
+                  raise SystemExit("Archive is empty after excluding __MACOSX.")
+
+              first_parts = {rel.parts[0] for _, rel in entries}
+              single_root = len(first_parts) == 1 and all(len(rel.parts) > 1 for _, rel in entries)
+              root = next(iter(first_parts)) if single_root else None
+
+              for info, rel in entries:
+                  parts = rel.parts[1:] if root else rel.parts
+                  if not parts:
+                      continue
+                  target = extracted.joinpath(*parts)
+                  target_resolved = target.resolve()
+                  if extracted.resolve() not in target_resolved.parents and target_resolved != extracted.resolve():
+                      raise SystemExit(f"Archive path escapes staging directory: {info.filename!r}")
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      with zf.open(info) as src, target.open("wb") as dst:
+                          dst.write(src.read())
+
+          required = [extracted / "index.html", extracted / "app.js"]
+          missing = [str(p.name) for p in required if not p.is_file()]
+          if missing:
+              raise SystemExit("Archive does not look like the storefront root; missing: " + ", ".join(missing))
+
+          import shutil
+          shutil.copytree(extracted, staging, dirs_exist_ok=True)
+          print("Archive validated and staged successfully.")
+          PY
+
+      - name: Replace tracked storefront files
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='*.zip' \
+            --exclude='CNAME' \
+            /tmp/amarix-store-staging/ ./
+
+      - name: Commit and push validated replacement
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Replace repository with Amarix007-store-fixed.zip" || echo "No changes"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Replace storefront with validated archive"
           git push
