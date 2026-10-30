@@ -207,7 +207,7 @@
       <label class="fld"><span>نسبة الربح الافتراضية %</span><input class="inp" type="number" min="0" step="1" dir="ltr" data-ic="mk" value="${esc(IC.mk)}"></label></div>
       <p class="hint">«تلقائي» يوزّع كل منتج على الألعاب أو التطبيقات أو الرشق حسب اسمه ومزوّده. اختيار قسم محدد يوجّه كل ما يُجلب إليه (مع إمكانية تغيير أي صف في المعاينة).</p>
       <div class="acts"><button class="b" type="button" data-ic="fetch"${IC.busy ? " disabled" : ""}>${IC.busy ? "جارٍ الجلب…" : "جلب الخدمات للمعاينة"}</button>${custom ? '<button class="b b2" type="button" data-ic="loadcats">تحميل فئات المزوّد</button>' : ""}</div>
-      ${IC.msg ? `<p class="hint ${/^✗/.test(IC.msg) ? "warn" : ""}">${esc(IC.msg)}</p>` : ""}</div>${IC.fetched ? `<div id="ic-prev">${previewHtml()}</div>` : ""}`;
+      ${IC.msg ? `<p id="ic-status" class="hint ${/^✗/.test(IC.msg) ? "warn" : ""}">${esc(IC.msg)}</p>` : ""}</div>${IC.fetched ? `<div id="ic-prev">${previewHtml()}</div>` : ""}`;
   }
 
   /* rows ----------------------------------------------------------------------------------------------- */
@@ -300,6 +300,11 @@
     const stats = [], failures = [];
     let added = 0, skipped = 0;
     const yieldUI = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const setProgress = (message) => {
+      IC.msg = message;
+      const el = document.getElementById("ic-status");
+      if (el) el.textContent = message;
+    };
 
     // Fetch at most two providers at once: avoids serial waiting without overloading Edge Functions/providers.
     const fetched = new Array(unique.length);
@@ -346,7 +351,8 @@
     }
 
     try {
-      await Promise.all([fetchWorker(), fetchWorker()]);
+      // Keep one provider request active at a time. This avoids bursts against the Edge Function and upstream APIs.
+      await fetchWorker();
       let processed = 0;
       for (const item of fetched) {
         if (!item) continue;
@@ -355,8 +361,8 @@
         let count = 0;
         const list = item.list;
         // Build in small slices and yield to the browser so the admin UI remains responsive.
-        for (let offset = 0; offset < list.length; offset += 200) {
-          const batch = list.slice(offset, offset + 200);
+        for (let offset = 0; offset < list.length; offset += 50) {
+          const batch = list.slice(offset, offset + 50);
           for (const x of batch) {
             let type = classifyService(x, item.kind);
             if (item.kind === "custom" && type === "gift_card" && p.id === "fazer" && !/gift\\s?card|voucher|\\bpin\\b|بطاقة|قسيمة|كود/i.test(x.name + " " + x.category)) type = "game_topup";
@@ -369,13 +375,15 @@
             existing.add(key); D.products.push(product); count++; added++;
           }
           processed += batch.length;
-          IC.msg = "فرز وحفظ مؤقت للخدمات… " + processed + " / " + fetched.reduce((n, v) => n + (v && v.list ? v.list.length : 0), 0);
-          if (processed % 1000 === 0 || offset + 200 >= list.length) { render(); await yieldUI(); }
+          setProgress("فرز الخدمات دون تجميد الواجهة… " + processed + " خدمة تمت معالجتها");
+          await yieldUI();
         }
         stats.push({ name: p.name, count, received: list.length });
       }
       // One draft write only; do not trigger bulk image discovery automatically on thousands of records.
-      save();
+      if (typeof save === "function" && save() !== true) {
+        throw new Error("تم استلام البيانات وفرزها، لكن تعذّر حفظ المسودة في المتصفح. لم يتم تأكيد حفظ المنتجات؛ لا تغلق الصفحة قبل معالجة مساحة التخزين.");
+      }
       IC.msg = "اكتمل الجلب: أضيف " + added + " منتج، وتجاوزنا " + skipped + " مكرراً. " + stats.map((x) => x.name + " (" + x.count + "/" + x.received + ")").join(" · ") + (failures.length ? " | تعذّر: " + failures.join(" | ") : "");
       toast("اكتمل الاستيراد: " + added + " خدمة جديدة" + (failures.length ? " مع " + failures.length + " أخطاء مزوّد" : ""));
     } finally {
