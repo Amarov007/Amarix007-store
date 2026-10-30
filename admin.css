@@ -305,3 +305,16 @@ main{min-width:0}
  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Category manager: compact searchable accordion */
+.category-admin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.category-count{margin:7px 0 0}
+.cat-admin{padding:0;overflow:hidden}
+.cat-admin summary{display:flex;justify-content:space-between;align-items:center;gap:12px;list-style:none;cursor:pointer;padding:15px 18px}
+.cat-admin summary::-webkit-details-marker{display:none}
+.cat-admin summary>span:first-child{min-width:0;display:grid;gap:3px}
+.cat-admin summary b{font-size:13px;color:var(--tx)}
+.cat-admin summary small{font-size:10px;color:var(--mu);direction:ltr;text-align:right}
+.cat-admin-open{flex:none;font-size:10px;color:var(--m);border:1px solid rgba(197,255,112,.25);padding:5px 9px;border-radius:9px}
+.cat-admin[open] summary{border-bottom:1px solid var(--bd);background:rgba(197,255,112,.035)}
+.cat-admin-body{padding:17px}
