@@ -3315,6 +3315,9 @@ async function smmDeleteImported(btn) {
     const r = await api("/rest/v1/orders?select=id,status,items&status=in.(new,processing)&limit=5000");
     if (!r.ok) throw new Error("تعذّر التحقق من الطلبات المفتوحة؛ أُوقف الحذف لحماية عمليات التنفيذ");
     const orders = await r.json();
+    if (!Array.isArray(orders) || orders.length >= 5000) {
+      throw new Error("تعذّر التأكد من جميع الطلبات المفتوحة؛ أُوقف الحذف لأن نتيجة الطلبات بلغت الحد الأقصى.");
+    }
     const ids = new Set(old.map((p) => String(p.id)));
     const pending = (Array.isArray(orders) ? orders : []).filter((o) => {
       let items = o.items;
@@ -3342,9 +3345,8 @@ async function smmDeleteImported(btn) {
       }
     }
     save();
-    toast(`حُذفت ${old.length} خدمة من «${provName(prov)}». اضغط «نشر» لتطبيق الحذف على المتجر.`);
-    smmOut(smmCatPick() + `<p class="hint">✓ حُذفت ${old.length} خدمة مستوردة من «${esc(provName(prov))}». النسخة الاحتياطية جاهزة للاسترجاع. اضغط «نشر» لحفظ التغيير.</p>`);
-    render();
+    smmList();
+    toast(`حُذفت ${old.length} خدمة من «${provName(prov)}». النسخة الاحتياطية جاهزة؛ اضغط «نشر» لتطبيق الحذف على المتجر.`);
   } catch (e) {
     toast("أُوقف الحذف — " + String(e.message || e).slice(0, 150), "e");
     smmOut(smmCatPick() + `<p class="hint warn">✗ ${esc(e.message || e)}</p>`);
