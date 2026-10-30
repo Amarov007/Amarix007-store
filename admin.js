@@ -591,8 +591,20 @@ async function numSync(b) {
 /* ---------- 7. Views (one function per sidebar tab) ---------- */
 const VIEW = {
   home() {
-    const n = D.products.length;
-    return `<div class="stats"><div class="stat"><b>${ D.categories.length }</b><span>الأقسام</span></div><div class="stat"><b>${n}</b><span>المنتجات</span></div><div class="stat"><b>${ D.payments.filter((x) => x.on !== false).length }</b><span>وسائل الدفع المفعّلة</span></div><div class="stat"><b>${ D.embeds.length }</b><span>التضمين</span></div><div class="stat"><b>${ D.banners.length }</b><span>البانرات</span></div><div class="stat"><b>${ Object.keys(D.coupons).length }</b><span>الكوبونات</span></div></div> <div class="card qa"><h2>مركز التحكم السريع</h2><p class="hint">انتقل مباشرة إلى القسم الذي تريد إدارته.</p><div class="qa-g"><button class="qa-b" data-tab="categories">${tabIc("categories")}<span>إدارة الأقسام</span></button><button class="qa-b" data-tab="payments">${tabIc("payments")}<span>وسائل الدفع</span></button><button class="qa-b" data-tab="orders">${tabIc("orders")}<span>مراجعة الطلبات</span></button><button class="qa-b" data-tab="products">${tabIc("products")}<span>إدارة المنتجات</span></button><button class="qa-b" data-tab="apis">${tabIc("apis")}<span>ربط المزوّد واستيراد الخدمات</span></button><button class="qa-b" data-tab="tickets">${tabIc("tickets")}<span>تذاكر الدعم</span></button></div></div> <div id="hs"></div> ${checklistHTML()}<div class="card"><h2>نشر التعديلات</h2><p class="hint">النشر يحفظ إعدادات المتجر في جدول store_config. مفاتيح الـ APIs لا تُنشر أبداً.</p><div class="acts"><button class="b" data-a="pub">نشر الآن</button><button class="b b2" data-a="exp">نسخة احتياطية</button><label class="b b2">استيراد<input type="file" accept=".js,.json" hidden data-imp="1"></label></div></div>`;
+    const links = [
+      ["الكتالوج", [["categories","الأقسام","إنشاء الأقسام وربطها"],["products","المنتجات","الأسعار والصور والاستيراد"],["banners","البانرات","واجهة المتجر والحملات"],["embeds","التضمين","الخدمات والمواقع المضمّنة"]]],
+      ["المبيعات والمدفوعات", [["orders","الطلبات","المتابعة والتنفيذ"],["invoices","الفواتير","مراجعة الفواتير"],["payments","وسائل الدفع","الشعارات والحسابات والتعليمات"],["wallets","المحافظ","أرصدة العملاء"],["coupons","الكوبونات","الخصومات"],["affiliates","الشركاء","الإحالات والعمولات"]]],
+      ["العملاء والدعم", [["users","العملاء","الحسابات"],["tickets","الدعم الفني","التذاكر والردود"],["social","التواصل","قنوات الدعم"]]],
+      ["النظام والتخصيص", [["site","هوية المتجر","الاسم والشعار والألوان"],["partner","الشريك","البيانات والهوية"],["apis","مزوّدو API","الربط والاستيراد"],["staff","فريق العمل","الموظفون والصلاحيات"],["activity","سجل النشاط","تدقيق العمليات"],["push","الإشعارات","رسائل العملاء"],["stats","التقارير","مؤشرات الأداء"]]]
+    ];
+    const metrics = [["categories",D.categories.length,"الأقسام"],["products",D.products.length,"المنتجات"],["payments",D.payments.filter(x=>x.on!==false).length,"وسائل الدفع"],["embeds",D.embeds.length,"التضمين"],["banners",D.banners.length,"البانرات"],["coupons",Object.keys(D.coupons).length,"الكوبونات"]];
+    return \`
+      <section class="dash-welcome"><div><span class="eyebrow">AMARIX007 · CONTROL CENTER</span><h2>مركز إدارة المتجر</h2><p>مساحة عمل موحّدة. اختر المجال ثم افتح الأداة التابعة له.</p></div><div class="dash-welcome-actions"><button class="b" data-a="pub">نشر التغييرات</button><a class="b b2" href="index.html" target="_blank" rel="noopener">معاينة المتجر ↗</a></div></section>
+      <section class="dash-metrics">\${metrics.map(([id,value,label])=>\`<button class="metric-card" data-tab="\${id}"><span class="metric-icon">\${tabIc(id)}</span><b>\${Number(value).toLocaleString("en-US")}</b><span>\${label}</span><small>فتح الإدارة ←</small></button>\`).join("")}</section>
+      <header class="dash-section-head"><span class="eyebrow">WORKSPACES</span><h2>مساحات الإدارة</h2><p>الأدوات مصنّفة حسب وظيفتها لتسهيل الوصول.</p></header>
+      <section class="dash-workspaces">\${links.map(([title,items])=>\`<article class="workspace-card"><header><h3>\${title}</h3><small>\${items.length} أدوات</small></header><div>\${items.filter(([id])=>canTab(id)).map(([id,label,desc])=>\`<button class="workspace-link" data-tab="\${id}"><span class="workspace-link-icon">\${tabIc(id)}</span><span><b>\${label}</b><small>\${desc}</small></span><i>←</i></button>\`).join("")}</div></article>\`).join("")}</section>
+      <div id="hs" class="dash-live"></div>
+      <section class="dash-footer-grid"><div class="card"><h3>جاهزية المتجر</h3><p class="hint">تحقق من إعدادات الكتالوج والدفع قبل النشر.</p>\${checklistHTML()}</div><div class="card"><h3>النسخ الاحتياطي</h3><p class="hint">نزّل نسخة قبل التعديلات الكبيرة.</p><div class="acts"><button class="b b2" data-a="exp">تنزيل نسخة</button><label class="b b2">استيراد نسخة<input type="file" accept=".js,.json" hidden data-imp="1"></label></div><p class="hint">مفاتيح API السرية لا تُنشر ضمن إعدادات المتجر العامة.</p></div></section>\`;
   },
   site() {
     const s = "site.";
@@ -1092,25 +1104,15 @@ document.addEventListener("click", (e) => {
 });
 
 function render() {
-  if (!canTab(tab)) {
-    const f = TABS.find(([k]) => canTab(k));
-    tab = f ? f[0] : "none";
-  }
-  const staffOnly = isStaffOnly();
-  const warn = staffOnly
-    ? '<div class="card"><small>حساب موظف — الصلاحيات المفعّلة: ' +
-      (STAFF.length ? esc(STAFF.map((k) => (STF_PERMS.find((x) => x[0] == k) || [k, k])[1].split(" (")[0]).join("، ")) : "لا شيء") +
-      "</small></div>"
-    : IS_ADMIN === false
-      ? '<div class="card" style="border-color:var(--wn)"><small>⚠ حسابك الحالي (' +
-        esc(SES && SES.email) +
-        ") غير مضاف في جدول admins؛ قد تفشل عمليات النشر وتغيير الحالات بسبب سياسات RLS.</small></div>"
-      : "";
-  $(
-    "#app"
-  ).innerHTML = `<header class="top"><div class="w tr"><b class="ttl"><span class="brand-dot"></span>لوحة التحكم <small>${esc( D.site.n1 + D.site.n2 )}</small></b><span class="bdg" id="bdg"></span><span class="sp"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a>${staffOnly && !STAFF.includes("products") ? "" : '<button class="b sm" data-a="pub">نشر الآن</button>'}<button class="b b2 sm" data-a="logout">خروج</button></div></header><div class="w lay"><nav class="sd">${sideNav()}</nav><main>${warn}${(VIEW[tab] || VIEW.home)()}</main></div>`;
-  badge();
-  if (tab == "home") setTimeout(homeStats, 0);
+  if (!canTab(tab)) { const f=TABS.find(([k])=>canTab(k)); tab=f?f[0]:"none"; }
+  const staffOnly=isStaffOnly(), current=TABS.find(([k])=>k===tab)||["home","الرئيسية"];
+  const desc={home:"نظرة شاملة واختصارات لكل أدوات المتجر.",site:"الهوية البصرية والإعدادات العامة.",partner:"بيانات الشريك ومحتواه.",banners:"صور الواجهة والحملات.",categories:"إنشاء الأقسام وربطها بالمنتجات.",products:"الكتالوج والأسعار والصور والاستيراد.",embeds:"الخدمات والمواقع المضمّنة.",coupons:"الخصومات وشروط الاستخدام.",social:"قنوات التواصل والدعم.",payments:"وسائل الدفع وشعاراتها وتعليماتها.",users:"حسابات العملاء.",wallets:"أرصدة العملاء وحركات المحافظ.",staff:"الموظفون وصلاحيات الوصول.",activity:"سجل العمليات الإدارية.",apis:"مزوّدو الخدمات والربط الخارجي.",affiliates:"برنامج الشركاء والعمولات.",orders:"الطلبات والتنفيذ والدفع.",invoices:"الفواتير وسجلاتها.",stats:"تقارير المتجر ومؤشرات الأداء.",tickets:"استفسارات العملاء وتذاكر الدعم.",push:"إشعارات وتنبيهات العملاء."};
+  const warn=staffOnly?'<div class="admin-notice"><b>حساب موظف</b><span>الصلاحيات: '+(STAFF.length?esc(STAFF.map(k=>(STF_PERMS.find(x=>x[0]==k)||[k,k])[1].split(" (")[0]).join("، ")):"لا شيء")+"</span></div>":IS_ADMIN===false?'<div class="admin-notice is-warning"><b>تنبيه الصلاحيات</b><span>الحساب الحالي ('+esc(SES&&SES.email)+") غير مضاف في جدول admins.</span></div>":"";
+  $("#app").innerHTML=\`
+    <header class="admin-topbar"><div class="admin-topbar-brand"><span class="admin-brand-mark">A</span><span><b>AMARIX<span>007</span></b><small>STORE MANAGEMENT</small></span></div><div class="admin-topbar-current"><i></i> لوحة التحكم <b>/ \${esc(current[1])}</b></div><div class="admin-topbar-actions"><span class="bdg" id="bdg"></span><a class="b b2 sm" href="index.html" target="_blank" rel="noopener">معاينة ↗</a>\${staffOnly&&!STAFF.includes("products")?"":'<button class="b sm" data-a="pub">نشر التغييرات</button>'}<button class="admin-logout" data-a="logout">خروج</button></div></header>
+    <div class="admin-frame"><aside class="admin-sidebar"><div class="sidebar-caption">WORKSPACE</div><nav class="sd">\${sideNav()}</nav><div class="sidebar-bottom"><span class="sidebar-avatar">A</span><span><b>\${esc(SES&&(SES.email||SES.user&&SES.user.email)||"مدير المتجر")}</b><small>\${staffOnly?"موظف":"إدارة المتجر"}</small></span></div></aside>
+    <main class="admin-main"><div class="admin-page-heading"><div><span class="eyebrow">AMARIX007 / \${tab.toUpperCase()}</span><h1>\${esc(current[1])}</h1><p>\${esc(desc[tab]||"إدارة إعدادات هذا القسم.")}</p></div>\${tab!=="home"&&!staffOnly?'<button class="b" data-a="pub">حفظ ونشر</button>':""}</div>\${warn}<div class="admin-page-content">\${(VIEW[tab]||VIEW.home)()}</div></main></div>\`;
+  badge(); if(tab==="home") setTimeout(homeStats,0);
 }
 
 /* ---------- 8. Events ---------- */
