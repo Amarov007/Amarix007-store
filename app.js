@@ -2268,7 +2268,7 @@ function nmRes(f) {
   return `${bar}<div class="sb-list">${show.map(nmRow).join("")}</div>${a.length > show.length ? `<button type="button" class="b b2 block sb-more" data-a="nmmore">${sbT("عرض المزيد", "Show more")} (${fmtN(a.length - show.length)})</button>` : ""}`;
 }
 function numPaid(c) {
-  if (!numberProducts(c).length) return emptyBox("box", t("catempty"));
+  if (!numberProducts(c).length) return catalogLoading ? emptyBox("loader", lang == "ar" ? "جارٍ تحميل أرقام التفعيل…" : "Loading activation numbers…") : emptyBox("box", t("catempty"));
   const f = nmCalc(c);
   return `<div class="box sb-panel"><div class="sb-lab"><i>1</i>${sbT("الخدمة التي تريد تفعيلها", "Service to verify")}</div>
 <div class="sb-s"><span class="sb-si">${ic("search", 18)}</span><input id="nm-q" class="inp" type="search" data-a="nmq" value="${ex(NM.q)}" placeholder="${sbT("ابحث عن خدمة: واتساب، تيليجرام…", "Search a service: WhatsApp, Telegram…")}" autocomplete="off" enterkeyhint="search" aria-label="${sbT("بحث", "Search")}"></div>
