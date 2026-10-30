@@ -1495,6 +1495,7 @@ document.addEventListener("click", (e) => {
   if (a == "smm-fcat-go") return smmFcatGo(b);
   if (a == "smm-imp") return smmImport(b);
   if (a == "smm-delete-imported") return smmDeleteImported(b);
+  if (a == "smm-delete-one") return smmDeleteImported(b, b.dataset.id);
   if (a == "smm-wipe") return smmWipe(b, false);
   if (a == "smm-redo") return smmWipe(b, true);
   if (a == "smm-undo") return smmUndo();
@@ -3155,7 +3156,7 @@ function smmList() {
     '<div class="acts" style="margin:8px 0">' +
     `<button class="b b2" type="button" data-a="smm-delete-imported"${importedCount ? "" : " disabled"}>🗑 حذف الخدمات المستوردة من هذا المزوّد (${importedCount})</button>` +
     '<button class="b b2" type="button" data-a="smm-undo">↶ استرجاع آخر حذف</button></div>' +
-    '<div class="g2" style="margin:8px 0;align-items:end">'
+    '<div class="g2" style="margin:8px 0;align-items:end">' +
     '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641 (\u0625\u0644\u0632\u0627\u0645\u064a)</span><select class="inp" id="smm-cat"><option value="">\u2014 \u0627\u062e\u062a\u0631 \u0627\u0644\u0642\u0633\u0645 \u0642\u0628\u0644 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u2014</option>' +
     D.categories.filter((c) => c.ty != "hub").map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)} \u00b7 ${esc(typeof AMXImport != "undefined" ? AMXImport.catHubLabel(c) : "")}</option>`).join("") +
     '</select></label>' +
@@ -3168,7 +3169,7 @@ function smmList() {
           '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
           L.map(
             (x) =>
-              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}${x.category ? '<br><small class="od-m">' + esc(x.category) + '</small>' : ''}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button></td></tr>`
+              `<tr><td dir="ltr">${esc(x.id)}</td><td>${esc(x.name)}${x.category ? '<br><small class="od-m">' + esc(x.category) + '</small>' : ''}</td><td dir="ltr">${esc(x.rate)}</td><td dir="ltr">${esc(x.min)}-${esc(x.max)}</td><td><button class="b sm" data-a="smm-imp" data-id="${esc(x.id)}">+</button>${D.products.some((p) => p && p.smm_service != null && String(p.smm_service) === String(x.id) && provOf(p) === provider) ? ` <button class="b sm" data-a="smm-delete-one" data-id="${esc(x.id)}" title="حذف الخدمة المستوردة">🗑</button>` : ""}</td></tr>`
           ).join("") +
           "</table>"
       : "\u0644\u0627 \u0646\u062a\u0627\u0626\u062c")
@@ -3301,13 +3302,15 @@ async function smmWipe(btn, redo) {
     busy(btn, false);
   }
 }
-async function smmDeleteImported(btn) {
+async function smmDeleteImported(btn, serviceId = null) {
   const prov = SMM_SVC_PROV || smmProv();
   const old = D.products.filter((p) =>
-    p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov
+    p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov &&
+    (!serviceId || String(p.smm_service) === String(serviceId))
   );
-  if (!old.length) return toast("لا توجد خدمات مستوردة لهذا المزوّد", "e");
-  if (!confirm(`سيتم حذف ${old.length} خدمة مستوردة من «${provName(prov)}» فقط. لن تُحذف الطلبات أو الأرصدة أو السجلات المالية، ولن تتأثر منتجاتك اليدوية أو خدمات المزوّدين الآخرين. متابعة؟`)) return;
+  if (!old.length) return toast("لا توجد خدمات مستوردة مطابقة لهذا المزوّد", "e");
+  const scopeName = serviceId ? `الخدمة رقم ${serviceId}` : "جميع خدمات هذا المزوّد";
+  if (!confirm(`سيتم حذف ${old.length} عنصر/عناصر من ${scopeName} لدى «${provName(prov)}» فقط. لن تُحذف الطلبات أو الأرصدة أو السجلات المالية، ولن تتأثر المنتجات اليدوية أو خدمات المزوّدين الآخرين. متابعة؟`)) return;
 
   busy(btn, true);
   try {
@@ -3340,7 +3343,7 @@ async function smmDeleteImported(btn) {
     const idsToDelete = new Set(old.map((p) => String(p.id)));
     for (let i = D.products.length - 1; i >= 0; i--) {
       const p = D.products[i];
-      if (p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov && idsToDelete.has(String(p.id))) {
+      if (p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov && (!serviceId || String(p.smm_service) === String(serviceId)) && idsToDelete.has(String(p.id))) {
         D.products.splice(i, 1);
       }
     }
