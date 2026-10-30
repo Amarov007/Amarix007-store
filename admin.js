@@ -3306,14 +3306,24 @@ async function smmDeleteImported(btn, serviceId = null) {
   const prov = SMM_SVC_PROV || smmProv();
   const old = D.products.filter((p) =>
     p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov &&
-    (!serviceId || String(p.smm_service) === String(serviceId))
+    (serviceId == null || String(p.smm_service) === String(serviceId))
   );
   if (!old.length) return toast("لا توجد خدمات مستوردة مطابقة لهذا المزوّد", "e");
-  const scopeName = serviceId ? `الخدمة رقم ${serviceId}` : "جميع خدمات هذا المزوّد";
+  const scopeName = serviceId == null ? "جميع خدمات هذا المزوّد" : `الخدمة رقم ${serviceId}`;
   if (!confirm(`سيتم حذف ${old.length} عنصر/عناصر من ${scopeName} لدى «${provName(prov)}» فقط. لن تُحذف الطلبات أو الأرصدة أو السجلات المالية، ولن تتأثر المنتجات اليدوية أو خدمات المزوّدين الآخرين. متابعة؟`)) return;
 
   busy(btn, true);
   try {
+    // Require order-read permission: an empty RLS-filtered result must never be mistaken for zero open orders.
+    const permissionResponse = await api("/rest/v1/rpc/has_perm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p: "orders" }),
+    });
+    if (!permissionResponse.ok || !(await permissionResponse.json())) {
+      throw new Error("تحتاج صلاحية إدارة الطلبات للتحقق من ارتباط الخدمات بالطلبات المفتوحة قبل الحذف.");
+    }
+
     // Fail closed: never remove a provider mapping while an open order still needs it for fulfilment.
     const r = await api("/rest/v1/orders?select=id,status,items&status=in.(new,processing)&limit=5000");
     if (!r.ok) throw new Error("تعذّر التحقق من الطلبات المفتوحة؛ أُوقف الحذف لحماية عمليات التنفيذ");
@@ -3343,7 +3353,7 @@ async function smmDeleteImported(btn, serviceId = null) {
     const idsToDelete = new Set(old.map((p) => String(p.id)));
     for (let i = D.products.length - 1; i >= 0; i--) {
       const p = D.products[i];
-      if (p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov && (!serviceId || String(p.smm_service) === String(serviceId)) && idsToDelete.has(String(p.id))) {
+      if (p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov && (serviceId == null || String(p.smm_service) === String(serviceId)) && idsToDelete.has(String(p.id))) {
         D.products.splice(i, 1);
       }
     }
