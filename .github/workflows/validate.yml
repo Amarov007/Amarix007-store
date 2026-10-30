@@ -33,5 +33,6 @@ jobs:
           deno-version: v2.x
       - name: Check Edge Functions
         run: |
+          deno check --node-modules-dir=none supabase/functions/ai-support/index.ts
           deno check --node-modules-dir=none supabase/functions/smm-order/index.ts
           deno check --node-modules-dir=none supabase/functions/telegram-admin/index.ts
