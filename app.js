@@ -6001,13 +6001,12 @@ async function loadCatalogRemainder(meta, initial, total) {
       break;
     }
   }
-  // Avoid replacing the entire page after every 500-row response: that caused
-  // visible jumps/flicker while the background catalogue was filling.
+  // Update the in-memory catalogue/cache without rebuilding the visible page.
+  // Re-rendering here replaced the entire route after the final page arrived,
+  // which caused a noticeable jump while the customer was scrolling.
   const next = { ...meta, products, products_total: total };
   setCfg(withDefaults(next));
   ls.set("amx_remote", next);
-  head();
-  render();
 }
 /* ---------- 15. Boot ---------- */
 /* A config published by an older admin may lack newer sections (payments, partner, social…): fall back to the embedded ones */
