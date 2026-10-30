@@ -5437,8 +5437,21 @@ function banner3d(el) {
   cancelAnimationFrame(banRaf);
   const kids = [...el.children],
     wrap = el.parentElement,
-    still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (still) return;
+    still = matchMedia("(prefers-reduced-motion: reduce), (hover: none), (pointer: coarse)").matches;
+  // Touch screens were getting a continuous idle 3D tilt on every animation
+  // frame. Keep the carousel static there; desktop pointer interaction remains.
+  if (still) {
+    kids.forEach((k) => {
+      k.style.setProperty("--o", "0");
+      k.style.setProperty("--a", "0");
+      k.style.setProperty("--rx", "0deg");
+      k.style.setProperty("--ry", "0deg");
+      k.style.setProperty("--px", "0");
+      k.style.setProperty("--py", "0");
+      k.style.setProperty("--gl", "0");
+    });
+    return;
+  }
   const mid = (r) => r.left + r.width / 2,
     clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   let hov = null,
@@ -5983,16 +5996,18 @@ async function loadCatalogRemainder(meta, initial, total) {
       const page = await fetchCatalogPage(offset);
       if (!page.items.length) break;
       products.push(...page.items);
-      const next = { ...meta, products: products.slice(), products_total: total };
-      setCfg(withDefaults(next));
-      ls.set("amx_remote", next);
-      head();
-      render();
     } catch (err) {
       console.warn("[AMARIX] remaining catalogue page failed", offset, err);
       break;
     }
   }
+  // Avoid replacing the entire page after every 500-row response: that caused
+  // visible jumps/flicker while the background catalogue was filling.
+  const next = { ...meta, products, products_total: total };
+  setCfg(withDefaults(next));
+  ls.set("amx_remote", next);
+  head();
+  render();
 }
 /* ---------- 15. Boot ---------- */
 /* A config published by an older admin may lack newer sections (payments, partner, social…): fall back to the embedded ones */
