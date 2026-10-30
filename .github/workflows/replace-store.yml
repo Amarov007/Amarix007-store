@@ -41,15 +41,36 @@ jobs:
                   shutil.rmtree(p)
               p.mkdir(parents=True)
 
+          MAX_ARCHIVE_BYTES = 250 * 1024 * 1024
+          MAX_ENTRIES = 20000
+          MAX_FILE_BYTES = 100 * 1024 * 1024
+          MAX_TOTAL_BYTES = 1024 * 1024 * 1024
+          if archive.stat().st_size > MAX_ARCHIVE_BYTES:
+              raise SystemExit("ZIP archive exceeds the 250 MiB safety limit.")
+
           with zipfile.ZipFile(archive) as zf:
+              infos = zf.infolist()
+              if len(infos) > MAX_ENTRIES:
+                  raise SystemExit("ZIP archive contains too many entries.")
               entries = []
-              for info in zf.infolist():
+              seen = set()
+              total_bytes = 0
+              for info in infos:
                   raw = info.filename
                   if not raw or raw.startswith(("/", "\\")) or "\\" in raw:
                       raise SystemExit(f"Unsafe archive path: {raw!r}")
                   rel = PurePosixPath(raw)
                   if any(part in ("", ".", "..") for part in rel.parts):
                       raise SystemExit(f"Unsafe archive path: {raw!r}")
+                  normalized = rel.as_posix().casefold().rstrip("/")
+                  if normalized in seen:
+                      raise SystemExit(f"Duplicate archive path: {raw!r}")
+                  seen.add(normalized)
+                  if info.file_size > MAX_FILE_BYTES:
+                      raise SystemExit(f"Archive member exceeds the 100 MiB file limit: {raw!r}")
+                  total_bytes += info.file_size
+                  if total_bytes > MAX_TOTAL_BYTES:
+                      raise SystemExit("Archive expands beyond the 1 GiB safety limit.")
                   if (info.external_attr >> 16) & 0o170000 == stat.S_IFLNK:
                       raise SystemExit(f"Symlinks are not allowed: {raw!r}")
                   if rel.parts and rel.parts[0] == "__MACOSX":
@@ -76,7 +97,17 @@ jobs:
                   else:
                       target.parent.mkdir(parents=True, exist_ok=True)
                       with zf.open(info) as src, target.open("wb") as dst:
-                          dst.write(src.read())
+                          copied = 0
+                          while True:
+                              chunk = src.read(1024 * 1024)
+                              if not chunk:
+                                  break
+                              copied += len(chunk)
+                              if copied > MAX_FILE_BYTES:
+                                  raise SystemExit(f"Expanded file exceeded its safety limit: {raw!r}")
+                              dst.write(chunk)
+                          if copied != info.file_size:
+                              raise SystemExit(f"Archive member size mismatch: {raw!r}")
 
           required = [extracted / "index.html", extracted / "app.js"]
           missing = [str(p.name) for p in required if not p.is_file()]
