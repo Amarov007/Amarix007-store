@@ -1,0 +1,21 @@
+name: Validate Amarix rebuild
+on:
+  push:
+    branches: [rebuild]
+  pull_request:
+    branches: [main]
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check admin.js
+      - name: Verify required storefront and admin elements
+        run: |
+          node -e "const fs=require('fs'); const i=fs.readFileSync('index.html','utf8'); const a=fs.readFileSync('admin.html','utf8'); for(const x of ['id=\"categories\"','id=\"products\"','id=\"order-dialog\"','id=\"topup-form\"']) if(!i.includes(x)) throw Error('Missing storefront element '+x); for(const x of ['id=\"admin-login\"','id=\"provider-form\"','id=\"product-form\"','id=\"category-form\"']) if(!a.includes(x)) throw Error('Missing admin element '+x);"
