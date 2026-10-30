@@ -47,7 +47,9 @@ test("provider execution enforces staff permissions and paid owner orders", asyn
 
 test("payments v2 has a server-side off switch until E2E signoff", async () => {
   const sql = await read("../supabase/migrations/20261030011456_block_payments_v2_enable_until_e2e_signoff.sql");
-  assert.match(sql, /payments_v2_on/i);
+  assert.match(sql, /payments_v2_flag_set/i);
+  assert.match(sql, /payments_v2_e2e_not_signed_off/i);
+  assert.match(sql, /\{payments_v2,on\}/i);
   assert.match(sql, /RAISE EXCEPTION/i);
 });
 
