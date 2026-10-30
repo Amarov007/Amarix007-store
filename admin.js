@@ -186,10 +186,11 @@ const TI = {
   push:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a1.9 1.9 0 0 0 3.4 0"/>'
 };
 const TG = [
-  ["المبيعات", ["orders","invoices","payments","wallets","coupons","affiliates","users"]],
-  ["المتجر", ["home","products","categories","banners","embeds","partner","site"]],
-  ["التواصل والدعم", ["tickets","social"]],
-  ["أدوات متقدمة", ["stats","staff","activity","push"]]
+  ["نظرة عامة", ["home","stats"]],
+  ["الكتالوج", ["categories","products","banners","embeds"]],
+  ["المبيعات والمدفوعات", ["orders","invoices","payments","wallets","coupons","affiliates"]],
+  ["العملاء والدعم", ["users","tickets","social"]],
+  ["النظام والربط", ["site","partner","apis","staff","activity","push"]]
 ];
 const tabIc = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TI[k] || ""}</svg>`;
 /* ---------- الموظفون: ما يراه كل حساب ---------- */
