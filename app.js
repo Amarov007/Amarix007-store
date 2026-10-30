@@ -2393,9 +2393,10 @@ function catPage(id) {
     return `<div class="box"><h1>${c[lang]}</h1><p class="pd">${lang == "ar" ? c.da : c.de}</p>${eu ? `<iframe src="${ex(eu)}" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" style="width:100%;height:500px;border:0;border-radius:12px"></iframe>` : ""}</div>${embeds}`;
   }
   const all = P.filter((p) => p.c == id);
+  const categoryPending = categoryProductsPending.has(String(id));
   let body = "";
   if (!(c.ty == "embed" && embeds)) {
-    if (!all.length) body = embeds ? "" : emptyBox("box", t("catempty"));
+    if (!all.length) body = embeds ? "" : categoryPending ? loadingBox() : emptyBox("box", t("catempty"));
     else {
       const a = catList(c);
       body =
@@ -5736,6 +5737,7 @@ function render0() {
     supportPage(seq, oq);
     return;
   }
+  if (r == "c") hydrateCategoryProducts(dec(id || ""), seq);
   m.innerHTML =
     r == "g" && window.AMXHub
     ? AMXHub.page(dec(id || ""), dec(sub || ""))
@@ -5767,7 +5769,6 @@ function render0() {
   nav();
   startBanners();
   decorate();
-  if (r == "c") hydrateCategoryProducts(dec(id || ""), seq);
   if (r == "login") humanStart();
 }
 addEventListener("hashchange", () => {
