@@ -80,8 +80,11 @@ jobs:
               if not entries:
                   raise SystemExit("Archive is empty after excluding __MACOSX.")
 
-              first_parts = {rel.parts[0] for _, rel in entries}
-              single_root = len(first_parts) == 1 and all(len(rel.parts) > 1 for _, rel in entries)
+              file_entries = [(info, rel) for info, rel in entries if not info.is_dir()]
+              if not file_entries:
+                  raise SystemExit("Archive contains no files.")
+              first_parts = {rel.parts[0] for _, rel in file_entries}
+              single_root = len(first_parts) == 1 and all(len(rel.parts) > 1 for _, rel in file_entries)
               root = next(iter(first_parts)) if single_root else None
 
               for info, rel in entries:
