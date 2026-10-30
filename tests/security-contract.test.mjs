@@ -63,7 +63,9 @@ test("admin UI applies the same named permission keys to staff navigation", asyn
 test("provider service deletion is scoped, backed up, and blocked for open orders", async () => {
   const src = await read("../admin.js");
   assert.match(src, /data-a="smm-delete-imported"/);
+  assert.match(src, /data-a="smm-delete-one"/);
   assert.match(src, /if \(a == "smm-delete-imported"\) return smmDeleteImported\(b\)/);
+  assert.match(src, /if \(a == "smm-delete-one"\) return smmDeleteImported\(b, b\.dataset\.id\)/);
   assert.match(src, /p\.smm_service != null[\s\S]{0,140}provOf\(p\) === prov/);
   assert.match(src, /status=in\.\(new,processing\)/);
   assert.match(src, /amx_smm_backup/);
