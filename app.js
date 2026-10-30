@@ -1789,10 +1789,21 @@ function card(p) {
   const href = `#/p/${ex(p.id)}`;
   return `<div class="pr-r${vis ? " visit" : ""}"><a class="pr-t" href="${href}" tabindex="-1" aria-hidden="true">${art(p, c)}</a><a class="pr-b" href="${href}"><h3>${p[lang]}</h3><small>${c[lang]}</small><span class="pr-p">${vis ? `<i class="vchip">${ic("ext", 12)}</i> ${t("visitshort")}` : `<b class="n">${price}</b>${old}${p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}`}</span></a><span class="pr-x"><button class="hb ${fav.includes(p.id) ? "on" : ""}" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic("heart", 15)}</button>${vis ? visitBtn(p) : `<button class="pr-add" data-a="add" data-id="${ex(p.id)}" aria-label="${t("add")}">${ic("cart", 16)}</button>`}</span></div>`;
 }
-const grid = (a) =>
-  a.length
-    ? `<div class="pr-list">${a.map(card).join("")}</div>`
-    : `<p class="emp">${t("none")}</p>`;
+/* Large product lists are rendered in small DOM batches. The full catalogue remains
+   available in memory for search, cart validation and admin publishing; only card DOM is paged. */
+const GRID_BATCH = 60;
+const GRID_DATA = new Map();
+let GRID_RENDER = 0, GRID_NEXT = 0;
+const grid = (a) => {
+  if (!a.length) return `<p class="emp">${t("none")}</p>`;
+  const key = "g" + (++GRID_NEXT);
+  GRID_DATA.set(key, a);
+  const shown = a.slice(0, GRID_BATCH);
+  const more = a.length > shown.length
+    ? `<button type="button" class="b b2 block" data-a="grid-more" data-grid="${key}" data-next="${shown.length}" style="margin:14px auto;max-width:280px">${lang == "ar" ? "عرض المزيد" : "Load more"} · ${shown.length} / ${a.length}</button>`
+    : "";
+  return `<div class="pr-list" data-grid-list="${key}">${shown.map(card).join("")}</div>${more}`;
+};
 /* Big cards: only for the "featured" section of the home page (products pinned from the admin). */
 const gridBig = (a) =>
   a.length
@@ -4136,7 +4147,19 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   const a = b.dataset.a,
     id = b.dataset.id;
-  if (a == "add") {
+  if (a == "grid-more") {
+    const rows = GRID_DATA.get(b.dataset.grid);
+    const list = document.querySelector(`[data-grid-list="${b.dataset.grid}"]`);
+    if (!rows || !list) { b.remove(); return; }
+    const start = Math.max(0, Number(b.dataset.next) || 0);
+    const end = Math.min(rows.length, start + GRID_BATCH);
+    list.insertAdjacentHTML("beforeend", rows.slice(start, end).map(card).join(""));
+    if (end >= rows.length) b.remove();
+    else {
+      b.dataset.next = String(end);
+      b.textContent = (lang == "ar" ? "عرض المزيد" : "Load more") + " · " + end + " / " + rows.length;
+    }
+  } else if (a == "add") {
     if (!addFromProduct(id, +b.dataset.n || 1)) return;
     toast(t("added"));
   } else if (a == "ntab") {
@@ -5612,6 +5635,8 @@ document.addEventListener("click", (e) => {
 
 const AUTH_ROUTES = ["orders", "account", "support"];
 function render() {
+  GRID_DATA.clear();
+  GRID_NEXT = 0;
   render0();
   qbRefresh();
 }
