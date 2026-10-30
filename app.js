@@ -6079,7 +6079,7 @@ async function hydrateCategoryProducts(categoryId, renderVersion) {
       setCfg(withDefaults(next));
       ls.set("amx_remote", next);
       categoryProductsLoaded.add(String(categoryId));
-      if (renderVersion === routeSeq && location.hash.startsWith("#/c/")) render();
+      if (location.hash.split("?")[0] === "#/c/" + String(categoryId)) render();
     } catch (err) {
       console.warn("[AMARIX] category catalogue load failed", categoryId, err);
     } finally {
