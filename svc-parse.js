@@ -221,7 +221,18 @@
     ["chatgpt","ChatGPT","ChatGPT",/\b(chatgpt|gpt ?plus)\b/i,"apps"],
     ["claude","Claude","Claude",/\b(claude)\b/i,"apps"],
     ["telegram","Telegram","تيليجرام",/\b(telegram|تيليجرام|تيليغرام)\b/i,"smm"],
-    ["instagram","Instagram","إنستغرام",/\b(instagram|انستغرام|انستجرام)\b/i,"smm"]
+    ["instagram","Instagram","إنستغرام",/\b(instagram|انستغرام|انستجرام)\b/i,"smm"],
+    ["tiktok","TikTok","تيك توك",/\b(tiktok|tik\s?tok|تيك\s?توك|تيكتوك)\b/i,"smm"],
+    ["youtube","YouTube","يوتيوب",/\b(youtube|يوتيوب)\b/i,"smm"],
+    ["facebook","Facebook","فيسبوك",/\b(facebook|فيسبوك|فيس\s?بوك)\b/i,"smm"],
+    ["x","X","إكس",/\b(twitter|\bx\b|تويتر|إكس)\b/i,"smm"],
+    ["whatsapp","WhatsApp","واتساب",/\b(whatsapp|واتساب)\b/i,"smm"],
+    ["snapchat","Snapchat","سناب شات",/\b(snapchat|snap\s?chat|سناب\s?شات|سناب)\b/i,"smm"],
+    ["discord","Discord","ديسكورد",/\b(discord|ديسكورد)\b/i,"smm"],
+    ["threads","Threads","ثريدز",/\b(threads|ثريدز)\b/i,"smm"],
+    ["linkedin","LinkedIn","لينكدإن",/\b(linkedin|لينكد.?إن)\b/i,"smm"],
+    ["pinterest","Pinterest","بينترست",/\b(pinterest|بينترست)\b/i,"smm"],
+    ["twitch","Twitch","تويتش",/\b(twitch|تويتش)\b/i,"smm"]
   ];
   function brandOf(x) {
     const text = String((x && (x.name || x.en || x.ar || "")) || "") + " " + String((x && x.category) || "");
