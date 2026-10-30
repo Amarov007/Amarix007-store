@@ -73,7 +73,7 @@ test("provider service deletion is scoped, backed up, and blocked for open order
 });
 
 test("Payments V2 is forced off on every store_config write", async () => {
-  const sql = await read("../supabase/migrations/20261031000100_harden_payments_v2_store_config_invariant.sql");
+  const sql = await read("../supabase/migrations/20261030210908_harden_payments_v2_store_config_invariant.sql");
   assert.match(sql, /BEFORE INSERT OR UPDATE OF data ON public\.store_config/i);
   assert.match(sql, /jsonb_set\(v_payments, '\{on\}', 'false'::jsonb, true\)/i);
   assert.match(sql, /ARRAY\['products','ts','api','payments_v2'\]/i);
