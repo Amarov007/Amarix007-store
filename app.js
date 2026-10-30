@@ -1359,13 +1359,6 @@ function payLogo(m, size = 44) {
     return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${ex(logo)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
   const nmRaw = plain(m.en || m.ar || pmReadable(m) || "");
   const nm = nmRaw.replace(/[^A-Za-z0-9؀-ۿ ]/g, "").trim();
-  const keyText = (String(m.id || "") + " " + nmRaw).toLowerCase();
-  const official = [
-    [/\\b(binance|bnb)\\b/, fallback.binance],
-    [/\\b(usdt|tether)\\b/, fallback.usdt],
-  ].find(([re]) => re.test(keyText));
-  if (official)
-    return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${official[1]}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
   const letter = (nm || "P").slice(0, 1).toUpperCase();
   return `<span class="pl" style="${st};display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:${Math.round(size*.46)}px">${letter}</span>`;
 }
