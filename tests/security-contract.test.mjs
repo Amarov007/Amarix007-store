@@ -90,3 +90,15 @@ test("AI support fails closed when the shared rate limiter is unavailable", asyn
   assert.match(src, /rawBody\.length > 20000/);
   assert.match(src, /payload_too_large/);
 });
+
+
+test("all active Edge Functions are tracked in the repository", async () => {
+  const slugs = [
+    "ai-support", "api-hub", "img-shrink", "media-seed", "payment-proof-hash",
+    "send-push", "smm-order", "telegram-admin", "telegram-auth"
+  ];
+  for (const slug of slugs) {
+    const source = await read(`../supabase/functions/${slug}/index.ts`);
+    assert.ok(source.length > 0, `${slug} source must be tracked`);
+  }
+});
