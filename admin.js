@@ -2777,7 +2777,7 @@ async function setTicketStatus(sel) {
 async function fn(name, body) {
   /* مهلة 50 ثانية: بدونها يبقى زر «جارٍ الجلب…» معلّقاً للأبد إن لم يردّ Supabase / المزوّد */
   const ac = new AbortController();
-  const tm = setTimeout(() => ac.abort(), 50000);
+  const tm = setTimeout(() => ac.abort(), name === "smm-order" ? 120000 : 50000);
   let r;
   try {
     r = await api("/functions/v1/" + name, {
