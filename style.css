@@ -4226,3 +4226,23 @@ body.qb-open{overflow:hidden}
 .pay-method-card>b{align-self:center}
 .pay-method-card>small{text-align:center;max-width:28ch}
 @media(max-width:650px){.pay-card-logo .pl{width:58px!important;height:58px!important;border-radius:14px!important}}
+
+
+/* Payment methods — single-surface brand presentation (no nested logo tiles). */
+.pay-method-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px;max-width:980px;margin-inline:auto}
+.pay-method-card{align-items:center;text-align:center;justify-content:flex-start;gap:10px;min-height:0;padding:22px 18px 20px;border:1px solid var(--bd);border-radius:22px;background:var(--card);box-shadow:0 8px 24px -22px rgba(15,23,42,.45);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.pay-method-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--pc) 45%,var(--bd));box-shadow:0 16px 30px -24px rgba(15,23,42,.5)}
+.pay-card-top{display:none}
+.pay-card-logo{display:grid;place-items:center;width:82px;height:82px;margin:2px auto 5px;padding:0;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+.pay-card-logo .pl,.pay-card-logo .pl-img{display:grid!important;place-items:center;width:100%!important;height:100%!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;overflow:visible!important}
+.pay-card-logo .pl img{display:block;width:100%;height:100%;object-fit:contain;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+.pay-method-card>b{font-size:18px;line-height:1.35;font-weight:850;letter-spacing:-.02em}
+.pay-method-card>small{max-width:250px;color:var(--mu);font-size:12px;line-height:1.55}
+@media(max-width:650px){
+ .pay-method-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .pay-method-card{min-height:150px;padding:16px 10px 14px;border-radius:17px;gap:8px}
+ .pay-card-logo{width:66px;height:66px;margin:0 auto 3px}
+ .pay-method-card>b{font-size:15px}
+ .pay-method-card>small{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){.pay-method-card{transition:none}.pay-method-card:hover{transform:none}}
