@@ -1,17 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import {
-  TrendingUp,
-  Instagram,
-  Send,
-  Youtube,
-  Twitter,
-  Sparkles,
-  ShieldCheck,
-  Check,
-  Zap,
-  ShoppingCart
-} from 'lucide-react';
+import { TrendingUp, Zap, ShoppingCart } from 'lucide-react';
 
 export const BoostPage: React.FC = () => {
   const { lang, formatPrice, addToCart, navigate, showToast } = useStore();
