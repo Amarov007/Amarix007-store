@@ -19,7 +19,7 @@
     sessionStorage.setItem('amx_splash', '1');
   } catch (e) {}
 
-  var T0 = Date.now(), T1 = 0, MIN = reduce ? 700 : 2800, MAX = 6000;
+  var T0 = Date.now(), T1 = 0, MIN = reduce ? 500 : 1100, MAX = 2600;
   var el = null, loaded = false, begun = false, done = false, ctx = null, played = false;
   var bufIntro = null, bufExit = null;
   var soundOn = true;
