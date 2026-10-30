@@ -10,3 +10,15 @@
 @media(max-width:800px){.admin-topbar{height:auto;min-height:66px;padding:9px 12px;gap:10px;flex-wrap:wrap}.admin-topbar-brand{min-width:0}.admin-topbar-brand small,.admin-topbar-current{display:none}.admin-topbar-actions{gap:6px}.admin-frame{display:flex;flex-direction:column;min-height:calc(100vh - 66px)}.admin-sidebar{position:relative;top:auto;height:auto;overflow:visible;padding:9px 10px;border-inline-end:0;border-bottom:1px solid rgba(148,163,184,.14)}.sidebar-caption,.sidebar-bottom{display:none}.admin-sidebar .sd{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.admin-sidebar .sgl{padding:9px;font-size:10px}.admin-sidebar .sg-links{grid-template-columns:repeat(2,minmax(0,1fr));padding:5px}.admin-sidebar .sn-link{font-size:9px;padding:8px 6px;gap:5px}.admin-main{padding:18px 11px 42px}.admin-page-heading h1{font-size:21px}.dash-welcome{flex-direction:column;align-items:flex-start;padding:18px}.dash-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-workspaces{grid-template-columns:1fr}.dash-footer-grid{grid-template-columns:1fr}}
 @media(max-width:430px){.admin-topbar-actions .bdg{display:none}.admin-topbar-actions .b,.admin-logout{font-size:9px;padding:7px 8px}.admin-page-heading{gap:8px}.admin-page-heading>.b{font-size:9px;padding:7px}.workspace-card>div{grid-template-columns:1fr}.metric-card{padding:11px}.metric-card>b{font-size:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* AMARIX 2026 — simplified provider workflow */
+.amx-import-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 18px;align-items:center;padding:20px;border:1px solid rgba(185,255,102,.24);background:linear-gradient(135deg,rgba(185,255,102,.09),rgba(16,29,43,.96));}
+.amx-import-hero h2{margin:0 0 6px}.amx-import-hero .hint{margin:0}.amx-import-hero .hint:last-child{grid-column:1/-1;color:#91a6ba}
+.admin-sidebar .sg{border:1px solid rgba(148,163,184,.1);border-radius:12px;margin:5px 0;overflow:hidden}
+.admin-sidebar .sgl{padding:11px 12px;font-weight:800}
+.admin-sidebar .sg[open]{border-color:rgba(185,255,102,.24);background:rgba(17,29,43,.42)}
+.admin-sidebar .sn-link{border-radius:9px;margin:2px 4px;transition:background .16s,border-color .16s}
+.admin-sidebar .sn-link.on{background:rgba(185,255,102,.1);color:var(--m);border:1px solid rgba(185,255,102,.2)}
+.admin-page-heading{border-bottom:1px solid rgba(148,163,184,.12);padding-bottom:14px;margin-bottom:18px}
+.admin-page-content .card{border-radius:16px}
+@media(max-width:800px){.amx-import-hero{grid-template-columns:1fr}.amx-import-hero .b{width:100%}.admin-sidebar .sg{margin:0}.admin-sidebar .sgl{padding:8px}}
