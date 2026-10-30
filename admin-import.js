@@ -23,6 +23,7 @@
     ["games", "شحن ألعاب"],
     ["apps", "تطبيقات واشتراكات"],
     ["smm", "رشق متابعين"],
+    ["numbers", "أرقام التفعيل"],
   ];
   const TYPE_OPTS = [
     ["game_topup", "شحن لعبة (Player ID + باقة)"],
@@ -31,7 +32,7 @@
     ["smm", "رشق (رابط + كمية)"],
   ];
   const HUB_OF_TYPE = { smm: "smm", game_topup: "games", app_subscription: "apps", gift_card: "apps" };
-  const DEFAULT_TYPE = { smm: "smm", games: "game_topup", apps: "app_subscription" };
+  const DEFAULT_TYPE = { smm: "smm", games: "game_topup", apps: "app_subscription", numbers: "app_subscription" };
   const MODES = [
     ["smm", "رشق متابعين (SMM)"],
     ["games", "شحن ألعاب"],
@@ -64,6 +65,7 @@
   function hubOfCat(c) {
     if (!c) return "";
     if (c.ty === "hub") return "hub";
+    if (c.ty === "numbers" || c.hub === "numbers") return "numbers";
     if (c.ty === "boost") return "smm";
     if (c.hub === "games" || c.hub === "apps") return c.hub;
     if (c.hub === "none") return "none";
@@ -113,8 +115,8 @@
       c: o.cat, k: "buy", ar, en, p: priceOf(x, type, o.mk), o: 0, d: 0, r: 5, n: 0, bs: 0, tg, sp,
       img: x.image ? String(x.image) : "", images: [],
       ptype: type, bk: brand.key,
-      smm_service: sid, smm_qty: 1, smm_mk: o.mk || 0,
-      smm_input: smm ? "" : type === "gift_card" ? "none" : "text",
+      smm_service: String(x.service != null ? x.service : sid), smm_qty: 1, smm_mk: o.mk || 0,
+      smm_input: smm || kind === "smsactivate" ? "none" : type === "gift_card" ? "none" : "text",
       ...(pv === "main" ? {} : { smm_provider: pv }),
       ...(x.country ? { smm_country: String(x.country) } : {}),
       ...(x.category ? { smm_cat: String(x.category) } : {}),
@@ -122,8 +124,9 @@
     if (smm) Object.assign(it, typeof smmLimits == "function" ? smmLimits(x.min, x.max, 1) : { qmin: 1, qmax: 0 });
     else { it.qmin = 1; it.qmax = 1; }
     if (!smm) {
-      const req = kind === "smsactivate" ? ["phone"] : sv.requiredOf(it);
+      const req = kind === "smsactivate" ? [] : sv.requiredOf(it);
       if (req.length) it.req = req;
+      else delete it.req;
       const dn = sv.denomination(name) || (x.amount ? { amount: parseFloat(x.amount) || 0, unit: "" } : null);
       if (dn && dn.amount) { it.amount = dn.amount; if (dn.unit) it.unit = dn.unit; }
     }
@@ -146,7 +149,7 @@
     if (!c) {
       c = NEW.categories();
       const known = brand.kind !== "other";
-      Object.assign(c, { ar: known ? brand.ar : label || brand.ar, en: known ? brand.en : label || brand.en, ty: "shop", i: hub === "games" ? "bolt" : "users", hub, bk: brand.key, image_url: x.catImage || "" });
+      Object.assign(c, { ar: hub === "numbers" ? (known ? brand.ar : label || "أرقام التفعيل") : known ? brand.ar : label || brand.ar, en: hub === "numbers" ? (known ? brand.en : label || "Activation numbers") : known ? brand.en : label || brand.en, ty: "shop", i: hub === "games" ? "bolt" : hub === "numbers" ? "phone" : "users", hub, bk: brand.key, image_url: x.catImage || "" });
       D.categories.push(c);
       cache.made++;
     }
@@ -171,7 +174,7 @@
     Object.keys(PROV_NAME).forEach((id) => { if (kindOf(id) === want) out.push([id, PROV_NAME[id] + " (" + id + ")"]); });
     return out;
   };
-  const defTarget = () => (IC.mode === "sync" ? "" : IC.mode === "numbers" ? "apps" : IC.mode); // mode = the default target hub, changeable below
+  const defTarget = () => (IC.mode === "sync" ? "" : IC.mode); // mode = the default target hub, changeable below
 
   /* ------------------------------------------------------------------ IMPORT CENTER (view) ------------------------------------------------------------------ */
   function modeBar() {
@@ -180,7 +183,7 @@
   function importView() {
     if (typeof PROV_LOADED != "undefined" && !PROV_LOADED && !Object.keys(PROV_NAME).length) loadProviders(true).then(() => tab === "import" && render()).catch(() => {});
     const body = IC.mode === "sync" ? syncView() : fetchView() + imgCard();
-    return `<div class="card"><h2>مركز الاستيراد والمزامنة</h2><p class="hint">اختر نوع الاستيراد، حدّد القسم المستهدف <b>قبل الجلب</b>، ثم راجع جدول المعاينة وعدّل النوع والقسم ونسبة الربح لكل صف (أو لعدة صفوف دفعة واحدة) قبل الحفظ في المتجر. لا يُحفظ شيء إلا بعد ضغط «حفظ المحدد»، ثم «نشر نهائي».</p>${modeBar()}</div>${body}`;
+    return `<section class="card amx-import-hero"><div><h2>مركز الاستيراد الذكي</h2><p class="hint">استيراد شامل من المزوّدين مع تصنيف تلقائي إلى الرشق والألعاب والاشتراكات وأرقام التفعيل، وربط كل خدمة بمصدرها ورقمها الأصلي.</p></div><button class="b" type="button" data-ic="auto-all"${IC.busy ? " disabled" : ""}>${IC.busy ? "جارٍ الاستيراد…" : "جلب وفرز كل المزوّدين تلقائياً"}</button><p class="hint">سيتم الاحتفاظ بإعدادات المتجر والطلبات؛ تُضاف الخدمات الجديدة فقط. بعد اكتمال المعاينة اضغط «نشر التغييرات» لتفعيل الكتالوج.</p></section><div class="card"><h2>الاستيراد اليدوي والمزامنة</h2><p class="hint">للمراجعة أو جلب مزوّد منفرد. اختر نوع الاستيراد، ثم راجع التصنيف والأسعار قبل الحفظ.</p>${modeBar()}</div>${body}`;
   }
   function fetchView() {
     const provs = provList();
@@ -275,6 +278,75 @@
       <p class="hint">بعد الحفظ ستظهر المنتجات في «المنتجات» ويجب الضغط على «نشر الآن» في الأعلى لتطبيقها على المتجر.</p></div>`;
   }
   const refreshPrev = () => { const el = $("#ic-prev"); if (el) el.innerHTML = previewHtml(); };
+
+
+  async function autoImportAll() {
+    if (IC.busy) return;
+    if (typeof loadProviders === "function" && (!PROV_LOADED || !Object.keys(PROV_NAME).length)) await loadProviders();
+    const providers = [{ id: "main", name: "المزوّد الرئيسي", kind: "smm", enabled: true }]
+      .concat((Array.isArray(PROVS) ? PROVS : []).filter((p) => p && p.enabled !== false).map((p) => ({ id: String(p.id), name: p.name || p.id, kind: p.kind || "smm", enabled: true })));
+    const unique = [...new Map(providers.map((p) => [p.id, p])).values()];
+    if (!unique.length) return toast("لا توجد مزوّدات مفعّلة", "e");
+    if (!confirm("سيتم جلب الكتالوج من جميع المزوّدين المفعّلين، وفرز المنتجات تلقائياً، وإضافة الخدمات غير الموجودة فقط. هل نتابع؟")) return;
+    IC.busy = true; IC.msg = ""; render();
+    const cache = { map: new Map(), made: 0 };
+    const existing = new Set(D.products.map(provKey));
+    const stats = [], failures = [];
+    let added = 0, skipped = 0;
+    try {
+      for (const p of unique) {
+        const kind = p.kind || kindOf(p.id);
+        try {
+          if (p.id !== "main" && !(await siteSupport())) throw new Error(SITES_OLD);
+          const j = kind === "smsactivate"
+            ? await fn("smm-order", { action: "numbers_catalog", provider: p.id })
+            : await fn("smm-order", { action: "services", provider: p.id });
+          let source = [];
+          if (kind === "smsactivate") {
+            const svc = new Map((j.services || []).map((x) => [String(x.code), String(x.name || x.code)]));
+            const countries = new Map((j.countries || []).map((x) => [String(x.id), String(x.name || x.id)]));
+            source = (j.offers || []).map((o) => {
+              const serviceName = svc.get(String(o.s)) || String(o.s);
+              const countryName = countries.get(String(o.c)) || String(o.c);
+              return { id: String(o.s) + "_" + String(o.c), service: String(o.s), country: String(o.c), name: serviceName + " — " + countryName, category: serviceName, rate: Number(o.p), amount: o.n, type: "Number", available: o.n == null || Number(o.n) > 0 };
+            });
+          } else {
+            source = Array.isArray(j) ? j : Array.isArray(j.services) ? j.services : Array.isArray(j.data) ? j.data : Array.isArray(j.results) ? j.results : [];
+          }
+          const list = source.map((x) => {
+            const id = x.id ?? x.service ?? x.service_id ?? x.offer_id ?? x.product_id;
+            const name = x.name ?? x.title ?? x.product_name ?? x.offer_name ?? x.service_name;
+            const category = x.category ?? x.category_name ?? x.group ?? x.game ?? x.brand ?? x.category_id ?? "";
+            const rate = x.rate ?? x.price_per_1000 ?? x.pricePer1000 ?? x.cost ?? x.price ?? x.amount_price;
+            const image = x.image ?? x.image_url ?? x.icon ?? x.logo ?? x.thumbnail ?? x.product_image ?? "";
+            const amount = x.amount ?? x.denomination ?? x.value ?? x.package_amount ?? x.quantity_value;
+            const available = x.available ?? x.is_available ?? x.active ?? x.enabled;
+            return { ...x, id: String(id ?? ""), name: String(name ?? ""), category: String(category ?? ""), rate: Number(rate), min: x.min ?? x.min_quantity ?? x.minimum, max: x.max ?? x.max_quantity ?? x.maximum, country: x.country ?? x.country_code ?? x.region ?? "", image: String(image || ""), catImage: String(x.category_image ?? x.categoryImage ?? x.category_icon ?? x.game_image ?? x.game_icon ?? x.brand_image ?? x.brand_logo ?? ""), amount, available: available === false || available === 0 || available === "false" ? false : true, type: x.type ?? x.delivery_type ?? "" };
+          }).filter((x) => x.id && x.name && Number.isFinite(x.rate) && x.rate > 0);
+          if (!list.length) throw new Error("لم يُرجع المزوّد خدمات قابلة للاستيراد أو أسعاراً صالحة");
+          let count = 0;
+          for (const x of list) {
+            const type = classifyService(x, kind);
+            const hub = kind === "smsactivate" ? "numbers" : HUB_OF_TYPE[type] || "apps";
+            const brand = SV().brandOf({ name: x.name, category: x.category, ptype: type });
+            const cid = ensureCat(hub, brand, x, cache);
+            const product = build(x, { cat: cid, mk: IC.mk, prov: p.id, kind, type });
+            const key = provKey(product);
+            if (existing.has(key)) { skipped++; continue; }
+            existing.add(key); D.products.push(product); count++; added++;
+          }
+          stats.push({ name: p.name, count, received: list.length });
+        } catch (e) {
+          failures.push(p.name + ": " + String(e.message || e).slice(0, 180));
+        }
+      }
+      save();
+      IC.msg = "اكتمل الجلب: أضيف " + added + " منتج، وتجاوزنا " + skipped + " مكرراً. " + stats.map((x) => x.name + " (" + x.count + "/" + x.received + ")").join(" · ") + (failures.length ? " | تعذّر: " + failures.join(" | ") : "");
+      toast("اكتمل الاستيراد: " + added + " خدمة جديدة" + (failures.length ? " مع " + failures.length + " أخطاء مزوّد" : ""));
+    } finally {
+      IC.busy = false; render();
+    }
+  }
 
   async function doFetch() {
     if (!IC.prov) return toast("اختر المزوّد أولاً", "e");
@@ -594,7 +666,7 @@
     });
     const list = cats().filter((c) => {
       if (c.ty !== "shop") return false;
-      if (c.hub === "games" || c.hub === "apps") return true;
+      if (c.hub === "games" || c.hub === "apps" || c.hub === "numbers") return true;
       if (c.hub === "none" || c.ty === "boost" || c.ty === "hub") return false;
       const ps = byCat.get(c.id) || [];
       if (!ps.length) return false;
@@ -610,7 +682,7 @@
         <h4>الباقات (${pkgs.length})</h4>${pkgs.map(({ p, i }) => pkgRow(p, i)).join("") || '<p class="hint">لا توجد باقات بعد.</p>'}
         <div class="acts"><button class="b sm" type="button" data-ic="pkg-add" data-c="${esc(c.id)}">+ باقة جديدة</button><button class="b bd2 sm" type="button" data-ic="cat-del" data-c="${esc(c.id)}">حذف القسم وباقاته</button></div></div>`;
     };
-    return `<div class="card"><h2>إدارة الألعاب والتطبيقات</h2><p class="hint">كل لعبة أو تطبيق قسم مستقل داخل القسم الرئيسي (ألعاب / تطبيقات) وتحته عدة باقات. لكل باقة سعرها وكميتها وحالتها وطريقة تسليمها (تلقائي عبر المزوّد أو يدوي) ورقم الخدمة عند المزوّد.</p>
+    return `<div class="card"><h2>إدارة الألعاب والتطبيقات وأرقام التفعيل</h2><p class="hint">كل لعبة أو تطبيق قسم مستقل داخل القسم الرئيسي (ألعاب / تطبيقات) وتحته عدة باقات. لكل باقة سعرها وكميتها وحالتها وطريقة تسليمها (تلقائي عبر المزوّد أو يدوي) ورقم الخدمة عند المزوّد.</p>
       <div class="acts"><button class="b" type="button" data-ic="hub-add" data-h="games">+ لعبة جديدة</button><button class="b" type="button" data-ic="hub-add" data-h="apps">+ تطبيق / اشتراك جديد</button></div></div>${list.map(mk).join("") || '<div class="card"><p class="hint">لا توجد ألعاب أو تطبيقات بعد. أنشئ واحدة أو استوردها من «مركز الاستيراد».</p></div>'}`;
   }
   function pkgRow(p, i) {
@@ -718,6 +790,7 @@
     switch (a) {
       case "mode": IC.mode = b.dataset.v; IC.prov = ""; IC.target = defTarget(); IC.catList = []; IC.cat = ""; IC.rows = []; IC.fetched = false; IC.msg = ""; IC.sync = []; return render();
       case "fetch": return doFetch();
+      case "auto-all": return autoImportAll();
       case "loadcats": return loadCats();
       case "selall": filteredRows().forEach(([r]) => { if (r.status === "new") r.sel = true; }); return refreshPrev();
       case "selnone": IC.rows.forEach((r) => (r.sel = false)); return refreshPrev();
@@ -790,10 +863,12 @@
   VIEW.import = importView;
   VIEW.products = productsView;
   VIEW.topups = topupsView;
+  VIEW.numbers = function numbersView() { const rows = D.products.map((p,i)=>({p,i})).filter(({p}) => { const c=D.categories.find(x=>x.id===p.c); return c && (c.hub==="numbers" || c.ty==="numbers"); }); const catsN=D.categories.filter(c=>c.hub==="numbers" || c.ty==="numbers"); return `<div class="card"><h2>أرقام التفعيل</h2><p class="hint">كتالوج مستقل للأرقام الافتراضية. عند شراء الخدمة يطلب النظام الرقم من المزوّد، ثم يجلب رمز OTP تلقائياً ويعرضه في تفاصيل الطلب. لا نطلب من العميل إدخال رقم هاتفه أو رمزاً مسبقاً.</p><div class="ic-cnt">${rows.length} خدمة · ${catsN.length} فئة</div><div class="tbw"><table class="tb ic-tb"><thead><tr><th>الخدمة</th><th>المزوّد</th><th>السعر</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.slice(0,250).map(({p,i})=>`<tr><td><b>${esc(p.ar||p.en||p.id)}</b><br><small>${esc(p.smm_service||"—")} · ${esc(p.smm_country||"")}</small></td><td>${esc(provName(p.smm_provider||"main"))}</td><td dir="ltr">${money(+p.p||0)}</td><td>${p.oos||p.hid?"غير متاح":"متاح"}</td><td><button class="b b2 sm" data-ic="open-edit" data-i="${i}">تعديل</button></td></tr>`).join("") || `<tr><td colspan="5">لم تُستورد أرقام بعد.</td></tr>`}</tbody></table></div></div>`; };
   VIEW.smmmgr = smmmgrView;
-  [["import", "استيراد ومزامنة الخدمات"], ["topups", "إدارة الألعاب والتطبيقات"], ["smmmgr", "إدارة خدمات الرشق"]].forEach((t) => { if (!TABS.some((x) => x[0] === t[0])) TABS.push(t); });
+  [["import", "استيراد ومزامنة الخدمات"], ["topups", "إدارة الألعاب والتطبيقات"], ["numbers", "أرقام التفعيل"], ["smmmgr", "إدارة خدمات الرشق"]].forEach((t) => { if (!TABS.some((x) => x[0] === t[0])) TABS.push(t); });
   TI.import = '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>';
   TI.topups = '<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>';
+  TI.numbers = '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 6h6M9 10h6M9 14h2M12 18h.01"/>';
   TI.smmmgr = '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>';
   const storeGrp = TG.find((x) => x[0] === "المتجر");
   if (storeGrp) storeGrp[1] = storeGrp[1].filter((k) => !["import", "topups", "smmmgr"].includes(k));
@@ -802,11 +877,11 @@
   // Group the entire provider-to-catalog workflow in one ordered navigation section.
   const storeGrpNow = TG.find((x) => x[0] === "المتجر");
   if (storeGrpNow) storeGrpNow[1] = storeGrpNow[1].filter((k) => k !== "products" && k !== "categories");
-  const providerGrp = ["إدارة المنتجات والمزوّدين", ["apis", "import", "products", "topups", "smmmgr", "categories"]];
+  const providerGrp = ["إدارة المنتجات والمزوّدين", ["apis", "import", "products", "topups", "numbers", "smmmgr", "categories"]];
   if (!TG.some((x) => x[0] === providerGrp[0])) TG.splice(Math.max(0, TG.findIndex((x) => x[0] === "المتجر")), 0, providerGrp);
-  const relabel = { apis: "1 · اتصال المزوّدين", import: "2 · جلب وفرز الخدمات", products: "3 · كتالوج المنتجات", topups: "4 · الألعاب والتطبيقات", smmmgr: "5 · خدمات الرشق", categories: "6 · الأقسام والتصنيف" };
+  const relabel = { apis: "1 · اتصال المزوّدين", import: "2 · جلب وفرز الخدمات", products: "3 · كتالوج المنتجات", topups: "4 · الألعاب والتطبيقات", numbers: "5 · أرقام التفعيل", smmmgr: "6 · خدمات الرشق", categories: "7 · الأقسام والتصنيف" };
   Object.keys(relabel).forEach((k) => { const i = TABS.findIndex((x) => x[0] === k); if (i >= 0) TABS[i][1] = relabel[k]; });
-  g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, v: 3 };
+  g.AMXImport = { build, priceOf, hubOfCat, catHubLabel, ensureCat, retype, autoImportAll, v: 4 };
   // admin.js may have rendered its first screen before this extension was loaded.
   if (typeof render === "function") render();
 })(window);
