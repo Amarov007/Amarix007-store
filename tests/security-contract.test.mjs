@@ -50,3 +50,9 @@ test("payments v2 has a server-side off switch until E2E signoff", async () => {
   assert.match(sql, /payments_v2_on/i);
   assert.match(sql, /RAISE EXCEPTION/i);
 });
+
+test("admin UI applies the same named permission keys to staff navigation", async () => {
+  const src = await read("../admin.js");
+  assert.match(src, /const TAB_PERM = \{\s*orders: "orders",\s*invoices: "orders",\s*tickets: "tickets",\s*users: "users",\s*products: "products"\s*\}/);
+  assert.match(src, /const canTab = \(k\) => !isStaffOnly\(\) \|\| \(!!TAB_PERM\[k\] && STAFF\.includes\(TAB_PERM\[k\]\)\)/);
+});
