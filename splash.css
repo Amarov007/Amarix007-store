@@ -13,8 +13,8 @@ html.amx-skip #amx-splash{display:none!important}
 }
 #amx-splash.amx-out{
   animation:none;pointer-events:none;
-  transform:translateY(calc(-100% - 90px));
-  transition:transform .9s cubic-bezier(.77,0,.18,1);
+  transform:none;opacity:0;
+  transition:opacity .32s ease;
 }
 @keyframes amxFailsafe{to{visibility:hidden;opacity:0;pointer-events:none}}
 #amx-splash:not(.amx-go) .amx-stage{opacity:0}
@@ -80,3 +80,13 @@ html.amx-skip #amx-splash{display:none!important}
   @keyframes amxFade{to{opacity:1}}
   #amx-splash.amx-out{transform:none;opacity:0;transition:opacity .4s}
 }
+
+
+/* Stability patch: remove the large moving waves/ripples and keep the intro lightweight on phones. */
+#amx-splash .amx-glow,#amx-splash .amx-ring,#amx-splash .amx-wlw,#amx-splash .amx-wl,#amx-splash .amx-edge svg{animation:none!important;}
+#amx-splash .amx-ring{display:none!important;}
+#amx-splash .amx-wlw{transform:translateY(var(--to,18%));}
+#amx-splash .amx-wl{transform:none!important;}
+#amx-splash .amx-glow{opacity:.22;transform:none!important;}
+@media(max-width:700px){#amx-splash .amx-logo{transform:none;}#amx-splash .amx-mark img{filter:none;}}
+@media(prefers-reduced-motion:reduce){#amx-splash.amx-out{opacity:0;transition:opacity .2s;}}
