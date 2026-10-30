@@ -1037,8 +1037,8 @@ const normalizeApiInput = (v, p) => {
 };
 const inputOk = (v, p) => {
   v = normalizeApiInput(v, p);
-  if (apiFieldKind(p) === "email") return /^[^\s@]+@[^\s@]+\\.[^\s@]{2,}$/.test(v) && v.length <= 254;
-  if (apiFieldKind(p) === "phone") return /^\\+[1-9]\d{7,14}$/.test(v);
+  if (apiFieldKind(p) === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) && v.length <= 254;
+  if (apiFieldKind(p) === "phone") return /^\+[1-9]\d{7,14}$/.test(v);
   return v.length >= 2 && v.length <= 120 && !/[\u0000-\u001f<>]/.test(v);
 };
 const isSmmType = (p) => !p.ptype || p.ptype === "smm"; // products typed by the importer as game_topup / app_subscription / gift_card are never boosting (no link + quantity form)
