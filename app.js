@@ -5767,6 +5767,7 @@ function render0() {
   nav();
   startBanners();
   decorate();
+  if (r == "c") hydrateCategoryProducts(dec(id || ""), seq);
   if (r == "login") humanStart();
 }
 addEventListener("hashchange", () => {
@@ -6013,7 +6014,7 @@ if ("serviceWorker" in navigator)
   });
 
 /* Catalog API: resilient, low-request pagination. */
-const CATALOG_PAGE_SIZE = 1000;
+const CATALOG_PAGE_SIZE = 250; // Small first payload; category pages are fetched independently on demand.
 const CATALOG_RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 524]);
 const catalogPause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function catalogRpc(name, body) {
@@ -6051,6 +6052,42 @@ async function catalogRpc(name, body) {
 }
 async function fetchCatalogPage(offset) {
   return catalogRpc("catalog_products_page", { p_offset: offset, p_limit: CATALOG_PAGE_SIZE });
+}
+
+/* Category-first loading: a category must not wait for earlier categories in the global catalogue. */
+const categoryProductsLoaded = new Set();
+const categoryProductsPending = new Map();
+async function hydrateCategoryProducts(categoryId, renderVersion) {
+  const category = C.find((x) => String(x.id) === String(categoryId));
+  if (!category || ["boost", "numbers", "hub"].includes(category.ty) || categoryProductsLoaded.has(String(categoryId))) return;
+  if (categoryProductsPending.has(String(categoryId))) return categoryProductsPending.get(String(categoryId));
+  const task = (async () => {
+    try {
+      let offset = 0, total = 0, items = [];
+      do {
+        const page = await catalogRpc("catalog_category_products_page", {
+          p_category_id: String(categoryId), p_offset: offset, p_limit: 1000
+        });
+        total = Number(page.total || 0);
+        if (!page.items.length) break;
+        items.push(...page.items);
+        offset += page.items.length;
+      } while (offset < total && offset < 20000);
+      const merged = new Map((Array.isArray(CFG?.products) ? CFG.products : []).map((p) => [String(p.id), p]));
+      items.forEach((p) => merged.set(String(p.id), p));
+      const next = { ...CFG, products: [...merged.values()], products_total: Number(CFG?.products_total || total) };
+      setCfg(withDefaults(next));
+      ls.set("amx_remote", next);
+      categoryProductsLoaded.add(String(categoryId));
+      if (renderVersion === routeSeq && location.hash.startsWith("#/c/")) render();
+    } catch (err) {
+      console.warn("[AMARIX] category catalogue load failed", categoryId, err);
+    } finally {
+      categoryProductsPending.delete(String(categoryId));
+    }
+  })();
+  categoryProductsPending.set(String(categoryId), task);
+  return task;
 }
 async function fetchNumberProducts() {
   return catalogRpc("catalog_number_products_page", { p_limit: 500 });
