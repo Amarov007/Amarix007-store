@@ -70,6 +70,8 @@ test("provider service deletion is scoped, backed up, and blocked for open order
   assert.match(src, /status=in\.\(new,processing\)/);
   assert.match(src, /rpc\/has_perm",\s*\{[\s\S]{0,160}p: "orders"/);
   assert.match(src, /amx_smm_backup/);
+  assert.match(src, /localStorage\.setItem\("amx_smm_backup", previous\)/);
+  assert.match(src, /localStorage\.removeItem\("amx_smm_backup"\)/);
   assert.match(src, /smmUndo\(\)/);
 });
 
