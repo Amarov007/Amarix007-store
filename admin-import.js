@@ -58,6 +58,10 @@
   const typeLab = (t) => (TYPE_OPTS.find((x) => x[0] === t) || [0, t])[1].replace(/\s*\(.*$/, "");
   const hubLab = (h) => (HUB_OPTS.find((x) => x[0] === h) || [0, "—"])[1];
   const money = (v) => (v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(3) : String(r6(v)));
+  const officialLogo = (key) => {
+    const slug = { instagram:"instagram", tiktok:"tiktok", youtube:"youtube", facebook:"facebook", x:"x", telegram:"telegram", whatsapp:"whatsapp", snapchat:"snapchat", discord:"discord", threads:"threads", linkedin:"linkedin", pinterest:"pinterest", twitch:"twitch", spotify:"spotify", netflix:"netflix", chatgpt:"openai", claude:"anthropic" }[String(key || "").toLowerCase()];
+    return slug ? "https://cdn.simpleicons.org/" + slug : "";
+  };
   const cats = () => D.categories.filter((c) => c.ty !== "hub");
   const isOnProvider = (p, pv) => String((p.smm_provider || "main")).toLowerCase() === pv;
 
@@ -113,7 +117,7 @@
     Object.assign(it, {
       id: pv === "main" ? "smm" + sid : "smm_" + pv + "_" + sid + (cty ? "_" + cty.replace(/[^A-Za-z0-9_-]/g, "_") : ""),
       c: o.cat, k: "buy", ar, en, p: priceOf(x, type, o.mk), o: 0, d: 0, r: 5, n: 0, bs: 0, tg, sp,
-      img: x.image ? String(x.image) : "", images: [],
+      img: x.image ? String(x.image) : officialLogo(brand.key), images: [],
       ptype: type, bk: brand.key,
       smm_service: String(x.service != null ? x.service : sid), smm_qty: 1, smm_mk: o.mk || 0,
       smm_input: smm || kind === "smsactivate" ? "none" : type === "gift_card" ? "none" : "text",
@@ -149,7 +153,7 @@
     if (!c) {
       c = NEW.categories();
       const known = brand.kind !== "other";
-      Object.assign(c, { ar: hub === "numbers" ? (known ? brand.ar : label || "أرقام التفعيل") : known ? brand.ar : label || brand.ar, en: hub === "numbers" ? (known ? brand.en : label || "Activation numbers") : known ? brand.en : label || brand.en, ty: "shop", i: hub === "games" ? "bolt" : hub === "numbers" ? "phone" : "users", hub, bk: brand.key, image_url: x.catImage || "" });
+      Object.assign(c, { ar: hub === "numbers" ? (known ? brand.ar : label || "أرقام التفعيل") : known ? brand.ar : label || brand.ar, en: hub === "numbers" ? (known ? brand.en : label || "Activation numbers") : known ? brand.en : label || brand.en, ty: "shop", i: hub === "games" ? "bolt" : hub === "numbers" ? "phone" : "users", hub, bk: brand.key, image_url: x.catImage || officialLogo(brand.key) });
       D.categories.push(c);
       cache.made++;
     }
