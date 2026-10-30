@@ -1,9 +1,0 @@
-{
-  "name": "AMARIX007 Digital Assets Store",
-  "description": "AMARIX007 digital assets storefront for trading bots, websites, apps, game top-up, SMM boost services, and virtual numbers.",
-  "version": "1.0.0",
-  "permissions": [],
-  "capabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
