@@ -59,9 +59,14 @@ jobs:
                   raw = info.filename
                   if not raw or raw.startswith(("/", "\\")) or "\\" in raw:
                       raise SystemExit(f"Unsafe archive path: {raw!r}")
-                  rel = PurePosixPath(raw)
-                  if any(part in ("", ".", "..") for part in rel.parts):
+                  raw_parts = raw.split("/")
+                  if raw.endswith("/"):
+                      raw_parts = raw_parts[:-1]
+                  if not raw_parts or any(part in ("", ".", "..") for part in raw_parts):
                       raise SystemExit(f"Unsafe archive path: {raw!r}")
+                  if ":" in raw_parts[0] or "\\x00" in raw:
+                      raise SystemExit(f"Unsafe archive path: {raw!r}")
+                  rel = PurePosixPath(raw)
                   normalized = rel.as_posix().casefold().rstrip("/")
                   if normalized in seen:
                       raise SystemExit(f"Duplicate archive path: {raw!r}")
@@ -127,6 +132,22 @@ jobs:
           rsync -a --delete \
             --exclude='.git' \
             --exclude='.github' \
+            --exclude='.well-known/' \
+            --exclude='supabase/' \
+            --exclude='tests/' \
+            --exclude='tools/' \
+            --exclude='docs/' \
+            --exclude='faq/' \
+            --exclude='policies/' \
+            --exclude='*.md' \
+            --exclude='*.sql' \
+            --exclude='*.py' \
+            --exclude='package.json' \
+            --exclude='tsconfig.json' \
+            --exclude='vite.config.ts' \
+            --exclude='.gitignore' \
+            --exclude='.nojekyll' \
+            --exclude='404.html' \
             --exclude='*.zip' \
             --exclude='CNAME' \
             /tmp/amarix-store-staging/ ./
