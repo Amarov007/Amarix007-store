@@ -54,6 +54,7 @@ let D = clone(PUB),
   tab = "home",
   ed = null,
   pq = "",
+  catAdminQuery = "",
   pcat = "",
   ppin = false,
   prodShow = 100,
@@ -619,14 +620,16 @@ const VIEW = {
   },
   categories() {
     const hubOpts = () => [["", "تلقائي (حسب نوع المنتجات)"], ...["games", "chat", "ai", "apps"].map((h) => [h, (D.categories.find((x) => x.id == "hub_" + h) || {}).ar || ({games:"شحن الألعاب",chat:"تطبيقات الدردشة والبث",ai:"اشتراكات الذكاء الاصطناعي",apps:"التطبيقات والبطاقات الرقمية"}[h])]), ["none", "مستقل (بدون قسم رئيسي)"]];
+    const q = catAdminQuery.trim().toLowerCase();
+    const filtered = D.categories.map((c, i) => ({ c, i })).filter(({ c }) =>
+      !q || [c.ar, c.en, c.id, c.ty].some((v) => String(v || "").toLowerCase().includes(q))
+    );
     return (
-      `<div class="card"><h2>الأقسام</h2><div class="acts"><button class="b" data-a="add" data-k="categories">+ قسم جديد</button><button class="b b2" data-a="add-numbers-cat">+ قسم الأرقام (مجانية ومدفوعة)</button></div></div>` +
-      D.categories
-        .map((c, i) => {
-          const k = "categories." + i + ".";
-          return `<div class="card"><div class="g2">${F( "الاسم (عربي)", k + "ar" )}${F("الاسم (إنجليزي)", k + "en", { d: 1 })}${F( "الوصف (عربي)", k + "da" )}${F("الوصف (إنجليزي)", k + "de", { d: 1 })}${F("النوع", k + "ty", { t: "sel", o: TYPES, re: 1, })}${F("الأيقونة", k + "i", { t: "sel", o: ICONS.map((x) => [x, x]), re: 1, })}${c.ty == "hub" ? "" : F("ينتمي إلى القسم الرئيسي", k + "hub", { t: "sel", o: hubOpts(), re: 1 })}${F("صورة القسم", k + "image_url", { t: "img", w: 1 })}${F( "رابط تضمين (iframe) للقسم", k + "embed_url", { d: 1, w: 1 } )}</div>${c.ty == "hub" ? "" : filtersEditor(c, i)}${c.ty == "numbers" ? freeEditor(c, i) : ""}${mv("categories", i)}</div>`;
-        })
-        .join("")
+      `<div class="card"><div class="category-admin-head"><div><h2>إدارة الأقسام والتصنيفات</h2><p class="hint">${D.categories.length} قسم محفوظ · افتح القسم الذي تريد تعديله فقط</p></div><div class="acts"><button class="b" data-a="add" data-k="categories">+ قسم جديد</button><button class="b b2" data-a="add-numbers-cat">+ قسم الأرقام</button></div></div><input id="catq" class="inp" type="search" placeholder="ابحث باسم القسم أو المعرّف أو النوع…" value="${esc(catAdminQuery)}"><p class="hint category-count">المعروض: ${filtered.length} من ${D.categories.length}</p></div>` +
+      filtered.map(({ c, i }) => {
+        const k = "categories." + i + ".";
+        return `<details class="card cat-admin"><summary><span><b>${esc(c.ar || c.en || c.id || "قسم بلا اسم")}</b><small>${esc(c.id)} · ${esc((TYPES.find((x) => x[0] === c.ty) || [c.ty || "shop", c.ty || "قسم"])[1])}</small></span><span class="cat-admin-open">تحرير القسم</span></summary><div class="cat-admin-body"><div class="g2">${F("الاسم (عربي)", k + "ar")}${F("الاسم (إنجليزي)", k + "en", { d: 1 })}${F("الوصف (عربي)", k + "da")}${F("الوصف (إنجليزي)", k + "de", { d: 1 })}${F("النوع", k + "ty", { t: "sel", o: TYPES, re: 1 })}${F("الأيقونة", k + "i", { t: "sel", o: ICONS.map((x) => [x, x]), re: 1 })}${c.ty == "hub" ? "" : F("ينتمي إلى القسم الرئيسي", k + "hub", { t: "sel", o: hubOpts(), re: 1 })}${F("صورة القسم", k + "image_url", { t: "img", w: 1 })}${F("رابط تضمين (iframe) للقسم", k + "embed_url", { d: 1, w: 1 })}</div>${c.ty == "hub" ? "" : filtersEditor(c, i)}${c.ty == "numbers" ? freeEditor(c, i) : ""}${mv("categories", i)}</div></details>`;
+      }).join("")
     );
   },
   products() {
@@ -1118,6 +1121,12 @@ document.addEventListener("input", (e) => {
     if (t.dataset.n || t.type == "number") v = v === "" ? 0 : +v;
     st(D, t.dataset.p, v);
     later();
+  } else if (t.id == "catq") {
+    catAdminQuery = t.value;
+    const pos = t.selectionStart;
+    render();
+    const n = $("#catq");
+    if (n) { n.focus(); n.setSelectionRange(pos, pos); }
   } else if (t.id == "pq") {
     pq = t.value;
     prodShow = 100;
