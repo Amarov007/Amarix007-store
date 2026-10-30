@@ -5965,6 +5965,35 @@ if ("serviceWorker" in navigator)
     if (m && m.type === "amx-nav" && /^#\/[a-z]+$/.test(m.hash || "")) location.hash = m.hash;
   });
 
+/* Catalog API: fetch product rows in bounded pages so public_config stays small. */
+const CATALOG_PAGE_SIZE = 500;
+async function fetchCatalogPage(offset) {
+  const r = await sb("/rest/v1/rpc/catalog_products_page", {
+    method: "POST", body: { p_offset: offset, p_limit: CATALOG_PAGE_SIZE }, auth: false,
+  });
+  if (!r.ok) throw new Error("catalog_page_http_" + r.status);
+  const page = await r.json();
+  if (!page || !Array.isArray(page.items)) throw new Error("catalog_page_invalid");
+  return page;
+}
+async function loadCatalogRemainder(meta, initial, total) {
+  const products = initial.slice();
+  for (let offset = initial.length; offset < total; offset += CATALOG_PAGE_SIZE) {
+    try {
+      const page = await fetchCatalogPage(offset);
+      if (!page.items.length) break;
+      products.push(...page.items);
+      const next = { ...meta, products: products.slice(), products_total: total };
+      setCfg(withDefaults(next));
+      ls.set("amx_remote", next);
+      head();
+      render();
+    } catch (err) {
+      console.warn("[AMARIX] remaining catalogue page failed", offset, err);
+      break;
+    }
+  }
+}
 /* ---------- 15. Boot ---------- */
 /* A config published by an older admin may lack newer sections (payments, partner, social…): fall back to the embedded ones */
 function withDefaults(d) {
@@ -5993,6 +6022,7 @@ async function boot() {
   const cached =
     REMOTE_CFG && Array.isArray(REMOTE_CFG.products) ? REMOTE_CFG : null;
   let painted = false;
+  let catalogRemainder = null;
   if (cached) {
     setCfg(withDefaults(cached));
     head();
@@ -6031,13 +6061,25 @@ async function boot() {
       }
       }
     } catch (payCfgError) { console.warn("[AMARIX] payment_methods_public unavailable; public_config fallback used", payCfgError); }
-    if (d && Array.isArray(d.products)) {
-      ls.set("amx_remote", d); // remember it for the next visit; payment accounts were removed from public methods
-      if (paymentMethodsRead || !cached || d.ts !== cached.ts) {
-        setCfg(withDefaults(d));
+    if (d && (Array.isArray(d.products) || Number.isFinite(Number(d.products_total)))) {
+      if (Array.isArray(d.products)) {
+        // Backward-compatible path if the older full-catalog RPC is still deployed.
+        ls.set("amx_remote", d);
+        if (paymentMethodsRead || !cached || d.ts !== cached.ts) {
+          setCfg(withDefaults(d));
+          painted = false;
+        } else painted = true;
+      } else {
+        const first = await fetchCatalogPage(0);
+        const products = first.items;
+        const total = Number(first.total || d.products_total || products.length);
+        const meta = { ...d, products_total: total };
+        const initial = { ...meta, products };
+        ls.set("amx_remote", initial); // cache only the first page, not the entire catalogue
+        setCfg(withDefaults(initial));
         painted = false;
-      } // v2 methods are authoritative even when other store data is unchanged
-      else painted = true;
+        if (products.length < total) catalogRemainder = { meta, products, total };
+      }
     }
   } catch {}
   waitCfg = false;
@@ -6046,6 +6088,7 @@ async function boot() {
     head();
     render();
   } // first paint (no cache) or a newer published version
+  if (catalogRemainder) loadCatalogRemainder(catalogRemainder.meta, catalogRemainder.products, catalogRemainder.total);
   loadStats().then((ch) => ch && render());
   trackView();
   if (user) {
