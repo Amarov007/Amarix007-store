@@ -37,6 +37,7 @@ export interface Product {
   d?: number; // discount percentage
   tg?: string; // tags
   sp?: string; // specs summary (e.g. "MT5 · Forex")
+  specs?: string; // extended technical specifications shown on the product detail page
   img?: string;
   images?: string[];
   description_ar?: string;
