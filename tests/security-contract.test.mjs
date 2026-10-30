@@ -80,3 +80,13 @@ test("Payments V2 is forced off on every store_config write", async () => {
   assert.match(sql, /ARRAY\['products','ts','api','payments_v2'\]/i);
   assert.match(sql, /REVOKE ALL ON FUNCTION public\.publish_store_config[\s\S]*?GRANT EXECUTE ON FUNCTION public\.publish_store_config/i);
 });
+
+
+test("AI support fails closed when the shared rate limiter is unavailable", async () => {
+  const src = await read("../supabase/functions/ai-support/index.ts");
+  assert.match(src, /Promise<boolean \| null>/);
+  assert.match(src, /persistentLimit === null/);
+  assert.match(src, /rate_limit_unavailable/);
+  assert.match(src, /rawBody\.length > 20000/);
+  assert.match(src, /payload_too_large/);
+});
