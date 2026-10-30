@@ -811,6 +811,9 @@ let bq = 1, bqId = ""; // quick quantity chosen on a boost product page
 
 if (!T[lang]) lang = "ar";
 
+/* Activation-number country collections are separate categories created by the provider importer. */
+const isVirtualNumberCategory = (c) => !!c && (c.hub === "numbers" || /(أرقام\s*التفعيل|ارقام\s*التفعيل|virtual\s*numbers|activation\s*numbers)/i.test(String(c.ar || "") + " " + String(c.en || "")));
+const numberProducts = (c) => P.filter((p) => { const pc = C.find((x) => String(x.id) === String(p.c)); return pc && isVirtualNumberCategory(pc); });
 /* Config: embedded store-data.js, overridden by a newer remote copy */
 function setCfg(cfg) {
   CFG = cfg;
@@ -854,7 +857,7 @@ function setCfg(cfg) {
     se: ex(b.se),
   })).filter((b) => b.img || !(isGenericTitle(b.ar) && isGenericTitle(b.en))); // untouched placeholder banners without a picture are hidden
   CP = CFG.coupons && typeof CFG.coupons == "object" ? CFG.coupons : {}; // only the coupons the server chose to publish; the rest are checked through check_coupon()
-  CV = C.filter((c) => P.some((p) => p.c == c.id) || (c.ty == "numbers" && freeOf(c).length) || E.some((e) => e.c == c.id && embedOk(e)) || catEmbedOk(c) || c.id === "ai-subscriptions" || c.id === "pubg-mobile-uc"); // sections with nothing to show are hidden from the strip and the home grid (data is untouched)
+  CV = C.filter((c) => P.some((p) => p.c == c.id) || (c.ty == "numbers" && (freeOf(c).length || C.some(isVirtualNumberCategory))) || E.some((e) => e.c == c.id && embedOk(e)) || catEmbedOk(c) || c.id === "ai-subscriptions" || c.id === "pubg-mobile-uc"); // sections with nothing to show are hidden from the strip and the home grid (data is untouched)
   if (window.AMXHub) CV = AMXHub.apply(CV, C); // hubs.js: games, chat apps, AI subscriptions and digital apps are folded into master sections (members keep their ids and routes)
   /* The strip, home grid and drawer must never show the same section twice: drop repeated ids, entries without any name, and standalone
      categories that carry the same name as a master section (games / apps). Data is untouched; only the lists are cleaned. */
@@ -2184,16 +2187,16 @@ const nmFlag = (name) => {
   return c ? String.fromCodePoint(...[...c].map((x) => 127397 + x.charCodeAt(0))) : "";
 };
 function nmMeta(p) {
-  const sig = p.en + "|" + p.ar;
+  const sig = [p.en, p.ar, p.smm_cat].join("|");
   let m = NMM[p.id];
   if (m && m.sig == sig) return m;
-  const sp = (s) => plain(s).split(/\s[·•]\s/).map((x) => x.trim());
-  const e = sp(p.en),
-    a = sp(p.ar),
-    sv = e[0] || a[0] || "",
-    cEn = e.length > 1 ? e.slice(1).join(" · ") : "",
-    cAr = a.length > 1 ? a.slice(1).join(" · ") : "";
-  return (NMM[p.id] = { sig, sv, key: nmKey(sv), cEn, cAr, c: cEn || cAr, flag: nmFlag(cEn || cAr), h: nz(plain([p.tg, p.en, p.ar].join(" "))) });
+  const raw = String(p.en || p.ar || "");
+  const match = raw.match(/[—–-]\s*([^—–-]+?)\s*[—–-]\s*[^—–-]+$/);
+  const sv = (match && match[1].trim()) || String(p.smm_service || p.sp || "Service");
+  const country = String(p.smm_cat || "").replace(/^(?:أرقام\s*التفعيل|ارقام\s*التفعيل|virtual\s*numbers)\s*[·•-]\s*/i, "").trim();
+  const cEn = country || raw.split(/[—–]/).pop().trim();
+  const cAr = country || cEn;
+  return (NMM[p.id] = { sig, sv, key: nmKey(sv), cEn, cAr, c: cEn, flag: nmFlag(cEn), h: nz(plain([p.tg, p.sp, p.smm_cat, p.en, p.ar].join(" "))) });
 }
 const nmCty = (m) => (lang == "ar" ? m.cAr || m.cEn : m.cEn || m.cAr);
 function nmBadge(name, z) {
@@ -2206,7 +2209,7 @@ function nmBadge(name, z) {
   return `<span class="sb-pi" style="background:hsl(${s % 360} 55% 38%);color:#fff"><b class="sb-lt">${ex(L)}</b></span>`;
 }
 function nmCalc(c) {
-  const all = P.filter((p) => p.c == c.id),
+  const all = numberProducts(c),
     sv = new Map();
   all.forEach((p) => {
     const m = nmMeta(p);
@@ -2265,7 +2268,7 @@ function nmRes(f) {
   return `${bar}<div class="sb-list">${show.map(nmRow).join("")}</div>${a.length > show.length ? `<button type="button" class="b b2 block sb-more" data-a="nmmore">${sbT("عرض المزيد", "Show more")} (${fmtN(a.length - show.length)})</button>` : ""}`;
 }
 function numPaid(c) {
-  if (!P.some((p) => p.c == c.id)) return emptyBox("box", t("catempty"));
+  if (!numberProducts(c).length) return emptyBox("box", t("catempty"));
   const f = nmCalc(c);
   return `<div class="box sb-panel"><div class="sb-lab"><i>1</i>${sbT("الخدمة التي تريد تفعيلها", "Service to verify")}</div>
 <div class="sb-s"><span class="sb-si">${ic("search", 18)}</span><input id="nm-q" class="inp" type="search" data-a="nmq" value="${ex(NM.q)}" placeholder="${sbT("ابحث عن خدمة: واتساب، تيليجرام…", "Search a service: WhatsApp, Telegram…")}" autocomplete="off" enterkeyhint="search" aria-label="${sbT("بحث", "Search")}"></div>
@@ -3540,7 +3543,7 @@ function nmT0(o, r) {
 const isNumItem = (i) => {
   const p = prod(i.id),
     c = p && cat(p.c);
-  return !!p && apiMode(p) && !!c && c.ty == "numbers";
+  return !!p && apiMode(p) && !!c && (c.ty == "numbers" || isVirtualNumberCategory(c));
 };
 function nmSteps(n) {
   return `<div class="nm-st">${NM_STEPS.map((x, i) => `<span class="${i < n ? "on" : i == n ? "cur" : ""}">${i < n ? ic("check", 12) + " " : ""}${sbT(x[0], x[1])}</span>`).join("")}</div>`;
@@ -5981,7 +5984,7 @@ if ("serviceWorker" in navigator)
   });
 
 /* Catalog API: fetch product rows in bounded pages so public_config stays small. */
-const CATALOG_PAGE_SIZE = 500;
+const CATALOG_PAGE_SIZE = 150;
 async function fetchCatalogPage(offset) {
   const r = await sb("/rest/v1/rpc/catalog_products_page", {
     method: "POST", body: { p_offset: offset, p_limit: CATALOG_PAGE_SIZE }, auth: false,
@@ -5991,24 +5994,29 @@ async function fetchCatalogPage(offset) {
   if (!page || !Array.isArray(page.items)) throw new Error("catalog_page_invalid");
   return page;
 }
+let catalogLoading = false;
 async function loadCatalogRemainder(meta, initial, total) {
   const products = initial.slice();
-  for (let offset = initial.length; offset < total; offset += CATALOG_PAGE_SIZE) {
+  catalogLoading = true;
+  let offset = initial.length;
+  while (offset < total) {
+    const offsets = [];
+    for (let n = 0; n < 4 && offset < total; n++, offset += CATALOG_PAGE_SIZE) offsets.push(offset);
     try {
-      const page = await fetchCatalogPage(offset);
-      if (!page.items.length) break;
-      products.push(...page.items);
+      const pages = await Promise.all(offsets.map(fetchCatalogPage));
+      let added = 0;
+      pages.forEach((page) => { if (Array.isArray(page.items)) { products.push(...page.items); added += page.items.length; } });
+      if (!added) break;
+      const next = { ...meta, products: products.slice(), products_total: total };
+      setCfg(withDefaults(next));
+      if (location.hash.startsWith("#/c/") && cat(decodeURIComponent(location.hash.split("/")[2] || ""))?.ty === "numbers") render();
+      ls.set("amx_remote", next);
     } catch (err) {
-      console.warn("[AMARIX] remaining catalogue page failed", offset, err);
+      console.warn("[AMARIX] remaining catalogue batch failed", offsets[0], err);
       break;
     }
   }
-  // Update the in-memory catalogue/cache without rebuilding the visible page.
-  // Re-rendering here replaced the entire route after the final page arrived,
-  // which caused a noticeable jump while the customer was scrolling.
-  const next = { ...meta, products, products_total: total };
-  setCfg(withDefaults(next));
-  ls.set("amx_remote", next);
+  catalogLoading = false;
 }
 /* ---------- 15. Boot ---------- */
 /* A config published by an older admin may lack newer sections (payments, partner, social…): fall back to the embedded ones */
