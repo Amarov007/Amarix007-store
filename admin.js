@@ -311,10 +311,13 @@ function badge() {
 function save() {
   dirty = true;
   try {
-    localStorage.setItem("amx_draft", JSON.stringify(pubData()));
+    const draft = JSON.stringify(pubData());
+    localStorage.setItem("amx_draft", draft);
     badge();
+    return true;
   } catch (e) {
-    toast("تعذّر حفظ المسودة", "e");
+    toast("تعذّر حفظ المسودة: مساحة التخزين ممتلئة أو غير متاحة. لم تُحفظ نتائج الجلب محلياً.", "e");
+    return false;
   }
 }
 let tm;
