@@ -1024,8 +1024,8 @@ const apiInput = (p) => apiMode(p) && String(p.smm_input).trim() != "none";
 const apiFieldKind = (p) => {
   const c = cat(p.c), req = Array.isArray(p.req) ? p.req : [];
   if (isVirtualNumberCategory(c)) return "phone";
-  if (req.includes("email") || p.ptype === "app_subscription" || c?.hub === "ai" || c?.id === "ai-subscriptions") return "email";
   if (req.includes("phone")) return "phone";
+  if (req.includes("email") || p.ptype === "app_subscription" || c?.hub === "ai" || c?.id === "ai-subscriptions") return "email";
   return "id";
 };
 const normalizeApiInput = (v, p) => {
