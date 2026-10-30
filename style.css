@@ -4145,3 +4145,40 @@ body.qb-open{overflow:hidden}
 @media (max-width: 380px) {
   .pr-p b.n { padding: 4px 8px; font-size: 11px; }
 }
+
+
+/* ---------- AMARIX motion polish (GPU-friendly, accessible) ---------- */
+@keyframes amx-route-enter {
+  from { opacity: .72; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes amx-card-enter {
+  from { opacity: .78; transform: translate3d(0, 7px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+#m.route-enter {
+  animation: amx-route-enter 220ms cubic-bezier(.2,.75,.25,1) both;
+}
+#m.route-enter .cd:nth-child(-n+6) {
+  animation: amx-card-enter 300ms cubic-bezier(.2,.75,.25,1) both;
+}
+#m.route-enter .cd:nth-child(2) { animation-delay: 18ms; }
+#m.route-enter .cd:nth-child(3) { animation-delay: 36ms; }
+#m.route-enter .cd:nth-child(4) { animation-delay: 54ms; }
+#m.route-enter .cd:nth-child(5) { animation-delay: 72ms; }
+#m.route-enter .cd:nth-child(6) { animation-delay: 90ms; }
+@media (hover: hover) and (pointer: fine) {
+  .cd { transition: border-color .2s, transform .2s, box-shadow .2s; }
+  .cd:hover { transform: translate3d(0,-3px,0); box-shadow: 0 10px 24px -18px rgba(0,0,0,.48); }
+  .ct { transition: border-color .2s, transform .2s, box-shadow .2s; }
+  .ct:hover { transform: translate3d(0,-2px,0); box-shadow: 0 8px 20px -17px rgba(0,0,0,.42); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #m.route-enter,
+  #m.route-enter .cd,
+  .cd, .ct, .b, .ib, #nv a svg {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
