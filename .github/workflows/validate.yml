@@ -34,5 +34,11 @@ jobs:
       - name: Check Edge Functions
         run: |
           deno check --node-modules-dir=none supabase/functions/ai-support/index.ts
+          deno check --node-modules-dir=none supabase/functions/api-hub/index.ts
+          deno check --node-modules-dir=none supabase/functions/img-shrink/index.ts
+          deno check --node-modules-dir=none supabase/functions/media-seed/index.ts
+          deno check --node-modules-dir=none supabase/functions/payment-proof-hash/index.ts
+          deno check --node-modules-dir=none supabase/functions/send-push/index.ts
           deno check --node-modules-dir=none supabase/functions/smm-order/index.ts
           deno check --node-modules-dir=none supabase/functions/telegram-admin/index.ts
+          deno check --node-modules-dir=none supabase/functions/telegram-auth/index.ts
