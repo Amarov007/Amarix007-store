@@ -1927,7 +1927,6 @@ function buildPublishDiff(productsOnly = false) {
   return { patch, upserts, deletes, order: orderChanged ? afterOrder : null, count: upserts.length + deletes.length };
 }
 async function savePublishDiff(productsOnly = false) {
-  // Cancel the debounced local-draft write so it cannot re-mark a successful publish as dirty.
   clearTimeout(tm);
   tm = null;
   const diff = buildPublishDiff(productsOnly);
@@ -1938,32 +1937,70 @@ async function savePublishDiff(productsOnly = false) {
     toast("لا توجد تغييرات جديدة للنشر");
     return;
   }
-  // Keep one atomic server transaction: chunking separate transactions would expose partially published catalogs.
-  // Only changed product records and changed top-level config sections cross the network.
-  const r = await api("/rest/v1/rpc/publish_store_config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      p_base_ts: BASE_TS,
-      p_patch: diff.patch,
-      p_product_upserts: diff.upserts,
-      p_product_delete_ids: diff.deletes,
-      p_product_order: diff.order,
-    }),
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    if (/stale|40001/.test(t)) throw new Error("تم تعديل المتجر من جلسة أخرى؛ حدّث الصفحة وادمج تعديلاتك قبل إعادة النشر");
-    throw new Error(t.slice(0, 220));
+
+  // Stage small chunks first; the catalog becomes visible only after one atomic commit.
+  const batchId = crypto.randomUUID();
+  const chunks = [];
+  let chunk = [], bytes = 2;
+  for (const product of diff.upserts) {
+    const size = new TextEncoder().encode(JSON.stringify(product)).length + 1;
+    if (size > 240000) throw new Error("يوجد منتج حجمه أكبر من الحد الآمن للنشر؛ افحص صور/بيانات هذا المنتج");
+    if (chunk.length && bytes + size > 240000) {
+      chunks.push(chunk);
+      chunk = [];
+      bytes = 2;
+    }
+    chunk.push(product);
+    bytes += size;
   }
-  const ts = await r.json();
-  D.ts = Number(ts);
-  BASE_TS = Number(ts);
-  BASE_DATA = clone(pubData());
-  dirty = false;
-  badge();
-  try { localStorage.removeItem("amx_draft"); } catch (e) {}
-  toast(`تم النشر بنجاح · ${diff.upserts.length} منتج مضاف/محدّث · ${diff.deletes.length} محذوف`);
+  if (chunk.length || !chunks.length) chunks.push(chunk);
+
+  const rpc = async (name, payload) => {
+    const response = await api("/rest/v1/rpc/" + name, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      if (/stale|40001/.test(body)) throw new Error("تم تعديل المتجر من جلسة أخرى؛ حدّث الصفحة وادمج تعديلاتك قبل إعادة النشر");
+      throw new Error(body.slice(0, 240));
+    }
+    return response.json();
+  };
+
+  try {
+    for (let index = 0; index < chunks.length; index++) {
+      await rpc("stage_store_config_publish", {
+        p_batch_id: batchId,
+        p_base_ts: BASE_TS,
+        p_patch: index === 0 ? diff.patch : {},
+        p_product_upserts: chunks[index],
+        p_product_delete_ids: index === 0 ? diff.deletes : [],
+        p_product_order: index === 0 ? diff.order : null,
+        p_chunk_no: index,
+      });
+      toast(`تجهيز النشر الآمن: ${index + 1}/${chunks.length}`);
+    }
+
+    const ts = await rpc("commit_store_config_publish", { p_batch_id: batchId });
+    D.ts = Number(ts);
+    BASE_TS = Number(ts);
+    BASE_DATA = clone(pubData());
+    dirty = false;
+    badge();
+    try { localStorage.removeItem("amx_draft"); } catch (e) {}
+    toast(`تم النشر بنجاح · ${diff.upserts.length} منتج مضاف/محدّث · ${diff.deletes.length} محذوف`);
+  } catch (error) {
+    try {
+      await api("/rest/v1/rpc/cancel_store_config_publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ p_batch_id: batchId }),
+      });
+    } catch (cleanupError) {}
+    throw error;
+  }
 }
 async function publishStaff(btn) {
   if (!CFG_OK || !STAFF.includes("products")) {
