@@ -230,6 +230,8 @@ const PAY_ICONS = [
   ["", "بدون (حروف أو شعار مرفوع)"],
   ["usdt", "USDT"],
   ["binance", "Binance"],
+  ["syriatel", "سيرياتيل كاش"],
+  ["sham", "شام كاش"],
 ];
 const ORDER_STATUSES = [
   ["new", "جديد"],
