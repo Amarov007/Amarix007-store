@@ -345,7 +345,7 @@
         } catch (e) {
           fetched[index] = { provider: p, error: String(e.message || e).slice(0, 180) };
         }
-        IC.msg = "تم استلام بيانات " + (index + 1) + " من " + unique.length + " مزوّد…";
+        setProgress("تم استلام بيانات " + (index + 1) + " من " + unique.length + " مزوّد…");
         await yieldUI();
       }
     }
@@ -381,11 +381,14 @@
         stats.push({ name: p.name, count, received: list.length });
       }
       // One draft write only; do not trigger bulk image discovery automatically on thousands of records.
-      if (typeof save === "function" && save() !== true) {
-        throw new Error("تم استلام البيانات وفرزها، لكن تعذّر حفظ المسودة في المتصفح. لم يتم تأكيد حفظ المنتجات؛ لا تغلق الصفحة قبل معالجة مساحة التخزين.");
+      const summary = "اكتمل الجلب: أضيف " + added + " منتج، وتجاوزنا " + skipped + " مكرراً. " + stats.map((x) => x.name + " (" + x.count + "/" + x.received + ")").join(" · ") + (failures.length ? " | تعذّر: " + failures.join(" | ") : "");
+      if (typeof save !== "function" || save() !== true) {
+        IC.msg = "وصلت البيانات وفرزنا " + added + " منتج، لكن لم تُحفظ المسودة محلياً. لا تغلق الصفحة ولا تضغط نشر؛ عالج مساحة التخزين أولاً.";
+        toast("فشل حفظ المسودة — لم يتم تأكيد حفظ المنتجات", "e");
+      } else {
+        IC.msg = summary;
+        toast("اكتمل الاستيراد وحُفظت المسودة: " + added + " خدمة جديدة" + (failures.length ? " مع " + failures.length + " أخطاء مزوّد" : ""));
       }
-      IC.msg = "اكتمل الجلب: أضيف " + added + " منتج، وتجاوزنا " + skipped + " مكرراً. " + stats.map((x) => x.name + " (" + x.count + "/" + x.received + ")").join(" · ") + (failures.length ? " | تعذّر: " + failures.join(" | ") : "");
-      toast("اكتمل الاستيراد: " + added + " خدمة جديدة" + (failures.length ? " مع " + failures.length + " أخطاء مزوّد" : ""));
     } finally {
       IC.busy = false; render();
     }
