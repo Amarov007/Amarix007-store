@@ -1494,6 +1494,7 @@ document.addEventListener("click", (e) => {
   if (a == "smm-test" || a == "smm-services") return smmAction(b, a);
   if (a == "smm-fcat-go") return smmFcatGo(b);
   if (a == "smm-imp") return smmImport(b);
+  if (a == "smm-delete-imported") return smmDeleteImported(b);
   if (a == "smm-wipe") return smmWipe(b, false);
   if (a == "smm-redo") return smmWipe(b, true);
   if (a == "smm-undo") return smmUndo();
@@ -3147,9 +3148,14 @@ function smmList() {
   /* FIX: there is NO default target any more (it used to fall back to the first "boost" category, which dumped games / apps into SMM). */
   if (SMM_CAT && !D.categories.some((c) => c.id == SMM_CAT)) SMM_CAT = "";
   const all = smmFiltered(), L = all.slice(0, 80);
+  const provider = SMM_SVC_PROV || smmProv();
+  const importedCount = D.products.filter((p) => p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === provider).length;
   const bar =
-    '<p class="hint" style="margin:6px 0">المصدر: <b>' + esc(provName(SMM_SVC_PROV || "main")) + '</b> — المنتجات المستوردة تُربط بهذا الموقع.</p>' +
-    '<div class="g2" style="margin:8px 0;align-items:end">' +
+    '<p class="hint" style="margin:6px 0">المصدر: <b>' + esc(provName(provider)) + '</b> — المنتجات المستوردة تُربط بهذا الموقع.</p>' +
+    '<div class="acts" style="margin:8px 0">' +
+    `<button class="b b2" type="button" data-a="smm-delete-imported"${importedCount ? "" : " disabled"}>🗑 حذف الخدمات المستوردة من هذا المزوّد (${importedCount})</button>` +
+    '<button class="b b2" type="button" data-a="smm-undo">↶ استرجاع آخر حذف</button></div>' +
+    '<div class="g2" style="margin:8px 0;align-items:end">'
     '<label class="fld"><span>\u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u0645\u0633\u062a\u0647\u062f\u0641 (\u0625\u0644\u0632\u0627\u0645\u064a)</span><select class="inp" id="smm-cat"><option value="">\u2014 \u0627\u062e\u062a\u0631 \u0627\u0644\u0642\u0633\u0645 \u0642\u0628\u0644 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u2014</option>' +
     D.categories.filter((c) => c.ty != "hub").map((c) => `<option value="${esc(c.id)}"${c.id == SMM_CAT ? " selected" : ""}>${esc(c.ar || c.en || c.id)} \u00b7 ${esc(typeof AMXImport != "undefined" ? AMXImport.catHubLabel(c) : "")}</option>`).join("") +
     '</select></label>' +
@@ -3157,8 +3163,8 @@ function smmList() {
     `<label class="fld"><span>الحد الأقصى للاستيراد (0 = كل النتائج)</span><input class="inp" id="smm-lim" type="number" min="0" step="100" value="${esc(String(smmLim() === Infinity ? 0 : smmLim()))}" dir="ltr"></label></div>` +
     `<button class="b" data-a="smm-imp" data-id="*">\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0643\u0644 \u0627\u0644\u0646\u062a\u0627\u0626\u062c (${Math.min(all.length, smmLim())})</button> <button class="b b2" type="button" data-tab="import">\u0645\u0631\u0643\u0632 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0627\u0644\u0645\u062a\u0642\u062f\u0645 (\u0645\u0639\u0627\u064a\u0646\u0629 \u0648\u062a\u0639\u062f\u064a\u0644 \u0642\u0628\u0644 \u0627\u0644\u062d\u0641\u0638) \u2190</button>`;
   smmOut(
-    smmCatPick() + (L.length
-      ? bar + (smmGroupsOf(all.slice(0, smmLim())) ? smmMapBox(smmGroupsOf(all.slice(0, smmLim()))) : "") +
+    smmCatPick() + bar + (L.length
+      ? (smmGroupsOf(all.slice(0, smmLim())) ? smmMapBox(smmGroupsOf(all.slice(0, smmLim()))) : "") +
           '<table class="tb"><tr><th>ID</th><th></th><th>/1000</th><th>min-max</th><th></th></tr>' +
           L.map(
             (x) =>
@@ -3295,9 +3301,63 @@ async function smmWipe(btn, redo) {
     busy(btn, false);
   }
 }
+async function smmDeleteImported(btn) {
+  const prov = SMM_SVC_PROV || smmProv();
+  const old = D.products.filter((p) =>
+    p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov
+  );
+  if (!old.length) return toast("لا توجد خدمات مستوردة لهذا المزوّد", "e");
+  if (!confirm(`سيتم حذف ${old.length} خدمة مستوردة من «${provName(prov)}» فقط. لن تُحذف الطلبات أو الأرصدة أو السجلات المالية، ولن تتأثر منتجاتك اليدوية أو خدمات المزوّدين الآخرين. متابعة؟`)) return;
+
+  busy(btn, true);
+  try {
+    // Fail closed: never remove a provider mapping while an open order still needs it for fulfilment.
+    const r = await api("/rest/v1/orders?select=id,status,items&status=in.(new,processing)&limit=5000");
+    if (!r.ok) throw new Error("تعذّر التحقق من الطلبات المفتوحة؛ أُوقف الحذف لحماية عمليات التنفيذ");
+    const orders = await r.json();
+    const ids = new Set(old.map((p) => String(p.id)));
+    const pending = (Array.isArray(orders) ? orders : []).filter((o) => {
+      let items = o.items;
+      if (typeof items === "string") { try { items = JSON.parse(items); } catch (e) { items = []; } }
+      return Array.isArray(items) && items.some((it) => ids.has(String(it.id)));
+    });
+    if (pending.length) {
+      const refs = pending.slice(0, 8).map((o) => "#" + String(o.id)).join("، ");
+      throw new Error(`لا يمكن الحذف الآن: توجد ${pending.length} طلبات مفتوحة تعتمد على هذه الخدمات (${refs}). أكملها أو ألغها أولاً.`);
+    }
+
+    const previous = localStorage.getItem("amx_smm_backup");
+    if (previous) {
+      try {
+        const parsed = JSON.parse(previous);
+        if (Array.isArray(parsed?.items) && parsed.items.length) localStorage.setItem("amx_smm_backup_previous", previous);
+      } catch (e) {}
+    }
+    localStorage.setItem("amx_smm_backup", JSON.stringify({ ts: Date.now(), provider: prov, items: old }));
+    const idsToDelete = new Set(old.map((p) => String(p.id)));
+    for (let i = D.products.length - 1; i >= 0; i--) {
+      const p = D.products[i];
+      if (p && p.smm_service != null && String(p.smm_service) !== "" && provOf(p) === prov && idsToDelete.has(String(p.id))) {
+        D.products.splice(i, 1);
+      }
+    }
+    save();
+    toast(`حُذفت ${old.length} خدمة من «${provName(prov)}». اضغط «نشر» لتطبيق الحذف على المتجر.`);
+    smmOut(smmCatPick() + `<p class="hint">✓ حُذفت ${old.length} خدمة مستوردة من «${esc(provName(prov))}». النسخة الاحتياطية جاهزة للاسترجاع. اضغط «نشر» لحفظ التغيير.</p>`);
+    render();
+  } catch (e) {
+    toast("أُوقف الحذف — " + String(e.message || e).slice(0, 150), "e");
+    smmOut(smmCatPick() + `<p class="hint warn">✗ ${esc(e.message || e)}</p>`);
+  } finally {
+    busy(btn, false);
+  }
+}
 function smmUndo() {
   let b = null;
   try { b = JSON.parse(localStorage.getItem("amx_smm_backup") || "null"); } catch (e) {}
+  if (!b || !Array.isArray(b.items) || !b.items.length) {
+    try { b = JSON.parse(localStorage.getItem("amx_smm_backup_previous") || "null"); } catch (e) {}
+  }
   if (!b || !Array.isArray(b.items) || !b.items.length) return toast("لا توجد نسخة محذوفة للاسترجاع", "e");
   if (!confirm(`استرجاع ${b.items.length} منتج حُذف في ${new Date(b.ts).toLocaleString("ar")}؟ (المنتجات الجديدة بنفس المعرّف ستُستبدل)`)) return;
   const ids = new Set(b.items.map((p) => p.id));
