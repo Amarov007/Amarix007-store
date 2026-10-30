@@ -5994,9 +5994,17 @@ async function fetchCatalogPage(offset) {
   if (!page || !Array.isArray(page.items)) throw new Error("catalog_page_invalid");
   return page;
 }
+async function fetchNumberProducts() {
+  const r = await sb("/rest/v1/rpc/catalog_number_products_page", { method: "POST", body: { p_limit: 500 }, auth: false });
+  if (!r.ok) throw new Error("catalog_numbers_http_" + r.status);
+  const page = await r.json();
+  if (!page || !Array.isArray(page.items)) throw new Error("catalog_numbers_invalid");
+  return page;
+}
 let catalogLoading = false;
-async function loadCatalogRemainder(meta, initial, total) {
-  const products = initial.slice();
+async function loadCatalogRemainder(meta, initial, total, seeded = []) {
+  const products = [...new Map([...initial, ...seeded].map((p) => [String(p.id), p])).values()];
+  const known = new Set(products.map((p) => String(p.id)));
   catalogLoading = true;
   let offset = initial.length;
   while (offset < total) {
@@ -6005,7 +6013,7 @@ async function loadCatalogRemainder(meta, initial, total) {
     try {
       const pages = await Promise.all(offsets.map(fetchCatalogPage));
       let added = 0;
-      pages.forEach((page) => { if (Array.isArray(page.items)) { products.push(...page.items); added += page.items.length; } });
+      pages.forEach((page) => { if (Array.isArray(page.items)) page.items.forEach((p) => { const id = String(p.id); if (!known.has(id)) { known.add(id); products.push(p); added++; } }); });
       if (!added) break;
       const next = { ...meta, products: products.slice(), products_total: total };
       setCfg(withDefaults(next));
@@ -6094,15 +6102,18 @@ async function boot() {
           painted = false;
         } else painted = true;
       } else {
-        const first = await fetchCatalogPage(0);
-        const products = first.items;
+        /* Load the first general page and the activation-number catalogue in parallel.
+           Number products live in separate country categories and otherwise appear only near the end of the full catalogue. */
+        const [first, numberPage] = await Promise.all([fetchCatalogPage(0), fetchNumberProducts()]);
+        const numberItems = numberPage.items || [];
+        const products = [...new Map([...first.items, ...numberItems].map((p) => [String(p.id), p])).values()];
         const total = Number(first.total || d.products_total || products.length);
         const meta = { ...d, products_total: total };
         const initial = { ...meta, products };
-        ls.set("amx_remote", initial); // cache only the first page, not the entire catalogue
+        ls.set("amx_remote", initial);
         setCfg(withDefaults(initial));
         painted = false;
-        if (products.length < total) catalogRemainder = { meta, products, total };
+        if (first.items.length < total) catalogRemainder = { meta, products: first.items, total, seed: numberItems };
       }
     }
   } catch {}
@@ -6112,7 +6123,7 @@ async function boot() {
     head();
     render();
   } // first paint (no cache) or a newer published version
-  if (catalogRemainder) loadCatalogRemainder(catalogRemainder.meta, catalogRemainder.products, catalogRemainder.total);
+  if (catalogRemainder) loadCatalogRemainder(catalogRemainder.meta, catalogRemainder.products, catalogRemainder.total, catalogRemainder.seed);
   loadStats().then((ch) => ch && render());
   trackView();
   if (user) {
