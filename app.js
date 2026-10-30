@@ -6052,7 +6052,7 @@ async function fetchNumberProducts() {
 }
 let catalogLoading = false;
 async function loadCatalogRemainder(meta, initial, total, seeded = []) {
-  const products = [...new Map([...initial, ...seeded].map((p) => [String(p.id), p])).values()];
+  const products = [...new Map([...(Array.isArray(CFG?.products) ? CFG.products : []), ...initial, ...seeded].map((p) => [String(p.id), p])).values()];
   const known = new Set(products.map((p) => String(p.id)));
   catalogLoading = true;
   let offset = initial.length;
@@ -6067,6 +6067,10 @@ async function loadCatalogRemainder(meta, initial, total, seeded = []) {
       });
       offset += page.items.length;
       if (!added && page.items.length < CATALOG_PAGE_SIZE) break;
+      (Array.isArray(CFG?.products) ? CFG.products : []).forEach((p) => {
+        const id = String(p.id);
+        if (!known.has(id)) { known.add(id); products.push(p); }
+      });
       const next = { ...meta, products: products.slice(), products_total: total };
       setCfg(withDefaults(next));
       ls.set("amx_remote", next);
@@ -6157,20 +6161,25 @@ async function boot() {
       } else {
         /* Load the first general page and the activation-number catalogue in parallel.
            Number products live in separate country categories and otherwise appear only near the end of the full catalogue. */
-        /* The general page must succeed independently: a temporary failure in the number-only endpoint must never blank the entire shop. */
-        const [firstResult, numberResult] = await Promise.allSettled([fetchCatalogPage(0), fetchNumberProducts()]);
-        if (firstResult.status !== "fulfilled") throw firstResult.reason;
-        const first = firstResult.value;
-        const numberItems = numberResult.status === "fulfilled" ? numberResult.value.items : [];
-        if (numberResult.status !== "fulfilled") console.warn("[AMARIX] activation-number endpoint temporarily unavailable", numberResult.reason);
-        const products = [...new Map([...first.items, ...numberItems].map((p) => [String(p.id), p])).values()];
-        const total = Number(first.total || d.products_total || products.length);
+        /* Render the general catalogue immediately. The separate numbers endpoint must never hold up the storefront's first paint. */
+        const first = await fetchCatalogPage(0);
+        const total = Number(first.total || d.products_total || first.items.length);
         const meta = { ...d, products_total: total };
-        const initial = { ...meta, products };
+        const initial = { ...meta, products: first.items };
         ls.set("amx_remote", initial);
         setCfg(withDefaults(initial));
         painted = false;
-        if (first.items.length < total) catalogRemainder = { meta, products: first.items, total, seed: numberItems };
+        if (first.items.length < total) catalogRemainder = { meta, products: first.items, total, seed: [] };
+        fetchNumberProducts().then((numberPage) => {
+          const current = Array.isArray(CFG?.products) ? CFG : initial;
+          const merged = [...new Map([...(current.products || []), ...numberPage.items].map((p) => [String(p.id), p])).values()];
+          if (merged.length !== (current.products || []).length) {
+            const next = { ...current, products: merged, products_total: total };
+            setCfg(withDefaults(next));
+            ls.set("amx_remote", next);
+            if (location.hash === "#/" || location.hash === "" || (location.hash.startsWith("#/c/") && cat(decodeURIComponent(location.hash.split("/")[2] || ""))?.ty === "numbers")) render();
+          }
+        }).catch((err) => console.warn("[AMARIX] activation-number catalogue will retry on next visit", err));
       }
     }
   } catch {}
