@@ -795,6 +795,7 @@ let profileUid = ""; // short numeric UID from profiles.uid (supabase-user-uid.s
 let q = ""; // search query
 let returnTo = ""; // where to go after login
 let lastOrder = null; // info for the success page
+let orderSubmitLock = false;
 let routeSeq = 0; // guards async pages against stale renders
 let loadingCfg = true; // true until the remote config answered
 let googleOn = ls.get("amx_gg") === "1"; // Google provider enabled in Supabase (checked at boot, cached)
@@ -1019,9 +1020,26 @@ const hasSmm = (p) => {
    The admin marks them with smm_input: "none" = nothing to type (number / ready code), "text" = the buyer types a player ID or an email. */
 const apiMode = (p) => hasSmm(p) && !!String(p.smm_input ?? "").trim();
 const apiInput = (p) => apiMode(p) && String(p.smm_input).trim() != "none";
-const inputOk = (v) => {
-  v = String(v || "").trim();
-  return v.length >= 2 && v.length <= 120 && !/[\u0000-\u001f<>]/.test(v);
+/* Product-aware destination fields: virtual numbers -> WhatsApp phone; subscriptions/AI -> email; games -> provider IDs. */
+const apiFieldKind = (p) => {
+  const c = cat(p.c), req = Array.isArray(p.req) ? p.req : [];
+  if (isVirtualNumberCategory(c)) return "phone";
+  if (req.includes("email") || p.ptype === "app_subscription" || c?.hub === "ai" || c?.id === "ai-subscriptions") return "email";
+  if (req.includes("phone")) return "phone";
+  return "id";
+};
+const normalizeApiInput = (v, p) => {
+  const s = String(v || "").trim();
+  if (apiFieldKind(p) !== "phone") return s;
+  let n = s.replace(/[\\s().-]/g, "");
+  if (n.startsWith("00")) n = "+" + n.slice(2);
+  return n;
+};
+const inputOk = (v, p) => {
+  v = normalizeApiInput(v, p);
+  if (apiFieldKind(p) === "email") return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(v) && v.length <= 254;
+  if (apiFieldKind(p) === "phone") return /^\\+[1-9]\\d{7,14}$/.test(v);
+  return v.length >= 2 && v.length <= 120 && !/[\\u0000-\\u001f<>]/.test(v);
 };
 const isSmmType = (p) => !p.ptype || p.ptype === "smm"; // products typed by the importer as game_topup / app_subscription / gift_card are never boosting (no link + quantity form)
 const needsLink = (p) => {
@@ -1031,8 +1049,11 @@ const needsLink = (p) => {
 /* what the buyer must type for an API product (set per product in the admin: req = player_id / server_id / email / phone) */
 const REQ_L = { player_id: ["معرّف اللاعب (Player ID)", "Player ID"], user_id: ["معرّف المستخدم (User ID)", "User ID"], unique_id: ["المعرّف الفريد (Unique ID)", "Unique ID"], account_id: ["معرّف الحساب (Account ID)", "Account ID"], role_id: ["معرّف الشخصية (Role ID)", "Role ID"], server_id: ["رقم السيرفر (Server ID)", "Server ID"], email: ["البريد الإلكتروني", "Email"], phone: ["رقم الهاتف", "Phone"] };
 const reqHint = (p) => {
+  const kind = apiFieldKind(p);
+  if (kind === "phone") return lang == "ar" ? "رقم واتساب مع رمز الدولة" : "WhatsApp number with country code";
+  if (kind === "email") return lang == "ar" ? "البريد الإلكتروني" : "Email address";
   const r = Array.isArray(p.req) ? p.req.filter((k) => REQ_L[k]) : [];
-  if (!r.length) return lang == "ar" ? "المعرّف أو الإيميل" : "ID or email";
+  if (!r.length) return lang == "ar" ? "معرّف اللاعب أو المستخدم" : "Player or user ID";
   return r.map((k) => REQ_L[k][lang == "ar" ? 0 : 1]).join(r.length > 1 ? " | " : "");
 };
 const qLimited = (p) => needsLink(p) || apiMode(p); // products whose quantity follows the product's own min / max
@@ -2446,7 +2467,7 @@ function cartPage() {
     cp = cpOf(coupon);
   const rows = lines
     .map(
-      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" data-a="lk" data-id="${ex(p.id)}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t("acclink")} *" aria-label="${ex(apiInput(p) ? reqHint(p) : t("acclink"))}" autocomplete="off" spellcheck="false" required aria-required="true" dir="ltr"><small class="hint">${apiInput(p) && Array.isArray(p.req) && p.req.includes("player_id") ? (lang == "ar" ? "أدخل معرّف اللاعب كما يظهر داخل اللعبة، وليس اسم العرض." : "Enter the Player ID shown in-game, not the display name.") : apiInput(p) && Array.isArray(p.req) && p.req.includes("user_id") ? (lang == "ar" ? "أدخل معرّف المستخدم كما يظهر في التطبيق، وليس اسم العرض." : "Enter the User ID shown in the app, not the display name.") : apiInput(p) ? (lang == "ar" ? "أدخل البريد أو المعرّف المطلوب لهذا المنتج فقط." : "Enter only the email or ID requested for this product.") : (lang == "ar" ? "أدخل رابط الحساب العام." : "Enter the public profile link.")}</small>` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n" dir="ltr">${fmtN(x.q)}</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">${ic("x", 16)}</button></div></div>`
+      ({ x, p }) => `<div class="box"><div class="line"> <a class="thumb" href="#/p/${ex(p.id)}">${art(p, cat(p.c))}</a> <div class="info"><b>${p[lang]}</b><div class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</div>${smmEq(p, x.q)} ${ needsLink(p) || apiInput(p) ? `<input class="inp" style="margin-top:6px;width:100%" type="${apiInput(p) ? (apiFieldKind(p) === "email" ? "email" : apiFieldKind(p) === "phone" ? "tel" : "text") : "url"}" ${apiInput(p) && apiFieldKind(p) === "phone" ? 'inputmode="tel" autocomplete="tel" placeholder="+9639XXXXXXXX"' : apiInput(p) && apiFieldKind(p) === "email" ? 'inputmode="email" autocomplete="email"' : ""} data-a="lk" data-id="${ex(p.id)}" value="${ex(x.l || "")}" placeholder="${apiInput(p) ? reqHint(p) : t("acclink")} *" aria-label="${ex(apiInput(p) ? reqHint(p) : t("acclink"))}" autocomplete="${apiInput(p) ? (apiFieldKind(p) === "email" ? "email" : apiFieldKind(p) === "phone" ? "tel" : "off") : "url"}" spellcheck="false" required aria-required="true" dir="ltr"><small class="hint">${apiInput(p) && apiFieldKind(p) === "phone" ? (lang == "ar" ? "أدخل رقم واتساب فعالاً مع مفتاح الدولة (مثال: +963…). سيُستخدم لاستلام رمز التفعيل." : "Enter an active WhatsApp number with country code (e.g. +963…). It will receive the activation code.") : apiInput(p) && apiFieldKind(p) === "email" ? (lang == "ar" ? "أدخل البريد الذي تريد تفعيل الاشتراك عليه." : "Enter the email address where the subscription should be activated.") : apiInput(p) && Array.isArray(p.req) && p.req.includes("player_id") ? (lang == "ar" ? "أدخل معرّف اللاعب كما يظهر داخل اللعبة، وليس اسم العرض." : "Enter the Player ID shown in-game, not the display name.") : apiInput(p) && Array.isArray(p.req) && p.req.includes("user_id") ? (lang == "ar" ? "أدخل معرّف المستخدم كما يظهر في التطبيق، وليس اسم العرض." : "Enter the User ID shown in the app, not the display name.") : apiInput(p) ? (lang == "ar" ? "أدخل المعرّف المطلوب لهذا المنتج فقط." : "Enter only the ID requested for this product.") : (lang == "ar" ? "أدخل رابط الحساب العام." : "Enter the public profile link.")}</small>` : "" }</div> <span class="q"><button data-a="q" data-id="${ex( p.id )}" data-d="-1" aria-label="-">−</button>${ needsLink(p) ? `<input class="qin qin-c" type="number" inputmode="numeric" min="${qMin(p)}" max="${qMax(p)}" value="${x.q}" dir="ltr" data-a="cq" data-id="${ex(p.id)}" aria-label="${t("qtyl")}">` : `<b class="n" dir="ltr">${fmtN(x.q)}</b>` }<button data-a="q" data-id="${ex( p.id )}" data-d="1" aria-label="+">+</button></span> <button class="ib" data-a="rm" data-id="${ex( p.id )}" aria-label="remove">${ic("x", 16)}</button></div></div>`
     )
     .join("");
   const couponBox = cp
@@ -3121,9 +3142,9 @@ async function placeOrder(btn, viaWhatsApp = false) {
   if (viaWhatsApp && !waNumber()) return toast(t("waunset"), "wn");
   const badL = lines.find((l) => needsLink(l.p) && !linkOk(l.x.l));
   if (badL) return flagLink(badL);
-  const badI = lines.find((l) => apiInput(l.p) && !inputOk(l.x.l));
+  const badI = lines.find((l) => apiInput(l.p) && !inputOk(l.x.l, l.p));
   if (badI) {
-    toast(lang == "ar" ? "أدخل المعرّف أو الإيميل المطلوب لهذا المنتج" : "Enter the ID or email this product needs", "wn");
+    toast(lang == "ar" ? "أدخل " + reqHint(badI.p) + " بصيغة صحيحة" : "Enter a valid " + reqHint(badI.p), "wn");
     const el = [...document.querySelectorAll("input[data-a=lk]")].find((e) => e.dataset.id == badI.p.id);
     if (el) {
       el.setAttribute("aria-invalid", "true");
@@ -3146,32 +3167,38 @@ async function placeOrder(btn, viaWhatsApp = false) {
     return;
   }
   if (!walletOn() || wl.setup) return toast(lang == "ar" ? "الدفع غير متاح حالياً: المحفظة غير مفعّلة." : "Checkout is unavailable: the wallet is not enabled.", "wn");
-  const walletServerEligible = await walletEligibleFor(lines, true);
+  if (orderSubmitLock) return toast(lang == "ar" ? "طلبك قيد التجهيز، انتظر لحظة." : "Your order is being prepared. Please wait.", "wn");
+  orderSubmitLock = true;
+  setBusy(btn, true);
+  let walletServerEligible = false;
+  try { walletServerEligible = await walletEligibleFor(lines, true); }
+  catch (eligErr) { orderSubmitLock = false; setBusy(btn, false); console.error("[AMARIX] wallet eligibility", eligErr); return toast(lang == "ar" ? "تعذّر التحقق من أهلية الدفع. تحقق من الاتصال ثم أعد المحاولة." : "Could not verify payment eligibility. Check your connection and retry.", "er"); }
   const useWallet = !viaWhatsApp && !!user && payMethod == "wallet" && walletOn() && walletServerEligible;
-  if (!useWallet && !viaWhatsApp) return toast(lang == "ar" ? "تعذّر الدفع من المحفظة لهذا الطلب. أعد المحاولة أو تواصل مع الدعم." : "Could not pay this order from the wallet. Try again or contact support.", "er");
+  if (!useWallet && !viaWhatsApp) { orderSubmitLock = false; setBusy(btn, false); return toast(lang == "ar" ? "تعذّر الدفع من المحفظة لهذا الطلب. أعد المحاولة أو تواصل مع الدعم." : "Could not pay this order from the wallet. Try again or contact support.", "er"); }
   if (!viaWhatsApp && !useWallet && PM.length && !payMethod) return toast(t("paypick"), "wn");
   if (!viaWhatsApp) {
-    if (!window.AMXPay) return toast(lang == "ar" ? "نظام الدفع الجديد غير محمّل؛ لم يُنشأ الطلب." : "Payment module unavailable; no order was created.", "er");
+    if (!window.AMXPay) { orderSubmitLock = false; setBusy(btn, false); return toast(lang == "ar" ? "نظام الدفع الجديد غير محمّل؛ لم يُنشأ الطلب." : "Payment module unavailable; no order was created.", "er"); }
     try {
       const paymentCfg = await window.AMXPay.getConfig();
-      if (!paymentCfg || paymentCfg.on !== true) return toast(lang == "ar" ? "الدفع الجديد غير مفعّل بعد. لم يُنشأ الطلب." : "Payments v2 is not enabled yet. No order was created.", "wn");
+      if (!paymentCfg || paymentCfg.on !== true) { orderSubmitLock = false; setBusy(btn, false); return toast(lang == "ar" ? "الدفع الجديد غير مفعّل بعد. لم يُنشأ الطلب." : "Payments v2 is not enabled yet. No order was created.", "wn"); }
     } catch (payErr) {
       console.error("[AMARIX] payment readiness", payErr);
-      return toast(lang == "ar" ? "تعذّر التحقق من وسائل الدفع. لم يُنشأ الطلب." : "Could not verify payment settings. No order was created.", "er");
+      orderSubmitLock = false; setBusy(btn, false); return toast(lang == "ar" ? "تعذّر التحقق من وسائل الدفع. لم يُنشأ الطلب." : "Could not verify payment settings. No order was created.", "er");
     }
   }
   const tt = totals();
   if (!(+tt.total.toFixed(2) >= 0.01)) {
     /* the server rejects zero-value payments; stop before an unpayable order row is created */
-    return toast(lang == "ar" ? "قيمة الطلب أقل من الحد الأدنى للدفع (0.01). زد الكمية ثم أعد المحاولة." : "The order total is below the minimum payable amount (0.01). Increase the quantity and try again.", "wn");
+    orderSubmitLock = false; setBusy(btn, false); return toast(lang == "ar" ? "قيمة الطلب أقل من الحد الأدنى للدفع (0.01). زد الكمية ثم أعد المحاولة." : "The order total is below the minimum payable amount (0.01). Increase the quantity and try again.", "wn");
   }
   if (!viaWhatsApp && !useWallet) {
     const le = pmLimitErr(pmOf(payMethod), tt.total);
-    if (le) return toast(le, "wn");
+    if (le) { orderSubmitLock = false; setBusy(btn, false); return toast(le, "wn"); }
   }
   if (useWallet) {
     if (!wl.loaded) await loadWallet(true);
     if (walletReady() && walletBal("main") + 0.005 < tt.total) {
+      orderSubmitLock = false; setBusy(btn, false);
       toast(lang == "ar" ? "رصيدك غير كافٍ — اشحن المحفظة أولاً" : "Your balance is not enough — top up the wallet first", "wn");
       location.hash = "#/wallet";
       return;
@@ -3188,7 +3215,6 @@ async function placeOrder(btn, viaWhatsApp = false) {
   }
 
   const waWin = viaWhatsApp ? window.open("", "_blank") : null; // opened synchronously so popup blockers allow it
-  setBusy(btn, true);
   let id = orderId(); // temporary: the database assigns the real sequential number (AMX-1001, AMX-1002, ...)
   let orderCreated = false, paymentFlowDone = false;
   try {
@@ -3203,7 +3229,7 @@ async function placeOrder(btn, viaWhatsApp = false) {
         ar: plain(p.ar),
         en: plain(p.en),
         q: x.q,
-        link: x.l || "",
+        link: apiInput(p) ? normalizeApiInput(x.l, p) : x.l || "",
         price: +pr(p).toFixed(2),
       })),
       total: +tt.total.toFixed(2),
@@ -3298,18 +3324,15 @@ async function placeOrder(btn, viaWhatsApp = false) {
       returnTo = "#/cart";
       toast(t("sesexp"), "er");
       location.hash = "#/login";
-    } else
-      toast(
-        navigator.onLine
-          ? t("ordfail") +
-              (err.message
-                ? " — " + String(err.message).replace(/[{}"]/g, "").slice(0, 90)
-                : "")
-          : t("net"),
-        "er"
-      );
+    } else {
+      const em = String(err?.message || "");
+      if (/rate_limited/.test(em)) toast(lang == "ar" ? "وصلت إلى حد محاولات الدفع المؤقت. انتظر قليلاً قبل المحاولة التالية؛ لم يتم خصم أي مبلغ." : "You've reached the temporary payment-attempt limit. Wait before retrying; no money was charged.", "wn");
+      else if (/too_many_pending/.test(em)) toast(lang == "ar" ? "لديك دفعات سابقة لم تُغلق بعد. أكمل الدفعة الحالية أو ألغِ الدفعات المنتهية من صفحة الطلبات." : "You have previous payments still open. Complete the current payment or cancel expired payments.", "wn");
+      else toast(navigator.onLine ? t("ordfail") + (em ? " — " + em.replace(/[{}"]/g, "").slice(0, 90) : "") : t("net"), "er");
+    }
   } finally {
     setBusy(btn, false);
+    orderSubmitLock = false;
   }
 }
 
