@@ -200,14 +200,12 @@ const isStaffOnly = () => IS_ADMIN === false && Array.isArray(STAFF);
 const canTab = (k) => !isStaffOnly() || (!!TAB_PERM[k] && STAFF.includes(TAB_PERM[k]));
 const sideNav = () => {
   const nm = Object.fromEntries(TABS);
-  return TG.map(([g, ks]) => {
-    const links = ks.filter((k) => nm[k] && canTab(k)).map((k) => `<button class="${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("");
-    if (!links) return "";
-    if (g === "أدوات متقدمة") {
-      const active = ks.includes(tab);
-      return `<details class="sg sg-advanced" ${active ? "open" : ""}><summary class="sgl">${g}</summary>${links}</details>`;
-    }
-    return `<div class="sg"><span class="sgl">${g}</span>${links}</div>`;
+  return TG.map(([g, ks], index) => {
+    const visible = ks.filter((k) => nm[k] && canTab(k));
+    if (!visible.length) return "";
+    const links = visible.map((k) => `<button class="sn-link ${tab == k ? "on" : ""}" data-tab="${k}">${tabIc(k)}<span>${nm[k]}</span></button>`).join("");
+    const active = visible.includes(tab);
+    return `<details class="sg" data-nav-group="${index}" ${active ? "open" : ""}><summary class="sgl"><span>${g}</span><small>${visible.length}</small><i aria-hidden="true">⌄</i></summary><div class="sg-links">${links}</div></details>`;
   }).join("");
 };
 const SOCIAL = [
