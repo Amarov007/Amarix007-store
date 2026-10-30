@@ -287,6 +287,7 @@
   async function autoImportAll() {
     if (IC.busy) return;
     if (typeof loadProviders === "function" && (!PROV_LOADED || !Object.keys(PROV_NAME).length)) await loadProviders();
+    if (typeof PROV_LOADED !== "undefined" && !PROV_LOADED) return toast("تعذّر تحميل قائمة المزوّدين؛ أعد المحاولة بعد تحديث الصفحة.", "e");
     const providers = [{ id: "main", name: "المزوّد الرئيسي", kind: "smm", enabled: true }]
       .concat((Array.isArray(PROVS) ? PROVS : []).filter((p) => p && p.enabled !== false).map((p) => ({ id: String(p.id), name: p.name || p.id, kind: p.kind || "smm", enabled: true })));
     const unique = [...new Map(providers.map((p) => [p.id, p])).values()];
