@@ -2064,6 +2064,15 @@ function drToggle(open) {
   }
 }
 addEventListener("hashchange", () => document.body.classList.contains("dr-open") && drToggle(false));
+
+/* Lightweight route transition: animate only the persistent content wrapper.
+   No layout measurements, timers, dependencies or per-card observers are added. */
+addEventListener("hashchange", () => {
+  const main = document.getElementById("m");
+  if (!main || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  main.classList.remove("route-enter");
+  requestAnimationFrame(() => main.classList.add("route-enter"));
+});
 /* Clear stale top-up-limit notices when leaving the wallet flow; navigating back without uploading proof must not leave an old warning on screen. */
 addEventListener("hashchange", () => {
   const el = $("#ts");
