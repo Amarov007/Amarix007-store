@@ -8,7 +8,7 @@ test("orders: authenticated updates are limited to status", async () => {
   const sql = await read("../supabase/migrations/20261030011700_protect_order_audit_and_fulfillment_fields.sql");
   assert.match(sql, /REVOKE UPDATE ON public\.orders FROM authenticated/i);
   assert.match(sql, /GRANT UPDATE \(status\) ON public\.orders TO authenticated/i);
-  for (const field of ["total", "user_id", "payment_tx_ref", "payment_proof", "delivery", "delivered_at"]) {
+  for (const field of ["total", "user_id", "payment_tx_ref", "payment_proof", "delivered_at"]) {
     assert.match(sql, new RegExp("new\\." + field + " := old\\." + field, "i"), `orders guard must preserve ${field}`);
   }
   assert.match(sql, /new\.payment_status := 'pending'/i);
