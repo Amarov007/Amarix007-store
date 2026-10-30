@@ -292,15 +292,22 @@
       .concat((Array.isArray(PROVS) ? PROVS : []).filter((p) => p && p.enabled !== false).map((p) => ({ id: String(p.id), name: p.name || p.id, kind: p.kind || "smm", enabled: true })));
     const unique = [...new Map(providers.map((p) => [p.id, p])).values()];
     if (!unique.length) return toast("لا توجد مزوّدات مفعّلة", "e");
-    if (!confirm("سيتم جلب الكتالوج من جميع المزوّدين المفعّلين، وفرز المنتجات تلقائياً، وإضافة الخدمات غير الموجودة فقط. هل نتابع؟")) return;
-    IC.busy = true; IC.msg = ""; render();
+    if (!confirm("سيتم جلب الكتالوج من جميع المزوّدين المفعّلين، وفرز المنتجات تلقائياً، وإضافة الخدمات غير الموجودة فقط. سيعمل الجلب على دفعات لتقليل تعليق اللوحة. هل نتابع؟")) return;
+
+    IC.busy = true; IC.msg = "تهيئة جلب المزوّدين…"; render();
     const cache = { map: new Map(), made: 0 };
     const existing = new Set(D.products.map(provKey));
     const stats = [], failures = [];
     let added = 0, skipped = 0;
-    try {
-      for (const p of unique) {
-        const kind = p.kind || kindOf(p.id);
+    const yieldUI = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Fetch at most two providers at once: avoids serial waiting without overloading Edge Functions/providers.
+    const fetched = new Array(unique.length);
+    let cursor = 0;
+    async function fetchWorker() {
+      while (cursor < unique.length) {
+        const index = cursor++;
+        const p = unique[index], kind = p.kind || kindOf(p.id);
         try {
           if (p.id !== "main" && !(await siteSupport())) throw new Error(SITES_OLD);
           const j = kind === "smsactivate"
@@ -329,27 +336,48 @@
             return { ...x, id: String(id ?? ""), name: String(name ?? ""), category: String(category ?? ""), rate: Number(rate), min: x.min ?? x.min_quantity ?? x.minimum, max: x.max ?? x.max_quantity ?? x.maximum, country: x.country ?? x.country_code ?? x.region ?? "", image: String(image || ""), catImage: String(x.category_image ?? x.categoryImage ?? x.category_icon ?? x.game_image ?? x.game_icon ?? x.brand_image ?? x.brand_logo ?? ""), amount, available: available === false || available === 0 || available === "false" ? false : true, type: x.type ?? x.delivery_type ?? "" };
           }).filter((x) => x.id && x.name && Number.isFinite(x.rate) && x.rate > 0);
           if (!list.length) throw new Error("لم يُرجع المزوّد خدمات قابلة للاستيراد أو أسعاراً صالحة");
-          let count = 0;
-          for (const x of list) {
-            let type = classifyService(x, kind);
-            if (kind === "custom" && type === "gift_card" && p.id === "fazer" && !/gift\s?card|voucher|\bpin\b|بطاقة|قسيمة|كود/i.test(x.name + " " + x.category)) type = "game_topup";
-            const hub = kind === "smsactivate" ? "numbers" : HUB_OF_TYPE[type] || "apps";
+          fetched[index] = { provider: p, kind, list };
+        } catch (e) {
+          fetched[index] = { provider: p, error: String(e.message || e).slice(0, 180) };
+        }
+        IC.msg = "تم استلام بيانات " + (index + 1) + " من " + unique.length + " مزوّد…";
+        await yieldUI();
+      }
+    }
+
+    try {
+      await Promise.all([fetchWorker(), fetchWorker()]);
+      let processed = 0;
+      for (const item of fetched) {
+        if (!item) continue;
+        const p = item.provider;
+        if (item.error) { failures.push(p.name + ": " + item.error); continue; }
+        let count = 0;
+        const list = item.list;
+        // Build in small slices and yield to the browser so the admin UI remains responsive.
+        for (let offset = 0; offset < list.length; offset += 200) {
+          const batch = list.slice(offset, offset + 200);
+          for (const x of batch) {
+            let type = classifyService(x, item.kind);
+            if (item.kind === "custom" && type === "gift_card" && p.id === "fazer" && !/gift\\s?card|voucher|\\bpin\\b|بطاقة|قسيمة|كود/i.test(x.name + " " + x.category)) type = "game_topup";
+            const hub = item.kind === "smsactivate" ? "numbers" : HUB_OF_TYPE[type] || "apps";
             const brand = SV().brandOf({ name: x.name, category: x.category, ptype: type });
             const cid = ensureCat(hub, brand, x, cache);
-            const product = build(x, { cat: cid, mk: IC.mk, prov: p.id, kind, type });
+            const product = build(x, { cat: cid, mk: IC.mk, prov: p.id, kind: item.kind, type });
             const key = provKey(product);
             if (existing.has(key)) { skipped++; continue; }
             existing.add(key); D.products.push(product); count++; added++;
           }
-          stats.push({ name: p.name, count, received: list.length });
-        } catch (e) {
-          failures.push(p.name + ": " + String(e.message || e).slice(0, 180));
+          processed += batch.length;
+          IC.msg = "فرز وحفظ مؤقت للخدمات… " + processed + " / " + fetched.reduce((n, v) => n + (v && v.list ? v.list.length : 0), 0);
+          if (processed % 1000 === 0 || offset + 200 >= list.length) { render(); await yieldUI(); }
         }
+        stats.push({ name: p.name, count, received: list.length });
       }
+      // One draft write only; do not trigger bulk image discovery automatically on thousands of records.
       save();
       IC.msg = "اكتمل الجلب: أضيف " + added + " منتج، وتجاوزنا " + skipped + " مكرراً. " + stats.map((x) => x.name + " (" + x.count + "/" + x.received + ")").join(" · ") + (failures.length ? " | تعذّر: " + failures.join(" | ") : "");
       toast("اكتمل الاستيراد: " + added + " خدمة جديدة" + (failures.length ? " مع " + failures.length + " أخطاء مزوّد" : ""));
-      if (added && typeof autoImages === "function") setTimeout(() => autoImages(), 500);
     } finally {
       IC.busy = false; render();
     }
