@@ -19,7 +19,8 @@
     { id: "games", i: "bolt", ar: "شحن الألعاب", en: "Game Top-up", da: "اختر اللعبة والمنطقة والباقة، ثم أدخل معرّف اللاعب قبل الدفع", de: "Choose the game, region and package, then enter your player ID before payment", gold: "pubg_mobile" },
     { id: "chat", i: "users", ar: "تطبيقات الدردشة والبث", en: "Chat & Live Apps", da: "اشحن عملات تطبيقات البث والدردشة مع إدخال معرّف الحساب المطلوب", de: "Top up live and chat app coins using the required account ID", gold: "" },
     { id: "ai", i: "spark", ar: "اشتراكات الذكاء الاصطناعي", en: "AI Subscriptions", da: "اشتراكات أدوات الذكاء الاصطناعي وخططها — ستظهر الباقات المتاحة فقط", de: "AI tools and subscription plans — only verified available packages are listed", gold: "" },
-    { id: "apps", i: "phone", ar: "التطبيقات والبطاقات الرقمية", en: "Apps & Digital Cards", da: "اشتراكات التطبيقات والبطاقات الرقمية وأدوات الإبداع", de: "App subscriptions, digital cards and creative tools", gold: "" }
+    { id: "apps", i: "phone", ar: "التطبيقات والبطاقات الرقمية", en: "Apps & Digital Cards", da: "اشتراكات التطبيقات والبطاقات الرقمية وأدوات الإبداع", de: "App subscriptions, digital cards and creative tools", gold: "" },
+    { id: "numbers", i: "phone", ar: "أرقام التفعيل", en: "Activation Numbers", da: "أرقام افتراضية للواتساب وتليجرام والخدمات الأخرى مع استلام رمز التفعيل داخل الطلب", de: "Virtual numbers for WhatsApp, Telegram and other services, with the activation code delivered in your order", gold: "" }
   ];
   const AI_RE = /\b(chatgpt|openai|claude|gemini|midjourney|perplexity|copilot|cursor|suno|runway|elevenlabs|artificial intelligence|\bai\b|ذكاء اصطناعي|شات جي بي تي|كلود|جيميناي)\b/i;
   const CHAT_RE = /\b(bigo|chamet|dazz|poppo|likee|tango|weplay|hago|uplive|imo|yalla|soul\s?chill|live|chat|discord|telegram premium|whatsapp)\b/i;
@@ -46,7 +47,7 @@
   /* Category assignment prioritizes recognizable product families before legacy imported hub values. */
   function hubKey(c) {
     if (!c || c.ty === "hub") return null;
-    if (c.ty === "numbers" || c.hub === "numbers" || /(أرقام\s*التفعيل|ارقام\s*التفعيل|virtual\s*numbers|activation\s*numbers)/i.test(String(c.ar || "") + " " + String(c.en || ""))) return null;
+    if (c.ty === "numbers" || c.hub === "numbers" || /(أرقام\s*التفعيل|ارقام\s*التفعيل|virtual\s*numbers|activation\s*numbers)/i.test(String(c.ar || "") + " " + String(c.en || ""))) return "numbers";
     if (c.hub === "none") return null;
     const label = String(c.id || "") + " " + String(c.ar || "") + " " + String(c.en || "");
     const members = prods().filter((p) => String(p.c) === String(c.id));
@@ -107,7 +108,7 @@
       const ps = prods().filter((p) => p.c == c.id);
       if (!ps.length && !(hubId === "games" && c.id === "pubg-mobile-uc")) return;
       const first = ps.find((p) => p.smm_country) || {};
-      out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "chat" ? "live" : hubId === "ai" ? "ai" : hubId === "apps" ? "tools" : "game", from: minPrice(ps), n: ps.length, badge: ps.length ? "" : L("قريباً","Coming soon"), sub: ps.length ? L(ps.length + " باقة", ps.length + " packs") : L("يلزم ربط مزوّد الشدات أولاً","Provider connection required") });
+      out.push({ kind: "cat", id: c.id, href: "#/c/" + encodeURIComponent(c.id), ar: c.ar, en: c.en, logo: c.image_url, keys: [first.smm_country, slug(c.en)], grp: hubId === "chat" ? "live" : hubId === "ai" ? "ai" : hubId === "apps" ? "tools" : hubId === "numbers" ? "number" : "game", from: minPrice(ps), n: ps.length, badge: ps.length ? "" : L("قريباً","Coming soon"), sub: ps.length ? L(ps.length + " باقة", ps.length + " packs") : L("يلزم ربط مزوّد الشدات أولاً","Provider connection required") });
     });
     /* fold regional variants "Game (ID)" "Game (KH)" … into one family card (needs two or more regions) */
     const fam = {};
