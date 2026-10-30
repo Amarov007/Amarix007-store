@@ -46,6 +46,7 @@
   /* Category assignment prioritizes recognizable product families before legacy imported hub values. */
   function hubKey(c) {
     if (!c || c.ty === "hub") return null;
+    if (c.ty === "numbers" || c.hub === "numbers" || /(أرقام\s*التفعيل|ارقام\s*التفعيل|virtual\s*numbers|activation\s*numbers)/i.test(String(c.ar || "") + " " + String(c.en || ""))) return null;
     if (c.hub === "none") return null;
     const label = String(c.id || "") + " " + String(c.ar || "") + " " + String(c.en || "");
     const members = prods().filter((p) => String(p.c) === String(c.id));
