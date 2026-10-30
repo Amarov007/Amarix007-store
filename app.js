@@ -2652,7 +2652,7 @@ function walletErr(err) {
     [/below_min/, A ? "المبلغ أقل من الحد الأدنى للشحن" : "Amount is below the minimum top-up"],
     [/above_max/, A ? "المبلغ أكبر من الحد الأعلى للشحن" : "Amount is above the maximum top-up"],
     [/invalid_method/, A ? "وسيلة الدفع غير متاحة" : "Payment method is not available"],
-    [/too_many_pending/, A ? "لديك طلبات شحن معلّقة كثيرة، أكملها أولاً" : "You have too many open top-ups, finish them first"],
+    [/too_many_pending/, A ? "لديك دفعات شحن معلّقة كثيرة. أكمل دفعة أو انتظر انتهاء صلاحيتها قبل طلب جديد." : "You have several pending top-ups. Complete one or wait for an existing payment to expire before creating another."],
     [/rate_limited/, A ? "محاولات كثيرة، انتظر قليلاً" : "Too many attempts, wait a bit"],
     [/wallet_disabled/, A ? "المحفظة متوقفة حالياً" : "The wallet is currently disabled"],
     [/proof_required/, t("proofneed")],
