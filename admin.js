@@ -3368,9 +3368,10 @@ async function smmDeleteImported(btn, serviceId = null) {
   }
 }
 function smmUndo() {
-  let b = null;
+  let b = null, fromCurrent = true;
   try { b = JSON.parse(localStorage.getItem("amx_smm_backup") || "null"); } catch (e) {}
   if (!b || !Array.isArray(b.items) || !b.items.length) {
+    fromCurrent = false;
     try { b = JSON.parse(localStorage.getItem("amx_smm_backup_previous") || "null"); } catch (e) {}
   }
   if (!b || !Array.isArray(b.items) || !b.items.length) return toast("لا توجد نسخة محذوفة للاسترجاع", "e");
@@ -3378,6 +3379,18 @@ function smmUndo() {
   const ids = new Set(b.items.map((p) => p.id));
   for (let i = D.products.length - 1; i >= 0; i--) if (ids.has(D.products[i].id)) D.products.splice(i, 1);
   b.items.forEach((p) => D.products.push(p));
+  // Consume the restored backup and promote the previous one so consecutive undos work predictably.
+  if (fromCurrent) {
+    const previous = localStorage.getItem("amx_smm_backup_previous");
+    if (previous) {
+      localStorage.setItem("amx_smm_backup", previous);
+      localStorage.removeItem("amx_smm_backup_previous");
+    } else {
+      localStorage.removeItem("amx_smm_backup");
+    }
+  } else {
+    localStorage.removeItem("amx_smm_backup_previous");
+  }
   save();
   toast(`تم استرجاع ${b.items.length} منتج. اضغط نشر للحفظ`);
   render();
