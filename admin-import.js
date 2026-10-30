@@ -122,7 +122,7 @@
     if (smm) Object.assign(it, typeof smmLimits == "function" ? smmLimits(x.min, x.max, 1) : { qmin: 1, qmax: 0 });
     else { it.qmin = 1; it.qmax = 1; }
     if (!smm) {
-      const req = sv.requiredOf(it);
+      const req = kind === "smsactivate" ? ["phone"] : sv.requiredOf(it);
       if (req.length) it.req = req;
       const dn = sv.denomination(name) || (x.amount ? { amount: parseFloat(x.amount) || 0, unit: "" } : null);
       if (dn && dn.amount) { it.amount = dn.amount; if (dn.unit) it.unit = dn.unit; }
