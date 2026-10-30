@@ -3135,6 +3135,26 @@ body.dr-open .sup { display: none; }
 .ban.one > div.bs {
   box-shadow: 0 26px 36px -22px rgba(25, 26, 35, 0.8), 0 8px 16px -10px rgba(0, 0, 0, 0.35);
 }
+/* Touch devices: no 3D transforms or animated parallax on the banner.
+   This prevents the large visual wobble on phones while keeping desktop effects. */
+@media (hover: none), (pointer: coarse) {
+  .ban > div.bs,
+  .ban > div.bs.cur,
+  .ban.one > div.bs {
+    transform: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+    will-change: auto;
+  }
+  .ban .bs-c {
+    transform: none !important;
+    transition: none !important;
+  }
+  .ban .bs-o {
+    animation: none !important;
+    translate: none !important;
+  }
+}
 /* glare that follows the pointer */
 .ban > div.bs::before {
   content: "";
