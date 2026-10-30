@@ -1347,50 +1347,28 @@ const payKey = (m) => {
 };
 function payLogo(m, size = 44) {
   const st = `width:${size}px;height:${size}px`;
-  // Prefer original brand artwork for the global payment networks; retain the merchant-provided Syriatel Cash mark.
-  const brandId = String(m.id || "").toLowerCase();
-  const logo = brandId === "usdt"
-    ? "https://tether.io/wp-content/uploads/tether-io_logos/tether_USDt_token_COLOR_v1_v2_SVG/tether_USDt_token_v2%403x.svg"
-    : brandId === "binance"
-      ? "https://cdn.simpleicons.org/binance/F0B90B"
-      : String(m.logo || m.logo_url || m.image_url || "").trim();
+  const key = payKey(m);
+  // One controlled set of four payment marks, reused in the homepage, checkout and wallet top-up.
+  const uploaded = String(m.logo || m.logo_url || m.image_url || "").trim();
+  const fallback = {
+    usdt: "https://tether.io/wp-content/uploads/tether-io_logos/tether_USDt_token_COLOR_v1_v2_SVG/tether_USDt_token_v2%403x.svg",
+    binance: "https://cdn.simpleicons.org/binance/F0B90B",
+  };
+  const logo = uploaded || fallback[key] || "";
   if (/^(https:\/\/|data:image\/)/i.test(logo))
     return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${ex(logo)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
   const nmRaw = plain(m.en || m.ar || pmReadable(m) || "");
   const nm = nmRaw.replace(/[^A-Za-z0-9؀-ۿ ]/g, "").trim();
-  const key = (String(m.id || "") + " " + nmRaw).toLowerCase();
+  const keyText = (String(m.id || "") + " " + nmRaw).toLowerCase();
   const official = [
-    [/\b(binance|bnb)\b/, "https://cdn.simpleicons.org/binance/F0B90B"],
-    [/\b(usdt|tether)\b/, "https://cdn.simpleicons.org/tether/26A17B"],
-    [/\bvisa\b/, "https://cdn.simpleicons.org/visa/1A1F71"],
-    [/\bmastercard\b/, "https://cdn.simpleicons.org/mastercard/EB001B"],
-    [/\bpaypal\b/, "https://cdn.simpleicons.org/paypal/003087"],
-    [/\bapple pay\b/, "https://cdn.simpleicons.org/applepay/000000"],
-    [/\bgoogle pay\b/, "https://cdn.simpleicons.org/googlepay/4285F4"],
-  ].find(([re]) => re.test(key));
+    [/\\b(binance|bnb)\\b/, fallback.binance],
+    [/\\b(usdt|tether)\\b/, fallback.usdt],
+  ].find(([re]) => re.test(keyText));
   if (official)
     return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${official[1]}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
-  const g = PAYG[payKey(m)] || PAYG[m.icon];
-  if (g)
-    return `<span class="pl" style="${st};background:${g.bg};color:${g.fg}"><svg viewBox="1.5 1.5 21 21" width="${size * 0.66}" height="${size * 0.66}" fill="currentColor" aria-hidden="true">${g.g}</svg></span>`;
-  if (!nm)
-    return `<span class="pl" style="${st};background:${safeColor(m.color) || "#191A23"};color:#fff">${ic("card", size * 0.5)}</span>`;
-  const ini = ex(nm.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?");
-  return `<span class="pl" style="${st};background:${safeColor(m.color) || "#191A23"};color:#fff"><b>${ini}</b></span>`;
+  const letter = (nm || "P").slice(0, 1).toUpperCase();
+  return `<span class="pl" style="${st};display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:${Math.round(size*.46)}px">${letter}</span>`;
 }
-
-/* ---------- 6. Supabase client (anon key + user JWT) ---------- */
-const jwtExp = (tk) => {
-  try {
-    return (
-      JSON.parse(atob(tk.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")))
-        .exp || 0
-    );
-  } catch {
-    return 0;
-  }
-};
-
 function storeSession(j) {
   if (j.access_token) ls.set("amx_token", j.access_token);
   if (j.refresh_token) ls.set("amx_refresh", j.refresh_token);
