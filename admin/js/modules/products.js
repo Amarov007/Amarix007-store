@@ -15,10 +15,12 @@ export default async function (view) {
   const box = h("div");
   const draw = () => {
     const D = data(), cats = Object.fromEntries(D.categories.map((c) => [c.id, c.ar]));
-    const rows = D.products.filter((p) => (!cat || p.c === cat) && (!q || [p.ar, p.en, p.id, p.tg].some((x) => String(x || "").toLowerCase().includes(q))));
+    const rows = D.products.filter((p) => (!cat || p.c === cat) && (!q || [p.ar, p.en, p.id, p.tg, p.smm_provider, p.smm_service, p.ptype, p.smm_country].some((x) => String(x || "").toLowerCase().includes(q))));
     mount(box, dataTable({ rows, pageSize: 30, onRow: open, emptyText: "لا منتجات", columns: [
       { label: "المنتج", render: (p) => [h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } }, p.img ? h("img", { src: p.img, alt: "", width: 38, height: 38, loading: "lazy", style: { objectFit: "cover", borderRadius: "8px" } }) : null, h("div", null, p.ar || p.en, h("small", { class: "sub mono" }, p.id)))] },
       { label: "القسم", render: (p) => badge(cats[p.c] || p.c || "—", "info") },
+      { label: "المسار", render: (p) => badge(p.ptype || (p.smm_service ? "مزود" : "يدوي"), "info") },
+      { label: "المزوّد / الخدمة", render: (p) => [h("span", { class: "mono" }, p.smm_provider || "—"), h("small", { class: "sub mono" }, p.smm_service || "—")] },
       { label: "السعر", render: (p) => [h("b", { class: "mono" }, money(p.p)), num(p.o) > 0 && h("small", { class: "sub" }, `قبل: ${money(p.o)}`)] },
       { label: "خصم", render: (p) => (num(p.d) ? `${p.d}%` : "—") }, { label: "تقييم", render: (p) => (p.r ? `★ ${p.r}` : "—") }] }));
   };
@@ -57,7 +59,7 @@ export default async function (view) {
   }
   const D0 = data();
   mount(view, pageHeader("المنتجات", `${D0.products.length} منتج — التعديلات تُنشر عند الضغط على «نشر»`, h("button", { class: "btn primary", onclick: () => open() }, "+ منتج")),
-    toolbar(searchBox((v) => { q = v; draw(); }, "اسم أو معرّف أو وسم"), sel([["", "كل الأقسام"], ...D0.categories.map((c) => [c.id, c.ar])], "", { style: { width: "auto" }, onchange: (e) => { cat = e.target.value; draw(); } })), box, publishBar());
+    toolbar(searchBox((v) => { q = v; draw(); }, "اسم أو معرّف أو مزوّد أو رقم خدمة"), sel([["", "كل الأقسام"], ...D0.categories.map((c) => [c.id, c.ar])], "", { style: { width: "auto" }, onchange: (e) => { cat = e.target.value; draw(); } })), box, publishBar());
   draw();
   const off = subscribe(() => (view.isConnected ? draw() : off()));
 }
