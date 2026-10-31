@@ -15,9 +15,18 @@ function persist(s) {
 }
 
 async function tokenRequest(grant, body) {
-  const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`, {
-    method: "POST", headers: { apikey: SB_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body),
-  });
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 15000);
+  let r;
+  try {
+    r = await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`, {
+      method: "POST", signal: ac.signal,
+      headers: { apikey: SB_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("انتهت مهلة الاتصال بخدمة تسجيل الدخول؛ تحقق من الاتصال ثم أعد المحاولة");
+    throw new Error("تعذّر الاتصال بخدمة تسجيل الدخول؛ تحقق من الاتصال بالإنترنت");
+  } finally { clearTimeout(timer); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error_description || j.msg || "فشل تسجيل الدخول");
   return {
