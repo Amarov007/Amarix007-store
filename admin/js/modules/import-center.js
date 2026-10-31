@@ -25,16 +25,33 @@ export default async function (view) {
   let providers = [], selected = "", rows = [], loading = false, markup = 30, filter = "", page = 0;
   const status = h("div");
   const preview = h("div");
+  const searchInput = input({ type: "search", placeholder: "بحث في النتائج", value: "", oninput: (e) => { filter = e.target.value.toLowerCase(); page = 0; drawPreview(); } });
+  const searchToolbar = h("div", { class: "toolbar" },
+    searchInput,
+    h("button", { class: "btn ghost sm", onclick: () => { visibleRows().forEach((x) => { if (!x.exists && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الصالح في النتائج"),
+    h("button", { class: "btn ghost sm", onclick: () => { rows.forEach((x) => { x.selected = false; }); drawPreview(); } }, "إلغاء التحديد")
+  );
+  const summary = h("p", { class: "hint" });
+  const tableBody = h("tbody");
+  const tableHost = h("div", { class: "scroll-x" }, h("table", { class: "table" },
+    h("thead", null, h("tr", null, ["", "الخدمة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))),
+    tableBody
+  ));
+  const pager = h("div", { class: "page-actions" });
+  const addSelectedButton = h("button", { class: "btn primary", disabled: true, onclick: saveSelected }, "إضافة المحدد إلى المسودة");
+  mount(preview, searchToolbar, summary, tableHost, pager);
 
   async function loadProviders() {
+    const main = { id: "main", name: "المزوّد الرئيسي", kind: "smm", enabled: true };
     try {
       const extra = await rpc("smm_providers_admin_list");
-      providers = [{ id: "main", name: "المزوّد الرئيسي", kind: "smm", enabled: true }, ...(Array.isArray(extra) ? extra : []).filter((p) => p.enabled !== false)];
-      selected = providers.some((p) => p.id === selected) ? selected : providers[0]?.id || "";
-      draw();
+      providers = [main, ...(Array.isArray(extra) ? extra : []).filter((p) => p.enabled !== false)];
     } catch (e) {
-      mount(status, errorState(new Error("تعذّر تحميل المزوّدين: " + e.message), loadProviders));
+      providers = [main];
+      mount(status, h("p", { class: "hint" }, "تعذّر تحميل المزوّدين الإضافيين (" + e.message + ") — المتاح الآن: المزوّد الرئيسي فقط."));
     }
+    selected = providers.some((p) => p.id === selected) ? selected : providers[0]?.id || "";
+    draw();
   }
 
   function normalize(raw, provider) {
@@ -130,54 +147,57 @@ export default async function (view) {
     draw();
   }
 
+  function visibleRows() {
+    return rows.filter((x) => !filter || (x.name + " " + x.category + " " + x.id).toLowerCase().includes(filter));
+  }
+
   function drawPreview() {
     const provider = providers.find((p) => p.id === selected);
-    if (!rows.length) return mount(preview, h("div", { class: "empty" }, "اختر مزوّداً ثم اضغط جلب الخدمات للمعاينة."));
-    const filtered = rows.filter((x) => !filter || (x.name + " " + x.category + " " + x.id).toLowerCase().includes(filter));
+    const filtered = visibleRows();
     const pageSize = 100, pages = Math.max(1, Math.ceil(filtered.length / pageSize));
     page = Math.min(page, pages - 1);
-    const table = h("div", { class: "table-wrap" });
-    const body = h("tbody");
-    filtered.slice(page * pageSize, (page + 1) * pageSize).forEach((x) => {
+    const pageRows = filtered.slice(page * pageSize, (page + 1) * pageSize);
+    searchToolbar.hidden = !rows.length;
+    tableHost.hidden = !rows.length;
+    pager.hidden = !rows.length;
+    summary.textContent = rows.length
+      ? `المزوّد: ${provider?.name || selected} · المعروض 100 صف في الصفحة من ${filtered.length} · المحدد: ${rows.filter((x) => x.selected).length}`
+      : "اختر مزوّداً ثم اضغط جلب الخدمات للمعاينة.";
+    mount(tableBody, pageRows.map((x) => {
       const check = h("input", { type: "checkbox", checked: x.selected, disabled: x.exists || !x.available || !(x.rate > 0), onchange: (e) => { x.selected = e.target.checked; drawPreview(); } });
-      body.append(h("tr", null,
+      return h("tr", null,
         h("td", null, check),
         h("td", null, h("b", null, x.name), h("small", { class: "sub mono" }, `#${x.id}`)),
         h("td", null, badge(HUB_LABEL[x.hub] || x.hub, "info")),
         h("td", { class: "mono" }, x.rate),
         h("td", null, x.exists ? badge("موجود", "mute") : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "ok"))
-      ));
-    });
-    mount(preview, h("div", null,
-      h("div", { class: "toolbar" }, input({ type: "search", placeholder: "بحث في النتائج", value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); page = 0; drawPreview(); } }),
-        h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (!x.exists && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الصالح في النتائج"),
-        h("button", { class: "btn ghost sm", onclick: () => { rows.forEach((x) => x.selected = false); drawPreview(); } }, "إلغاء التحديد")),
-      h("p", { class: "hint" }, `المزوّد: ${provider?.name || selected} · المعروض حتى 250 صفاً من ${filtered.length} · المحدد: ${rows.filter((x) => x.selected).length}`),
-      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))), body)),
-      h("div", { class: "page-actions" },
-        h("button", { class: "btn ghost sm", disabled: page <= 0, onclick: () => { page--; drawPreview(); } }, "السابق"),
-        h("span", null, "صفحة " + (page + 1) + " من " + pages),
-        h("button", { class: "btn ghost sm", disabled: page >= pages - 1, onclick: () => { page++; drawPreview(); } }, "التالي"))
-    ));
+      );
+    }));
+    mount(pager,
+      h("button", { class: "btn ghost sm", disabled: page <= 0, onclick: () => { page--; drawPreview(); } }, "السابق"),
+      h("span", null, "صفحة " + (page + 1) + " من " + pages),
+      h("button", { class: "btn ghost sm", disabled: page >= pages - 1, onclick: () => { page++; drawPreview(); } }, "التالي")
+    );
+    addSelectedButton.disabled = !rows.some((x) => x.selected);
   }
-
   function draw() {
     const opts = providers.map((p) => [p.id, `${p.name || p.id} · ${p.kind || "smm"}`]);
     mount(root,
       pageHeader("مركز استيراد الخدمات", "جلب الخدمات من كل مزوّد، معاينة تصنيفها وأسعارها، ثم إضافتها كمسودة قبل النشر.",
         h("button", { class: "btn primary", disabled: loading || !selected, onclick: fetchCatalog }, "جلب الخدمات")),
       h("div", { class: "card" },
-        h("div", { class: "form-grid" }, field("المزوّد", sel(opts, selected, { onchange: (e) => { selected = e.target.value; rows = []; mount(status); drawPreview(); } })),
+        h("div", { class: "form-grid" }, field("المزوّد", sel(opts, selected, { onchange: (e) => { selected = e.target.value; rows = []; filter = ""; page = 0; searchInput.value = ""; mount(status); drawPreview(); } })),
           field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); } }))),
         h("p", { class: "hint" }, "الجلب لا يغيّر قاعدة البيانات أو المتجر المنشور. الخدمات تُضاف إلى مسودة الكتالوج، وتحتاج مراجعة الأسعار والحقول ثم الضغط على «نشر»."),
         status),
       preview,
-      h("div", { class: "page-actions" }, h("button", { class: "btn primary", disabled: !rows.some((x) => x.selected), onclick: saveSelected }, "إضافة المحدد إلى المسودة")),
+      h("div", { class: "page-actions" }, addSelectedButton),
       publishBar()
     );
     drawPreview();
   }
 
+  mount(view, root);
   draw();
   await loadProviders();
 }
