@@ -25,19 +25,21 @@ function loginView(message = "") {
   const err = h("div", { class: "form-error", role: "alert" }, message);
   const email = h("input", { class: "input", type: "email", name: "email", required: true, autocomplete: "username", dir: "ltr" });
   const pass = h("input", { class: "input", type: "password", name: "password", required: true, autocomplete: "current-password", dir: "ltr" });
+  const remember = h("input", { type: "checkbox", name: "remember", style: { width: "18px", height: "18px", accentColor: "var(--primary)" } });
+  const rememberLabel = h("label", { class: "remember-login", style: { display: "flex", alignItems: "center", gap: "9px", margin: "2px 0 12px", cursor: "pointer" } }, remember, h("span", null, "تذكرني على هذا الجهاز"));
   const ts = h("div", { class: "turnstile" });
   const btn = h("button", { class: "btn primary block", type: "submit" }, "تسجيل الدخول");
   const form = h("form", { class: "login-card", onsubmit: async (e) => {
     e.preventDefault(); err.textContent = "";
     if (!captcha) { err.textContent = "أكمل التحقق الأمني أولاً"; return; }
-    try { await withBusy(btn, () => signIn(email.value.trim(), pass.value, captcha)); await boot(); }
+    try { await withBusy(btn, () => signIn(email.value.trim(), pass.value, captcha, remember.checked)); await boot(); }
     catch (x) { err.textContent = x.message; captcha = ""; try { window.turnstile.reset(wid); } catch {} }
   } },
     h("div", { class: "brand-mark lg" }, "A"),
     h("h1", null, "لوحة التحكم"), h("p", null, "AMARIX007 · إدارة المتجر"),
     h("label", { class: "field" }, h("span", null, "البريد الإلكتروني"), email),
     h("label", { class: "field" }, h("span", null, "كلمة المرور"), pass),
-    ts, err, btn);
+    rememberLabel, ts, err, btn);
   mount(app, h("div", { class: "login-wrap" }, form));
   loadTurnstile().then(() => { wid = window.turnstile.render(ts, { sitekey: TURNSTILE_KEY, theme: "auto", callback: (k) => (captcha = k), "expired-callback": () => (captcha = ""), "error-callback": () => (captcha = "") }); })
     .catch((x) => (err.textContent = x.message));
