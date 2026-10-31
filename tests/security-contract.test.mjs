@@ -53,26 +53,40 @@ test("payments v2 has a server-side off switch until E2E signoff", async () => {
   assert.match(sql, /RAISE EXCEPTION/i);
 });
 
-test("admin UI applies the same named permission keys to staff navigation", async () => {
-  const src = await read("../admin.js");
-  assert.match(src, /const TAB_PERM = \{\s*orders: "orders",\s*invoices: "orders",\s*tickets: "tickets",\s*users: "users",\s*products: "products"\s*\}/);
-  assert.match(src, /const canTab = \(k\) => !isStaffOnly\(\) \|\| \(!!TAB_PERM\[k\] && STAFF\.includes\(TAB_PERM\[k\]\)\)/);
+test("admin routes map staff permissions to the same named keys as the database", async () => {
+  const routes = await read("../admin/js/routes.js");
+  for (const [id, perm] of [["orders", "orders"], ["invoices", "orders"], ["tickets", "tickets"], ["users", "users"], ["products", "products"]])
+    assert.match(routes, new RegExp(`id: "${id}"[^}]*perm: "${perm}"`));
+  // every other page is admin-only (perm: null)
+  for (const id of ["dashboard", "wallets", "payments", "providers", "staff", "activity", "settings", "coupons", "push"])
+    assert.match(routes, new RegExp(`id: "${id}"[^}]*perm: null`));
+  const rbac = await read("../admin/js/core/rbac.js");
+  assert.match(rbac, /export const can = \(perm\) => isAdmin\(\) \|\| \(!!perm && state\.perms\.includes\(perm\)\)/);
 });
 
+test("admin never publishes secrets and publishes through the staged RPCs", async () => {
+  const src = await read("../admin/js/core/catalog.js");
+  assert.match(src, /delete x\.api/);
+  assert.match(src, /stage_store_config_publish/);
+  assert.match(src, /commit_store_config_publish/);
+  assert.match(src, /cancel_store_config_publish/);
+  assert.match(src, /const productsOnly = !isAdmin\(\)/);
+});
 
-test("provider service deletion is scoped, backed up, and blocked for open orders", async () => {
-  const src = await read("../admin.js");
-  assert.match(src, /data-a="smm-delete-imported"/);
-  assert.match(src, /data-a="smm-delete-one"/);
-  assert.match(src, /if \(a == "smm-delete-imported"\) return smmDeleteImported\(b\)/);
-  assert.match(src, /if \(a == "smm-delete-one"\) return smmDeleteImported\(b, b\.dataset\.id\)/);
-  assert.match(src, /p\.smm_service != null[\s\S]{0,140}provOf\(p\) === prov/);
-  assert.match(src, /status=in\.\(new,processing\)/);
-  assert.match(src, /rpc\/has_perm",\s*\{[\s\S]{0,160}p: "orders"/);
-  assert.match(src, /amx_smm_backup/);
-  assert.match(src, /localStorage\.setItem\("amx_smm_backup", previous\)/);
-  assert.match(src, /localStorage\.removeItem\("amx_smm_backup"\)/);
-  assert.match(src, /smmUndo\(\)/);
+test("admin provider form stores only Edge Secret names, never key values", async () => {
+  const src = await read("../admin/js/modules/providers.js");
+  assert.match(src, /SECRET_RE/);
+  assert.doesNotMatch(src, /api_key\s*:/);
+});
+
+test("admin has no direct writes to payment tables and no innerHTML sinks", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const walk = async (d) => (await Promise.all((await readdir(new URL(d, import.meta.url), { withFileTypes: true })).map(async (e) => e.isDirectory() ? walk(`${d}/${e.name}`) : [`${d}/${e.name}`]))).flat();
+  for (const f of (await walk("../admin/js")).filter((x) => x.endsWith(".js"))) {
+    const src = await read(f);
+    assert.doesNotMatch(src, /innerHTML\s*=/, f);
+    assert.doesNotMatch(src, /\b(payments|payment_events)\?[^\n]*method:\s*["'](POST|PATCH|PUT|DELETE)/, f);
+  }
 });
 
 test("Payments V2 is forced off on every store_config write", async () => {
