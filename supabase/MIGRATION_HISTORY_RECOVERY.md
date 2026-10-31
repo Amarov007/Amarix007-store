@@ -1,6 +1,6 @@
 # Supabase migration history recovery
 
-**Status: recovery required — do not reset production or assume this folder can recreate it.**
+**Status: recovery required — do not reset production or assume this folder can recreate it. See the current, read-only reconciliation report in [recovery/README.md](recovery/README.md) and the machine-readable ledger in [recovery/production-migration-ledger-2026-10-31.json](recovery/production-migration-ledger-2026-10-31.json).**
 
 At the time of the AMARIX007 maintenance pass (2026-10-30 UTC):
 
