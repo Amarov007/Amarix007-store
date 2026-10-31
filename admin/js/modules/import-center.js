@@ -116,8 +116,8 @@ export default async function (view) {
           id: productId, c: category, ar: row.name, en: row.name, p: Math.max(0.000001, Math.round(price * 1000000) / 1000000),
           o: 0, d: 0, r: 5, t: 3, img: row.image || "", images: [], ptype: PTYPE[hub],
           smm_provider: provider.id, smm_service: service, smm_qty: 1,
-          smm_input: provider.kind === "smsactivate" ? "none" : hub === "smm" ? "text" : hub === "games" ? "player_id" : "email",
-          req: provider.kind === "smsactivate" ? [] : hub === "smm" ? ["url"] : required,
+          smm_input: provider.kind === "smsactivate" ? "none" : hub === "smm" ? "" : hub === "games" ? "player_id" : "email",
+          req: provider.kind === "smsactivate" || hub === "smm" ? [] : required,
           ...(row.country ? { smm_country: row.country } : {}),
           ...(hub === "smm" ? { qmin: Math.max(1, row.min || 1), qmax: Math.max(0, row.max || 0) } : { qmin: 1, qmax: 1 }),
           auto
