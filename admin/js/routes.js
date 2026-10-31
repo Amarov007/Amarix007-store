@@ -8,6 +8,7 @@ export const routes = [
   { id: "tickets", title: "تذاكر الدعم", group: "sales", icon: "ticket", perm: "tickets", load: () => import("./modules/tickets.js") },
   { id: "affiliates", title: "الشركاء (Affiliate)", group: "sales", icon: "star", perm: null, load: () => import("./modules/affiliates.js") },
   { id: "products", title: "المنتجات", group: "catalog", icon: "box", perm: "products", load: () => import("./modules/products.js") },
+  { id: "import-center", title: "مركز الاستيراد", group: "catalog", icon: "download", perm: "products", load: () => import("./modules/import-center.js") },
   { id: "categories", title: "الأقسام", group: "catalog", icon: "layers", perm: null, load: () => import("./modules/categories.js") },
   { id: "banners", title: "البانرات", group: "catalog", icon: "image", perm: null, load: () => import("./modules/banners.js") },
   { id: "coupons", title: "الكوبونات", group: "catalog", icon: "tag", perm: null, load: () => import("./modules/coupons.js") },
