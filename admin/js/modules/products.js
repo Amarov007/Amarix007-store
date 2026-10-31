@@ -1,8 +1,7 @@
 import { loadCatalog, data, edit, subscribe } from "../core/catalog.js";
 import { publishBar, imageField } from "../core/forms.js";
-import { h, mount, pageHeader, toolbar, searchBox, select as sel, dataTable, badge, modal, toast, confirmBox, field, input, spinner } from "../core/ui.js";
+import { h, mount, pageHeader, toolbar, searchBox, select as sel, dataTable, badge, modal, toast, confirmBox, field, input, spinner, switchEl } from "../core/ui.js";
 import { money, num } from "../core/utils.js";
-import { switchEl } from "../core/ui.js";
 
 const DELIV = [[0, "رابط مستودع / منصة"], [1, "بيانات حساب / اعتماد"], [2, "ملف تنفيذي / سورس"], [3, "تنفيذ على رابط حساب العميل"]];
 const PTYPES = [["", "غير محدد"], ["smm", "رشق وخدمات زيادة"], ["game_topup", "شحن ألعاب"], ["app_subscription", "تطبيق واشتراك"], ["gift_card", "بطاقة / كود"]];
