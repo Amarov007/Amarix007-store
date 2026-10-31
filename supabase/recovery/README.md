@@ -44,22 +44,27 @@
 
 ```bash
 supabase --version
-supabase migration list --help
 supabase db dump --help
 ```
 
-اربط CLI بالمشروع `pvuobngrybygohendwaz`، ثم صدّر المخطط فقط إلى مجلد recovery. استخدم target flag الذي يعرضه `--help` في إصدارك (`--linked` أو `--remote` حسب الإصدار)، ولا تضف `--data-only`:
+الأكثر وضوحاً هو تمرير رابط اتصال قاعدة البيانات صراحةً عبر متغير بيئة محلي اسمه `DB_URL` (لا تضعه في Git أو المحادثة أو سجل الأوامر). استخدم Session Pooler عادةً، أو الاتصال المباشر إذا كانت الشبكة تدعم IPv6/لديك IPv4 مفعّل. بعد ضبط المتغير في بيئة الجهاز الآمنة:
 
 ```bash
 mkdir -p supabase/recovery
-# بعد التحقق من صيغة target flag:
-supabase db dump <remote-target-flag> --schema public,private -f supabase/recovery/production-schema.sql
+supabase db dump --db-url "$DB_URL" -f supabase/recovery/production-schema.sql
 ```
 
-الـ dump الافتراضي schema-only ولا يتضمن صفوف البيانات أو custom roles، كما يستثني مخططات Supabase المُدارة مثل Auth وStorage وبعض مخططات الإضافات. راجع صلاحيات الأدوار والـ extensions والـ triggers التي تعتمد على Auth/Storage بشكل منفصل قبل اعتبار اللقطة مكتملة.
+هذا الأمر الافتراضي يصدّر المخطط فقط ولا يصدّر صفوف البيانات. لا تضف `--data-only`. إذا احتجت جرد الأدوار المخصصة، صدّرها إلى ملف محلي خارج Git ولا ترفعه للمستودع:
+
+```bash
+supabase db dump --db-url "$DB_URL" -f ./production-roles.sql --role-only
+```
+
+بعد التصدير، افحص الملف بحثاً عن أي قيم سرية أو بيانات اعتماد قبل مشاركته. لا ترفع dump الإنتاج إلى GitHub تلقائياً. لا تستخدم `db push` أو `db reset` أو `migration repair` على الإنتاج.
+
+الـ dump الافتراضي schema-only لا يتضمن صفوف البيانات أو custom roles، كما يستثني مخططات Supabase المُدارة مثل Auth وStorage وبعض مخططات الإضافات. راجع صلاحيات الأدوار والـ extensions والـ triggers التي تعتمد على Auth/Storage بشكل منفصل قبل اعتبار اللقطة مكتملة.
 
 صدّر كذلك ناتج `supabase migration list` إلى ملف محلي خاص بالمراجعة، وقارنه بالـ manifest الموجود هنا. لا تضع أي connection string أو secrets في الملف.
-
 ### المرحلة B — تحقق محلي معزول
 
 1. استخدم Docker وSupabase local stack فقط، أو قاعدة تطوير منفصلة غير إنتاجية.
