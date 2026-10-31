@@ -1,5 +1,40 @@
 <!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1220"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://pvuobngrybygohendwaz.supabase.co; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"><title>Amarix Store</title><link rel="stylesheet" href="styles.css"><script defer src="config.js"></script><script defer src="app.js"></script></head>
-<body><header class="top"><a class="brand" href="/">AMARIX<span>007</span></a><nav><a href="#catalog">المتجر</a><a href="#wallet">المحفظة</a><a href="admin.html">الإدارة</a><button id="theme" class="ghost" aria-label="تبديل المظهر">◐</button></nav></header><main><section class="hero"><p class="eyebrow">متجرك للخدمات الرقمية</p><h1>كل خدماتك الرقمية<br><em>في مكان واحد</em></h1><p>رشق، أرقام تفعيل، اشتراكات، وشحن ألعاب وتطبيقات.</p><div class="actions"><a class="primary" href="#catalog">تصفح الخدمات</a><button id="login" class="secondary">تسجيل الدخول</button></div></section><section id="catalog"><div class="section-head"><div><small>اكتشف خدماتنا</small><h2>الأقسام</h2></div><input id="search" type="search" placeholder="ابحث عن خدمة..."></div><div id="categories" class="chips"></div><div id="products" class="products"><p class="muted">جارٍ تحميل الخدمات…</p></div></section><section id="wallet" class="wallet"><div><small>حسابك</small><h2>المحفظة والطلبات</h2><p id="account-status">سجّل الدخول لمتابعة رصيدك وطلباتك.</p></div><button class="secondary" id="wallet-login">دخول الحساب</button><form id="topup-form" class="product admin-form"><h3>طلب شحن الرصيد</h3><label>المبلغ<input id="topup-amount" type="number" min="1" step="0.01" required></label><label>العملة<select id="topup-currency"><option>USD</option><option>SYP</option><option>EUR</option></select></label><label>طريقة الدفع<select id="topup-method"><option value="syriatel_cash">سيريتل كاش</option><option value="sham_cash">شام كاش</option><option value="usdt_bep20">USDT BEP20</option><option value="binance_pay">Binance Pay</option><option value="manual">تحويل يدوي</option></select></label><label>رقم العملية أو مرجع التحويل<input id="topup-reference" maxlength="160"></label><button class="primary">إرسال طلب الشحن للمراجعة</button><p id="topup-message" class="muted" aria-live="polite"></p><small class="muted">هذا طلب مراجعة فقط؛ لا يُضاف الرصيد قبل اعتماد الإدارة.</small></form></section></main><footer>© <span id="year"></span> AMARIX007 · جميع الحقوق محفوظة</footer>
-<dialog id="auth"><form method="dialog" id="auth-form"><button class="close" value="cancel">×</button><h2>تسجيل الدخول</h2><label>البريد الإلكتروني<input type="email" id="email" required autocomplete="email"></label><label>كلمة المرور<input type="password" id="password" required minlength="8" autocomplete="current-password"></label><button class="primary" id="auth-submit" value="default">متابعة</button><p id="auth-message" class="muted"></p></form></dialog>
-<dialog id="order-dialog"><form id="order-form"><button type="button" class="close" id="order-close">×</button><h2 id="order-title">طلب خدمة</h2><p id="order-price" class="price"></p><div id="customer-fields"></div><label>الكمية<input id="order-quantity" type="number" min="1" max="100000" value="1" required></label><p id="order-message" class="muted" aria-live="polite"></p><button class="primary" id="order-submit">تأكيد الطلب من المحفظة</button></form></dialog></body></html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; connect-src https://pvuobngrybygohendwaz.supabase.co; base-uri 'none'; form-action 'none'">
+<title>Amarix | متجر الخدمات الرقمية</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#161a23;--mut:#6b7280;--br:#e5e7eb;--pri:#6d5dfc;--ok:#16a34a;--bad:#dc2626}
+:root[data-theme=dark]{--bg:#0e1118;--card:#171b26;--tx:#eef0f6;--mut:#98a0b3;--br:#262c3b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,"Segoe UI",Tahoma,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--card);border-bottom:1px solid var(--br)}
+header a.brand{font-weight:800;color:var(--pri);text-decoration:none;margin-inline-end:auto;font-size:20px}
+main{max-width:900px;margin:0 auto;padding:14px}
+button,select,input{font:inherit;color:inherit}
+button,.btn{background:var(--pri);color:#fff;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}
+button.sec{background:var(--card);color:var(--tx);border:1px solid var(--br)}
+input,select{width:100%;padding:10px;border:1px solid var(--br);border-radius:10px;background:var(--card);margin:4px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:14px;padding:14px}
+.cat{text-align:center;text-decoration:none;color:inherit;font-weight:700}.cat span{display:block;font-size:34px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 0}.chip{white-space:nowrap;background:var(--card);color:var(--tx);border:1px solid var(--br);padding:5px 12px;border-radius:99px}.chip.on{background:var(--pri);color:#fff}
+.badge{font-size:12px;background:#6d5dfc22;color:var(--pri);padding:1px 8px;border-radius:99px;margin-inline-end:4px}
+.mut{color:var(--mut);font-size:14px}.price{font-weight:800;font-size:18px}
+.st-completed{color:var(--ok)}.st-failed{color:var(--bad)}
+#toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));inset-inline:16px;background:#111;color:#fff;padding:12px;border-radius:12px;display:none;text-align:center;z-index:9}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="#/">Amarix</a>
+  <select id="cur" style="width:auto;margin:0" aria-label="العملة"></select>
+  <button class="sec" id="theme" aria-label="الوضع">🌓</button>
+  <button id="acct">دخول</button>
+</header>
+<main id="app">جارٍ التحميل…</main>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
