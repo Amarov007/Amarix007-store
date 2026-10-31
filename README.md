@@ -1,107 +1,38 @@
-# AMARIX007 — متجر الأصول الرقمية
+# Amarix Store
 
-واجهة ثابتة (HTML/CSS/JS بلا بناء) تُنشر على GitHub Pages، والخلفية على Supabase.
+واجهة متجر خدمات رقمية عربية RTL مبنية بملفات HTML/CSS/JavaScript ثابتة ومتوافقة مع GitHub Pages، مع Supabase للمصادقة وقاعدة البيانات.
 
 ## الملفات
-- `index.html` + `app.js` + `style.css` + `store-data.js` — المتجر. `store-data.js` نسخة احتياطية فقط؛ الإعدادات الحية تأتي من `public_config()`.
-- `admin.html` + `admin.js` + `admin.css` — لوحة الإدارة (`noindex`).
-- `music.js` + `music.m4a` — موسيقى الخلفية، **اختيارية (opt-in) ومُطفأة افتراضياً**: لا يُحمَّل الملف ولا يُشغَّل شيء حتى يضغط الزائر زر الموسيقى في الشريط العلوي أو القائمة. عند التفعيل تبدأ بتلاشٍ تدريجي (بعد شاشة البداية إن وُجدت، أو عند أول لمسة إن منع المتصفح التشغيل التلقائي)، وتستمر أثناء التصفح داخل الصفحة الواحدة، وتتوقف عند خروج الزائر من التبويب وتستأنف عند عودته. الاختيار محفوظ في `localStorage.amx_music` (`1` = مفعّلة، `0` = مطفأة، لا قيمة = مطفأة). لتغيير الأغنية استبدل `music.m4a` وارفع `?v=` في `music.js`. (تعليق رأس `music.js` ما زال يصف السلوك القديم «تبدأ عند فتح الموقع»؛ الكود نفسه هو المرجع.)
-- `svc-parse.js` — محلّل أسماء خدمات الرشق (يُحمَّل في `index.html` و`admin.html`): يحوّل اسم المزوّد الطويل إلى عنوان قصير نظيف + وسوم (تعويض، سرعة، بدء، ثابت، جديد…).
-- `sw.js` — Service Worker (كاش للهيكل والأيقونات + الإشعارات).
-- `admin-boot.js` — يُحمَّل أولاً في `admin.html`: يحافظ على حماية الـ clickjacking (الصفحة مخفية حتى يتأكد أنها ليست داخل إطار) ويعرض رسالة خطأ عربية مع زر «إعادة التحميل» إن لم يُبلِّغ `admin.js` بجاهزيته خلال نحو 8 ثوانٍ (كان الفشل يعطي صفحة بيضاء).
-- `404.html`, `faq/index.html`, `policies/index.html`, `sitemap.xml` — صفحات SEO الثابتة؛ المولّد `tools/gen-seo-pages.mjs` (انظر «السيو والسرعة»).
-- `tests/verify-project.py` — فحص ثابت بلا اعتماديات: `python3 tests/verify-project.py` (صياغة JS بـ `node --check`، وجود الملفات المشار إليها، تطابق CSP بين الصفحتين، تغطية دوال `rpc` بملفات SQL أو `docs/LIVE-ONLY.md`، عدم تكرار تعريف الدالة في أكثر من ملف SQL، و`revoke execute on all functions` في ملف الصلاحيات النهائي فقط).
-- `SQL-RUN-ORDER.md` — ترتيب تشغيل ملفات SQL (قاعدة جديدة / قاعدة حية) وأوامر Supabase CLI و pg_cron. `docs/LIVE-ONLY.md` — الدوال والجداول الموجودة في القاعدة الحية فقط.
-- `SECURITY-HEADERS.md` — سياسة CSP المعتمدة وقواعد Cloudflare Transform Rules للترويسات (GitHub Pages لا يضبط ترويسات بنفسه).
-- `supabase-schema.sql` — مخطط قاعدة جديدة. `supabase-live-sync.sql` — الجداول والدوال التي كانت في القاعدة الحية فقط (التقييمات، الإشعارات، السلة، السحب، إحصاءات اللوحة). `supabase-security-fixes.sql`, `supabase-support-tickets.sql` — ترقيات للقواعد القديمة. **الترتيب الصحيح لكل الملفات في `SQL-RUN-ORDER.md`**. كل دالة معرَّفة في ملف واحد فقط، وصلاحيات التنفيذ كلها في `supabase-final-grants.sql` الذي يُشغَّل **أخيراً** دائماً.
-- `supabase/functions/*` — مصدر الدوال الطرفية، بما فيها `smm-order` و`payment-proof-hash` و`fulfillment-worker` في فرع إعادة هيكلة الدفع (لا تنشرها قبل الاختبارات). للتنزيل، نفّذ أمراً مستقلاً لكل اسم دالة؛ انظر `docs/LIVE-ONLY.md`، ولا تخلط تنزيل المصدر الحي بملفات الفرع الجديد.
-- `supabase/migrations/*` — التعديلات المطبّقة على القاعدة الحية بعد هذا التاريخ.
+- `index.html` و`app.js`: واجهة المتجر وتحميل الأقسام والمنتجات.
+- `admin.html` و`admin.js`: لوحة الإدارة وملخص بيانات المتجر.
+- `config.js`: يحتوي على مفتاح Supabase publishable العام فقط.
+- `styles.css`: التصميم المتجاوب.
 
-## ملاحظات مهمة
-- القاعدة الحية تحوي جداول غير موجودة في ملفات SQL هنا: `push_subscriptions`, `push_broadcasts`, `reviews`, `payout_requests` ودوال مرتبطة بها. للمزامنة: `supabase db pull`.
-- بعد تعديل `app.js` أو `style.css` أو `store-data.js` ارفع رقم `?v=` في `index.html`.
-- التصفح (الرئيسية، الأقسام، المنتجات، الرشق، السلة، المفضلة) مفتوح للزوار؛ الشراء والطلبات والحساب والدعم والشركاء تتطلب تسجيل الدخول (`GUEST_ROUTES` و`PUBLIC_ROUTES` في `app.js`). تفعيل الإشعارات **إجباري داخل التطبيق فقط** (TWA / PWA المثبّت / تطبيق الشاشة الرئيسية في iOS، يكتشفه `isApp()` في `app.js`)، وعلى الموقع في المتصفح اختياري: صندوق «تفعيل» في صفحة الحساب. لاختبار بوابة التطبيق في المتصفح افتح `/?source=twa`. صفحتا `#/policies` و`#/faq` مفتوحتان دون حساب.
-- CAPTCHA حقيقي: ضع مفتاح Turnstile العام في `TURNSTILE_SITE_KEY` (قسم 13 في `app.js`) وفعّل Captcha في Supabase > Auth > Attack Protection بالمفتاح السري.
-- تفعيل Leaked Password Protection من لوحة Supabase > Auth > Providers > Email (إعداد لا يمكن تغييره بـ SQL).
+## إعداد Supabase
+- المشروع: `pvuobngrybygohendwaz`
+- المفتاح في `config.js` هو publishable key عام ومخصص للواجهة.
+- لا تضع أبدًا `service_role` أو مفاتيح المزوّدين أو أي أسرار في ملفات الواجهة.
+- طبّق ملفات `supabase/migrations` على قواعد البيانات الجديدة بالترتيب.
+- أسرار المزوّدين تحفظ في Supabase Edge Function Secrets فقط.
 
-## إرسال الطلبات للمزود (smm-order v14 على هذا الفرع) ولوحة الطلبات
-- زر الإرسال في لوحة الطلبات اسمه «**إرسال للمزود**». بعد فشل جزئي يصير «إعادة إرسال البنود الفاشلة للمزود» (البنود التي نجحت لا تُعاد أبداً)، ويختفي عند «أُرسل / مكتمل / جارٍ الإرسال».
-- **قفل الإرسال**: يُكتب في `orders.smm_status` كـ `sending@<وقت>` (لا عمود جديد ولا SQL). قفل أحدث من 3 دقائق = إرسال جارٍ فعلاً (409). أقدم من ذلك أو `sending` القديمة بلا وقت = عالق: لا يُفكّ تلقائياً (قد يكون المزود قبل بنداً لم يُحفظ)، بل يظهر زر «فكّ القفل وإعادة الإرسال» للأدمن/الموظف مع تحذير بفحص لوحة المزود أولاً (`unlock:true`). الزبون لا يستطيع فكّ القفل.
-- **حفظ كل بند** فور قبول المزود له، فانقطاع الدالة في المنتصف لا يضيّع رقم الطلب عند المزود ولا يسبب إرسالاً مزدوجاً.
-- **التحديث لا يكتب أثناء إرسال جارٍ** (كان قد يمحو التقدّم)، والطلب الذي فيه بند فاشل يبقى `partial` ولا يتحول إلى `completed` (كان يُقفل ولا يمكن إعادة إرسال البند الفاشل).
-- لوحة الطلبات: تنبيه قبل تعليم طلب «مكتمل» وهو لم يُرسل للمزود، حالات المزود بالعربية، مبالغ البنود منسّقة بالعملة، فلاتر الدفع وحالة المزود («مدفوع ولم يُرسل» و«مشاكل»)، بحث برقم الطلب عند المزود، وعرض 50 طلباً مع «عرض المزيد» وتحميل صفحات أقدم من الخادم.
-- النسخة الحية القديمة كانت تعتمد الإرسال التلقائي من المتصفح. يضيف هذا الفرع طابور `fulfillment_jobs` وعاملاً مجدولاً، لكنه لا يعمل قبل مراجعة المخطط وتطبيق migration على بيئة اختبار وضبط Vault/`pg_cron`/`pg_net` ثم نشر الدوال. لا تُعدّ ميزة التنفيذ الخادمي مفعّلة بمجرد رفع ملفات الواجهة.
-- **النشر**: `supabase functions deploy smm-order` أولاً ثم ارفع الواجهة. الواجهة الجديدة تعمل مع الدالة القديمة (دون فكّ القفل).
+## الحالة الحالية
+المخطط الأساسي والجداول وسياسات RLS موجودة في Supabase، والواجهة ولوحة الإدارة على فرع `rebuild`. لوحة الإدارة الحالية تعرض البيانات للقراءة؛ عمليات إنشاء المنتجات وإدارة المزوّدين وتنفيذ الطلبات لم تُفعّل بعد. لا يعتبر هذا الفرع منشورًا للإنتاج حتى إكمال وظائف الطلبات والدفع والمزامنة والاختبارات وإعداد GitHub Pages.
 
-## تعدد مواقع الرشق (أكثر من API)
-- **المزوّد الرئيسي** (`main`) يحتفظ بالرابط ومسار API، أما هذا الفرع فيستخدم اسم Edge Secret بدلاً من إرجاع المفتاح أو حفظه عبر الواجهة. نقل القيم القديمة إلى Edge Secrets خطوة يدوية موثقة؛ لا تفعّل `ALLOW_LEGACY_DB_API_KEYS` في الإنتاج.
-- **مواقع إضافية**: من لوحة التحكم › APIs › «مواقع رشق إضافية» أضف أي عدد (معرّف إنجليزي محايد مثل `s2`، اسم، رابط https، مفتاح). تُحفظ في جدول `smm_providers` (أدمن فقط، لا تُنشر مع المتجر). زر «فحص الاتصال والرصيد» يختبر القيم المحفوظة. لا يلزم SQL جديد: الجدول موجود في `supabase-live-sync.sql`.
-- **الاستيراد**: في «اختبار موقع الرشق» اختر الموقع ثم «عرض الخدمات» ثم استورد. كل منتج مستورد يحمل `smm_provider` (غيابه = `main`)، ومعرّفه `smm_<موقع>_<رقم>` كي لا يتعارض رقم الخدمة بين موقعين (منتجات `main` تحتفظ بمعرّف `smm<رقم>`). «حذف كل منتجات الرشق» و«حذف وإعادة جلب» يعملان على الموقع المختار فقط ولا يمسّان منتجات المواقع الأخرى. يمكن تغيير موقع أي منتج يدوياً من حقل «موقع الرشق» في تحرير المنتج.
-- **الإرسال**: `smm-order` يقرأ `smm_provider` من كل منتج في الطلب ويرسل كل بند إلى موقعه؛ الطلب الواحد قد يحوي منتجات من مواقع مختلفة. تُحفظ النتيجة لكل بند مع `site` (الحقل `provider` محجوز لحالة الطلب عند الموقع بعد «تحديث الحالة»). تُتحقق كل المواقع المطلوبة **قبل** إرسال أي بند، فموقع معطّل أو بلا مفتاح يرفض الطلب كله دون إرسال جزئي. المواقع الإضافية: https فقط ولا عناوين داخلية ولا تتبّع تحويلات (حماية SSRF).
-- **خدمات غير الرشق (v3)**: `smm-order` يدعم ثلاثة أنواع مزوّدين، يُختار النوع عند إضافة الموقع في لوحة التحكم › APIs (عمود `kind` في `smm_providers`، والإعدادات في `config` JSON، ولا يلزم SQL جديد):
-  - `smm`: واجهة الرشق القياسية v2 كما كانت.
-  - `smsactivate`: أرقام التفعيل (واتساب، تليجرام ...) بواجهة SMS-Activate النصية. يشتري الرقم عند الإرسال ويجلب الرمز عند التحديث، ويصل الزبون الرقم والرمز تلقائياً في صفحة طلباته. مفاتيح `config` الاختيارية: `country` (الدولة الافتراضية)، `currency`، `rate_factor` (تحويل عملة المزوّد لعملة المتجر)، `max_price`، `operator`، `self_service:false` (يمنع تشغيل الطلب من جهة الزبون).
-  - `custom`: أي API آخر (شحن PUBG، Canva Pro، Midjourney، اشتراكات ذكاء اصطناعي ...) يُوصَف في `config` بلا تعديل كود: `balance`, `services`, `order`, `status` وكل منها `method` و`path` (يبدأ بـ `/` ويُضاف لرابط الموقع) و`headers` و`query` و`body` بقوالب `{service} {input} {quantity} {country} {ref} {order} {key}`، ومسارات الرد بنقاط مثل `data.order_id`. `order.delivery` و`status.delivery` يحدّدان ما يُعرض للزبون (`text`, `code`, `number`, `email`, `password`, `pin`, `serial`, `link`). بلا `status` يُعتبر الطلب مكتملاً فور نجاحه (تسليم فوري). `self_service:true` يسمح للزبون بتشغيل الطلب بنفسه بعد الدفع. أمثلة جاهزة داخل لوحة التحكم (شرح «كيف أضيف خدمات غير الرشق»). سعر `services` يُقرأ كسعر الوحدة الواحدة، و`rate_is_unit:false` إن كان سعر الألف.
-- **حقول المنتج الجديدة**: `smm_service` يقبل رقماً أو رمزاً نصياً (`wa`, `tg`, `uc_60`)، `smm_input` = `""` رشق (رابط + كمية) | `none` رقم أو كود بلا مدخل | `text` الزبون يكتب معرّف لاعب أو إيميل، `smm_country` رمز دولة الرقم أو خيار إضافي. المنتجات من النوعين `none` و`text` تُباع كمنتجات عادية (سعر الوحدة لا «/ 1000») وتُدفع بغير المحفظة. بند الأرقام كميته 1 دائماً (رقم واحد لكل بند).
-- **الأمان**: الزبون لا يستطيع تشغيل `send/poll` إلا لطلبه المدفوع هو، ولبنود مزوّدين `self_service` فقط (الرشق مرفوض دائماً). قفل `smm_status = sending` يمنع الإرسال المزدوج. تحديث الزبون محدود بمرة كل 4 ثوانٍ لكل طلب. كل مزوّد إضافي: https فقط، مضيف عام، بلا تتبّع تحويلات، والمسارات لا تخرج عن مضيف الموقع.
-- **حدود معروفة في هذا الفرع**: عامل التنفيذ يسترد حالات الفشل و`Partial` فقط عند توافر بيانات موثوقة من المزوّد، وإلا يحوّلها إلى `manual_review`. خدمات التسليم غير الرشق بلا adapter موثّق تبقى للمراجعة اليدوية. لا تُفعّل تأكيد USDT/Binance Pay الآلي.
-- **الأسعار والرصيد**: فحص تغيّر الأسعار ورصيد المزوّد في الرئيسية يعملان لكل موقع مستخدم على حدة؛ تعذّر موقع واحد لا يخفي الباقي ولا يُعدّ «خدمة محذوفة».
-- **ترتيب النشر المهم**: انشر دالة `smm-order` الجديدة **أولاً** (`supabase functions deploy smm-order`)، ثم ارفع الواجهة. الدالة الجديدة متوافقة مع الواجهة القديمة. الواجهة الجديدة تتحقق عبر `{action:"info"}` وترفض أي عملية على موقع غير رئيسي إن كانت الدالة المنشورة قديمة (كانت ستخاطب الموقع الرئيسي بالخطأ).
-- جدول `api_integrations` ودالة `api-hub` الموجودان في القاعدة الحية (فحص تكاملات عامة) منفصلان ولا تستخدمهما هذه الميزة.
 
-## الأسعار والعملات
-- `store-data.js` (`rates`، مثل `"SYP": [140, "ل.س"]`) و`currency` لوسائل الدفع **نسخة احتياطية فقط** تُستخدم عند تعذّر تحميل `public_config()` (دون اتصال أو خطأ مؤقت). القيم الفعلية تأتي من الإعدادات الحية (لوحة التحكم › الأسعار/العملات ثم «نشر»). **يجب أن تطابق قيم `store-data.js` الإعدادات الحية**، وإلا ظهرت للزائر أسعار مختلفة لثوانٍ أو دون اتصال. حدّثها عند كل تغيير في سعر الصرف، ثم ارفع `?v=` لـ `store-data.js` في `index.html` و`admin.html`.
-- الخادم يعيد حساب أسعار الطلب بنفسه (`orders_enforce_pricing`)، فاختلاف النسخة الاحتياطية لا يغيّر ما يُدفع فعلاً، لكنه يربك الزائر.
+## Current implementation update (2026-10-31)
 
-## الألوان والثيم
-- لوحة الألوان: ليموني `#B9FF66` (التمييز) · فحمي `#191A23` (الأسطح والنص) · رمادي `#F3F3F3` (البطاقات) · أبيض. الرموز المعرَّفة في القسم 1 من `style.css` (والقسم الموازي في `admin.css`) تتبدّل بين الوضعين الليلي والنهاري: `--cta`/`--cta-tx` للأزرار، `--lk` لنص التمييز، `--ac-line` للحدود وحلقات التركيز، `--on-ac` للنص فوق خلفية ليمونية.
-- ألوان العلامة في `store-data.js` (`site.col`) ولوحة التحكم (الهوية) تتجاوز الثيم **فقط إذا غُيّرت عن الافتراضي**؛ القيم الافتراضية الحالية والخضراء القديمة تُتجاهل حتى يعمل الثيم بالوضعين. لون مخصّص واحد يُطبَّق على الوضعين معاً، فاختر لوناً يقرأ جيداً فوق الفاتح والداكن.
-- تُحفظ المعاينة الأولى للثيم في `boot.js` قبل أول رسم (لا وميض أبيض في الوضع الليلي).
+- Admin workspace now supports category creation/activation, manual product drafts/publishing, inactive provider registration, and top-up review.
+- Storefront checkout forms are selected by category kind (SMM link, number phone + WhatsApp, game player ID, apps/AI email).
+- Checkout validation is enforced in the database RPC. The RPC uses a per-user idempotency advisory lock to prevent duplicate charges from concurrent retries.
+- Top-up requests can be submitted for manual review; approval credits the wallet through a single database transaction.
+- Security hardening revokes direct execution of the signup trigger function and adds missing foreign-key indexes.
+- GitHub Actions static checks were added for JavaScript syntax and required page elements.
 
-## الأمان والترويسات
-- سياسة CSP في `<meta>` متطابقة في `index.html` و`admin.html` (يتحقق منها `tests/verify-project.py`). `frame-src` مقيّد بـ `https://challenges.cloudflare.com` (Turnstile) فقط، و`connect-src` يضم Supabase وTurnstile. الترويسات التي لا يقرؤها المتصفح من `<meta>` (مثل `frame-ancestors`) وHSTS وغيرها تُضبط عبر Cloudflare: التفاصيل في `SECURITY-HEADERS.md`.
-- جلسة المستخدم (`amx_token` و`amx_refresh`) محفوظة في `localStorage` عمداً؛ فأي سكربت يعمل في الصفحة يستطيع قراءتها، والحماية الرئيسية هي `script-src 'self'` الصارمة. لا تضف سكربتاً خارجياً أو `unsafe-inline` للسكربتات.
+### Not production-ready
 
-## قسم الرشق المستقل (`#/boost`)
-- خدمات الرشق (أي منتج قسمه من نوع `boost` أو له `smm_service`) صارت في صفحة خاصة بها `#/boost`، ولم تعد تظهر في الرئيسية ولا في نتائج بحث المتجر (يظهر بدلها بطاقة «N خدمة رشق مطابقة» تفتح الصفحة).
-- أسماء الخدمات: يُعرض عنوان نظيف (بلا تكرار اسم المنصة والنوع وبلا رموز زخرفية) ورقم الخدمة `#id` وشارات المزايا (♻ تعويض، سرعة، بدء…) في كل صف، ويظهر الاسم الكامل عند المزوّد داخل الخدمة المفتوحة وفي صفحة المنتج. يعمل على المنتجات المستوردة سابقاً دون إعادة استيراد؛ عنوان كتبه المشرف يدوياً لا يُستبدل. صف «المزايا» تحت أنواع الخدمة يفلتر بالتعويض/الثابت/السريع/الجديد.
-- الصفحة: ١) أيقونات المنصات مع العدّاد ← ٢) بحث + نوع الخدمة (متابعين/لايكات/مشاهدات/تعليقات/مشاركات/أخرى) ← ٣) قائمة الخدمات؛ الضغط على خدمة يفتح نموذج الطلب في مكانه (رابط الحساب + الكمية + الإجمالي + «اشترِ الآن»/«أضف للسلة»).
-- المنصة والنوع يُكتشفان تلقائياً من نص المنتج (`app.js` ← `SBP` و`SBT`)؛ لا حاجة لتعديل المنتجات. لإضافة منصة جديدة أضف سطراً في `SBP`.
-- الروابط القديمة `#/c/<قسم الرشق>` تفتح الصفحة الجديدة نفسها.
-- `admin.js`: صُحّح تصنيف المنصة عند الاستيراد (كلمة Instant كانت تُعدّ إنستغرام). المنتجات المستوردة سابقاً لا تتأثر لأن المتجر يعتمد أولاً على الاسم الإنجليزي الأصلي للخدمة.
-
-## برنامج الشركاء (Affiliate)
-- نفّذ `supabase-affiliate-program.sql` مرة واحدة في Supabase SQL Editor.
-- المستخدم يقدّم طلب انضمام من صفحة حسابه (مع معرّف Binance Pay أو عنوان محفظة)، ويوافق المشرف من تبويب «الشركاء (Affiliate)».
-- لوحة الشريك صفحة مستقلة `#/partner` (يصلها من صف «برنامج الشركاء» في صفحة الحساب ومن القائمة الجانبية). تتغيّر حسب الحالة:
-  - **معتمد:** بطاقة العمولة الإجمالية (مع النسبة ومتوسط العمولة وآخر تحديث وزر تحديث يدوي)، الرابط مع نسخ ومشاركة (واتساب/تيليغرام روابط مباشرة، مشاركة النظام، نسخ رسالة جاهزة)، مسار التحويل (نقرات ← تسجيلات ← طلبات مدفوعة) بأشرطة ونسب، الكوبون، نصائح، وشرح البرنامج.
-  - **قيد المراجعة:** ثلاث خطوات واضحة وزر لتحديث الحالة.
-  - **لم يقدّم / مرفوض:** نموذج تقديم (يعمل بزر Enter) مع تحقق ورسالة خطأ داخلية.
-  - **فشل التحميل:** صندوق خطأ مع «إعادة المحاولة» بدل تحميل لا ينتهي، ولا يُعرض نموذج التقديم لشريك معتمد بسبب فشل طلب.
-- تُحدَّث الأرقام عند فتح الصفحة (بحدّ أدنى 20 ثانية بين تحديثين)، وعند عودة التبويب للواجهة، وعند الضغط على زر التحديث.
-- `refInfo.loaded` لا يصبح `true` إلا بعد قراءة صف `affiliates` فعلاً. و`syncProfile()` تعيد قراءة الملف بعد إنشائه لأول مرة.
-- العمولة تُحتسب للشركاء المعتمدين فقط؛ النسبة الافتراضية من `affiliate_rate` في `store_config` (5% إن لم توجد) ويمكن تخصيصها لكل شريك.
-
-## المحفظة (Wallet) — رصيد موحّد `main`
-- يُدار الرصيد عبر `wallets` و`wallet_transactions` و`wallet_topups` ودوال خادمية فقط؛ لا يكتب المتصفح إلى دفتر الحركات مباشرة.
-- صفحة `#/wallet` تسمح بطلب شحن المحفظة، عرض تعليمات الوسيلة بعد إنشاء الدفعة، رفع الإثبات، ثم المراجعة اليدوية. لا تُكشف بيانات الحساب قبل إنشاء دفعة مملوكة للعميل.
-- تستخدم المحفظة قسماً واحداً `main`، ولا تعتمد أهلية الدفع على شرط «كل المنتجات خدمات رشق» في الواجهة. يستدعي المتجر `wallet_eligible(items)` في الخادم، وهو المصدر المعتمد للأرقام ومنتجات التسليم الفوري والخدمات الأخرى. لا تضف منطق أهلية موازياً في JavaScript.
-- الخصم والاسترداد يجب أن يكونا عمليتين ذريّتين عبر payments v2 والدفتر غير القابل للتعديل؛ عند التراجع، أضف قيداً عكسياً ولا تعدّل السجل التاريخي. لا تعتمد على فتح لوحة الإدارة لتشغيل التنفيذ المجدول.
-- إعدادات التسعير والشحن تُراجع في لوحة الإدارة؛ تظل ميزة `payments_v2.on` معطّلة إلى حين نجاح اختبارات قاعدة محلية، وRLS بين مستخدمين، والتزامن والمطابقة المالية.
-
-## السيو والسرعة
-- الصفحات العامة القابلة للفهرسة فقط: الرئيسية `/` و`/faq/` و`/policies/`. بقية المتجر خلف تسجيل الدخول فتُعلَّم `noindex` تلقائياً (`seoHead()` في `app.js`).
-- `/faq/` و`/policies/` ملفات حقيقية (`faq/index.html`, `policies/index.html`) تُرجع 200 وفيها النص جاهزاً وبيانات FAQPage وBreadcrumb؛ تُولَّد بالأمر `node tools/gen-seo-pages.mjs` (يولّد أيضاً `sitemap.xml`). أعد تشغيله بعد تغيير نصوص الأسئلة أو السياسات في `app.js` أو رفع أرقام `?v=` في `index.html`.
-- `boot.js` (في الـhead): يفتح الصفحات الثابتة على مسارها داخل التطبيق، ويحمّل خط Google Fonts دون تعطيل أول رسم.
-- `404.html`: صفحة خطأ بهوية المتجر (GitHub Pages يستخدمها تلقائياً).
-- `index.html` يضيف `preconnect` إلى Supabase لتسريع تحميل الإعدادات، و`robots` وبيانات Organization/WebSite.
-- لم تُصغَّر ملفات JS/CSS عمداً: التوفير بعد الضغط (gzip) نحو 20KB فقط ولا يستحق تعقيد التحرير. الأيقونات محسّنة أصلاً.
-
-## Payments restructure (branch `payments-restructure`)
-
-- `pay.js` is the CSP-compatible ES module for v2 payment instructions, proof upload, wallet checkout/top-up, payment state and refund requests. The public payment-method RPC exposes only display metadata; account destinations are returned by the owner-scoped `payment_instructions()` RPC after payment creation.
-- `supabase/migrations/20261028070000_payments_restructure.sql` is an additive, feature-flagged migration. Pair it with `supabase/rollbacks/20261028070000_payments_restructure.sql`; the recovery file preserves financial rows and pauses the feature rather than dropping data. Follow `SQL-RUN-ORDER.md` exactly and never apply the migration directly to production without a tested backup and diff.
-- `supabase/functions/fulfillment-worker` consumes durable jobs after payment capture. Configure Vault secrets `supabase_url`, `service_role_key`, and `fulfillment_worker_token`, plus Edge Secret `FULFILLMENT_WORKER_TOKEN` with the same random value and `pg_cron`/`pg_net`; do not assume scheduling is active just because the SQL file ran.
-- `CHANGELOG-PAYMENTS.md` maps requested issues to files and tests, including features still not verified. `docs/LIVE-ONLY.md` describes the read-only Supabase metadata observed; it is not a schema dump.
-- Run `python3 tests/verify-project.py`, `for f in *.js; do node --check "$f"; done`, and `deno test --allow-net tests/smm-order.test.ts`. SQL contract assertions are in `supabase/tests/payments_v2_contract.sql` and must be run on a disposable local Supabase instance after applying the full schema and migration.
-- Automated USDT and Binance Pay confirmation remains disabled (`confirm_mode='manual'`); no provider API was guessed. Do not turn on `payments_v2.on` until local database, two-user RLS and concurrency tests pass.
+- Provider integrations are not implemented. Provider records remain inactive until a real provider API contract and secret are configured.
+- No products are imported yet. Do not publish placeholder prices or pretend catalog data is live.
+- Payment methods are only manual review placeholders; no payment verification or proof upload flow is configured.
+- Existing legacy Edge Functions and Storage objects were not deleted during the public-schema rebuild; audit/cleanup is still required.
+- Browser end-to-end tests, real provider sandbox tests, payment tests, and Pages deployment verification are outstanding.
+- The rebuild is in a draft pull request and must not be merged/deployed until the blockers above are closed.
