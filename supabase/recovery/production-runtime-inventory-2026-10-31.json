@@ -1,0 +1,137 @@
+{
+  "generated_at": "2026-10-31",
+  "project_ref": "pvuobngrybygohendwaz",
+  "purpose": "Read-only inventory for recovery review; not deployable configuration.",
+  "edge_functions": [
+    {
+      "name": "ai-support",
+      "status": "ACTIVE",
+      "version": 12,
+      "verify_jwt": true,
+      "updated_at": "2026-10-30T21:15:08.720Z",
+      "source_sha256": "43eef7d42c669e3357aa23a47079ca923c89b1c376dcd880e5056002027d7eb2"
+    },
+    {
+      "name": "smm-order",
+      "status": "ACTIVE",
+      "version": 18,
+      "verify_jwt": true,
+      "updated_at": "2026-10-29T03:05:28.880Z",
+      "source_sha256": "45c496ab24133ae79fc7366e368e5fc2542e53590afa006debc2e42a0a621aef"
+    },
+    {
+      "name": "media-seed",
+      "status": "ACTIVE",
+      "version": 6,
+      "verify_jwt": true,
+      "updated_at": "2026-10-20T08:32:35.865Z",
+      "source_sha256": "55bc1c38e14da61e5bccc4256d42cb2dfed04afe5d2ec4aa2013ac680d7bbb63"
+    },
+    {
+      "name": "img-shrink",
+      "status": "ACTIVE",
+      "version": 5,
+      "verify_jwt": true,
+      "updated_at": "2026-10-20T09:05:22.446Z",
+      "source_sha256": "26348d039001ca1dec7f7b1b3307b94a54afbe585e6ad6c174d26aec9ed9274b"
+    },
+    {
+      "name": "send-push",
+      "status": "ACTIVE",
+      "version": 6,
+      "verify_jwt": false,
+      "updated_at": "2026-10-25T01:05:45.419Z",
+      "source_sha256": "81aeacd34d6421f93d6a9a144b60e4b0a046c2e46f22eadf18a5dac51706d2dc"
+    },
+    {
+      "name": "telegram-auth",
+      "status": "ACTIVE",
+      "version": 8,
+      "verify_jwt": false,
+      "updated_at": "2026-10-30T21:18:04.584Z",
+      "source_sha256": "30cabef933f015de10e029d1b6bafbe6684a064eefb0ff22b70a5a3a9d6937b9"
+    },
+    {
+      "name": "api-hub",
+      "status": "ACTIVE",
+      "version": 4,
+      "verify_jwt": true,
+      "updated_at": "2026-10-25T17:12:27.317Z",
+      "source_sha256": "66c94a1c8f613d1f75c926ca428648a288dfa23b083dbfa87508231c2b89be78"
+    },
+    {
+      "name": "payment-proof-hash",
+      "status": "ACTIVE",
+      "version": 3,
+      "verify_jwt": true,
+      "updated_at": "2026-10-28T16:18:12.194Z",
+      "source_sha256": "42530881f73641b7ca9237b6c6774d51463b75592edd1bb59f438b9cd7695177"
+    },
+    {
+      "name": "telegram-admin",
+      "status": "ACTIVE",
+      "version": 4,
+      "verify_jwt": false,
+      "updated_at": "2026-10-29T04:50:42.240Z",
+      "source_sha256": "36ea9632aa47189a956dca539c969dad8af13bafd5d6855e69e29d0b1d90a54f"
+    },
+    {
+      "name": "smmnine-readonly",
+      "status": "ACTIVE",
+      "version": 3,
+      "verify_jwt": true,
+      "updated_at": "2026-10-31T00:02:48.147Z",
+      "source_sha256": "29d7d4b704f68d32c44067be52390f81ef9a000f59e021c29ca227e350c436e9"
+    },
+    {
+      "name": "provider-api",
+      "status": "ACTIVE",
+      "version": 2,
+      "verify_jwt": true,
+      "updated_at": "2026-10-31T00:43:20.340Z",
+      "source_sha256": "0dd1b97a29e59d0463813240f7dcaaa1166ff59352d6a5d99d3b0a3c55d3ee9b"
+    }
+  ],
+  "installed_extensions": [
+    {
+      "name": "plpgsql",
+      "version": "1.0",
+      "schema": "pg_catalog"
+    },
+    {
+      "name": "supabase_vault",
+      "version": "0.3.1",
+      "schema": "vault"
+    },
+    {
+      "name": "pg_cron",
+      "version": "1.6.4",
+      "schema": "pg_catalog"
+    },
+    {
+      "name": "pg_net",
+      "version": "0.20.4",
+      "schema": "extensions"
+    },
+    {
+      "name": "pg_stat_statements",
+      "version": "1.11",
+      "schema": "extensions"
+    },
+    {
+      "name": "pgcrypto",
+      "version": "1.3",
+      "schema": "extensions"
+    },
+    {
+      "name": "uuid-ossp",
+      "version": "1.1",
+      "schema": "extensions"
+    }
+  ],
+  "cautions": [
+    "Function source code and secrets are not included.",
+    "A matching SHA is not proof that the function source exists in GitHub.",
+    "Do not deploy or alter production functions based only on this inventory."
+  ]
+}
