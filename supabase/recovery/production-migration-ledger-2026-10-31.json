@@ -1,0 +1,742 @@
+{
+  "generated_at_utc": "2026-10-31",
+  "project_ref": "pvuobngrybygohendwaz",
+  "source_branch": "main",
+  "note": "Read-only inventory. No database objects, migration records, or data were modified to generate this manifest.",
+  "counts": {
+    "remote_migration_records": 140,
+    "repository_migration_files": 23,
+    "exact_version_matches": 8,
+    "remote_versions_without_same_filename_prefix": 132,
+    "local_versions_absent_from_remote_ledger": 15
+  },
+  "exact_version_matches": [
+    {
+      "version": "20261028232925",
+      "repository_file": "supabase/migrations/20261028232925_keep_payments_v2_disabled_until_e2e.sql",
+      "remote_name": "keep_payments_v2_disabled_until_e2e",
+      "git_blob_sha": "3efac8e3e82de968172b7baa4dfd4b1a7f984bbf"
+    },
+    {
+      "version": "20261030011046",
+      "repository_file": "supabase/migrations/20261030011046_restore_payments_v2_disabled_safety_invariant.sql",
+      "remote_name": "restore_payments_v2_disabled_safety_invariant",
+      "git_blob_sha": "e2bcfa9d41cb4d303a1d78da779338f2a10529cd"
+    },
+    {
+      "version": "20261030011407",
+      "repository_file": "supabase/migrations/20261030011407_consolidate_equivalent_rls_policies.sql",
+      "remote_name": "consolidate_equivalent_rls_policies",
+      "git_blob_sha": "4442206bcac59cfd065121c10f4b628caf64aae5"
+    },
+    {
+      "version": "20261030011423",
+      "repository_file": "supabase/migrations/20261030011423_split_staff_members_admin_policy.sql",
+      "remote_name": "split_staff_members_admin_policy",
+      "git_blob_sha": "67e72a018ad054c7a45e13a9af43a94bbc1595a1"
+    },
+    {
+      "version": "20261030011456",
+      "repository_file": "supabase/migrations/20261030011456_block_payments_v2_enable_until_e2e_signoff.sql",
+      "remote_name": "block_payments_v2_enable_until_e2e_signoff",
+      "git_blob_sha": "ef5acbc081c0e194252763c0f92096cb4d7884cd"
+    },
+    {
+      "version": "20261030011700",
+      "repository_file": "supabase/migrations/20261030011700_protect_order_audit_and_fulfillment_fields.sql",
+      "remote_name": "protect_order_audit_and_fulfillment_fields",
+      "git_blob_sha": "7c7572b9de356b2f7f2ba536f80eb8d35c667ade"
+    },
+    {
+      "version": "20261030011809",
+      "repository_file": "supabase/migrations/20261030011809_restrict_support_ticket_write_columns.sql",
+      "remote_name": "restrict_support_ticket_write_columns",
+      "git_blob_sha": "683a4aa0442c5193ff66c13cbeed296ed2439da2"
+    },
+    {
+      "version": "20261030210908",
+      "repository_file": "supabase/migrations/20261030210908_harden_payments_v2_store_config_invariant.sql",
+      "remote_name": "harden_payments_v2_store_config_invariant",
+      "git_blob_sha": "4834686aa4f6999b3a09f93a2ae28772547b64c5"
+    }
+  ],
+  "repository_migration_files": [
+    {
+      "path": "supabase/migrations/20261025_harden_grants_and_wallet_extras.sql",
+      "git_blob_sha": "8be11e0ad1e9f4e7441ca7189435534db8099f8f",
+      "version": "20261025"
+    },
+    {
+      "path": "supabase/migrations/20261028232925_keep_payments_v2_disabled_until_e2e.sql",
+      "git_blob_sha": "3efac8e3e82de968172b7baa4dfd4b1a7f984bbf",
+      "version": "20261028232925"
+    },
+    {
+      "path": "supabase/migrations/20261029030000_cancel_unpaid_order.sql",
+      "git_blob_sha": "aa126bde325b5a8176b97e100cc06e521faee929",
+      "version": "20261029030000"
+    },
+    {
+      "path": "supabase/migrations/20261029070000_global_unique_crypto_txid.sql",
+      "git_blob_sha": "0bf03e74de0881c6ed03a17ccb642313ae7ea02a",
+      "version": "20261029070000"
+    },
+    {
+      "path": "supabase/migrations/20261029080000_publish_performance_fix.sql",
+      "git_blob_sha": "c9e6c37396408bfb4c44514b564e8454d08fddae",
+      "version": "20261029080000"
+    },
+    {
+      "path": "supabase/migrations/20261029081000_admin_ops_hardening.sql",
+      "git_blob_sha": "8acf7068cd4915896d2fa4ab8651f7d0c1b9430d",
+      "version": "20261029081000"
+    },
+    {
+      "path": "supabase/migrations/20261029082000_secure_telegram_admin_webhook.sql",
+      "git_blob_sha": "f7f30e2fe8dd73f29b626280c428c8e37eac7e2c",
+      "version": "20261029082000"
+    },
+    {
+      "path": "supabase/migrations/20261029083000_game_chat_ai_catalog_fixes.sql",
+      "git_blob_sha": "16f6f5128d505fb721ed12203243a239b929cc13",
+      "version": "20261029083000"
+    },
+    {
+      "path": "supabase/migrations/20261029100000_split_storefront_catalog_hubs.sql",
+      "git_blob_sha": "a14bf436eb16b158321d8d496f398e2aedb98d49",
+      "version": "20261029100000"
+    },
+    {
+      "path": "supabase/migrations/20261029101500_add_pubg_uc_catalog_slot.sql",
+      "git_blob_sha": "ce0da489ec8a2543227a5171433797a05ef1eb8e",
+      "version": "20261029101500"
+    },
+    {
+      "path": "supabase/migrations/20261029103000_require_user_ids_for_direct_topups.sql",
+      "git_blob_sha": "2d6f4bfc167622269c731cbf452f82895d40afdc",
+      "version": "20261029103000"
+    },
+    {
+      "path": "supabase/migrations/20261029104500_correct_chat_app_account_id_labels.sql",
+      "git_blob_sha": "ef1951fd659c57469e3fb1d0e3f9187e67aa2410",
+      "version": "20261029104500"
+    },
+    {
+      "path": "supabase/migrations/20261029110000_require_ids_for_single_field_fazer_topups.sql",
+      "git_blob_sha": "4d48916abc284becc018d43a65dd683764885bdf",
+      "version": "20261029110000"
+    },
+    {
+      "path": "supabase/migrations/20261029111500_hide_password_based_auto_login_topups.sql",
+      "git_blob_sha": "24f9065cb32ca378bf6af22e4486c9e4a49cf1b2",
+      "version": "20261029111500"
+    },
+    {
+      "path": "supabase/migrations/20261029113000_hide_multi_field_topups_until_structured_checkout.sql",
+      "git_blob_sha": "3c665a3c69c273948c50b7bf48e914a7b6a5332a",
+      "version": "20261029113000"
+    },
+    {
+      "path": "supabase/migrations/20261030011046_restore_payments_v2_disabled_safety_invariant.sql",
+      "git_blob_sha": "e2bcfa9d41cb4d303a1d78da779338f2a10529cd",
+      "version": "20261030011046"
+    },
+    {
+      "path": "supabase/migrations/20261030011407_consolidate_equivalent_rls_policies.sql",
+      "git_blob_sha": "4442206bcac59cfd065121c10f4b628caf64aae5",
+      "version": "20261030011407"
+    },
+    {
+      "path": "supabase/migrations/20261030011423_split_staff_members_admin_policy.sql",
+      "git_blob_sha": "67e72a018ad054c7a45e13a9af43a94bbc1595a1",
+      "version": "20261030011423"
+    },
+    {
+      "path": "supabase/migrations/20261030011456_block_payments_v2_enable_until_e2e_signoff.sql",
+      "git_blob_sha": "ef5acbc081c0e194252763c0f92096cb4d7884cd",
+      "version": "20261030011456"
+    },
+    {
+      "path": "supabase/migrations/20261030011700_protect_order_audit_and_fulfillment_fields.sql",
+      "git_blob_sha": "7c7572b9de356b2f7f2ba536f80eb8d35c667ade",
+      "version": "20261030011700"
+    },
+    {
+      "path": "supabase/migrations/20261030011809_restrict_support_ticket_write_columns.sql",
+      "git_blob_sha": "683a4aa0442c5193ff66c13cbeed296ed2439da2",
+      "version": "20261030011809"
+    },
+    {
+      "path": "supabase/migrations/20261030210908_harden_payments_v2_store_config_invariant.sql",
+      "git_blob_sha": "4834686aa4f6999b3a09f93a2ae28772547b64c5",
+      "version": "20261030210908"
+    },
+    {
+      "path": "supabase/migrations/20261031010000_stage_large_store_config_publish.sql",
+      "git_blob_sha": "643fe7de4ba0525833ca574128feaf36aa1e806e",
+      "version": "20261031010000"
+    }
+  ],
+  "remote_migration_ledger": [
+    {
+      "version": "20261019004431",
+      "name": "amarix007_orders_payment_claim"
+    },
+    {
+      "version": "20261019021608",
+      "name": "create_smm_service_map"
+    },
+    {
+      "version": "20261019022439",
+      "name": "enable_pg_net"
+    },
+    {
+      "version": "20261019022656",
+      "name": "backup_store_config_before_smm_import"
+    },
+    {
+      "version": "20261019093520",
+      "name": "amarix007_referrals_and_hardening"
+    },
+    {
+      "version": "20261019100117",
+      "name": "harden_profiles_referral_fields_and_drop_backup"
+    },
+    {
+      "version": "20261020092344",
+      "name": "harden_orders_insert_and_referrals"
+    },
+    {
+      "version": "20261020093109",
+      "name": "fix_affiliates_fk_cascade_and_trigger_fn_grants"
+    },
+    {
+      "version": "20261020093720",
+      "name": "sequential_numeric_order_ids"
+    },
+    {
+      "version": "20261020093734",
+      "name": "keepalive_cron_every_3_days"
+    },
+    {
+      "version": "20261021001857",
+      "name": "security_fixes_phase1"
+    },
+    {
+      "version": "20261021003409",
+      "name": "telegram_order_notifications"
+    },
+    {
+      "version": "20261021085715",
+      "name": "fix_payment_proofs_insert_policy_recursion"
+    },
+    {
+      "version": "20261021091619",
+      "name": "notify_buyer_currency"
+    },
+    {
+      "version": "20261021093320",
+      "name": "notify_payment_method_name"
+    },
+    {
+      "version": "20261021093856",
+      "name": "claim_payment_requires_proof"
+    },
+    {
+      "version": "20261021113042",
+      "name": "store_config_read_admin_only"
+    },
+    {
+      "version": "20261022094458",
+      "name": "hardening_rate_limits_coupons_referrals_orders"
+    },
+    {
+      "version": "20261022095445",
+      "name": "fix_keepalive_ping_use_public_config"
+    },
+    {
+      "version": "20261022100559",
+      "name": "cleanup_placeholder_content_and_product_link"
+    },
+    {
+      "version": "20261022124259",
+      "name": "harden_table_privileges_least_privilege"
+    },
+    {
+      "version": "20261022191642",
+      "name": "bind_admin_to_user_id"
+    },
+    {
+      "version": "20261022191658",
+      "name": "security_hardening_rate_limits_orders_keepalive"
+    },
+    {
+      "version": "20261022214254",
+      "name": "support_tickets_and_quantity_limits"
+    },
+    {
+      "version": "20261022220009",
+      "name": "ticket_email_reply_and_rating"
+    },
+    {
+      "version": "20261023010323",
+      "name": "push_notifications_for_customers"
+    },
+    {
+      "version": "20261023013442",
+      "name": "admin_push_broadcast"
+    },
+    {
+      "version": "20261023022422",
+      "name": "drop_store_config_backup_20261022"
+    },
+    {
+      "version": "20261023023003",
+      "name": "affiliate_coupon_attribution"
+    },
+    {
+      "version": "20261023023616",
+      "name": "store_features_delivery_reviews_payouts_stats"
+    },
+    {
+      "version": "20261023101416",
+      "name": "fix_orders_delivery_ts_search_path"
+    },
+    {
+      "version": "20261023223316",
+      "name": "store_growth_features"
+    },
+    {
+      "version": "20261023223324",
+      "name": "store_growth_features_grants"
+    },
+    {
+      "version": "20261023223812",
+      "name": "store_config_weekly_snapshots"
+    },
+    {
+      "version": "20261023235710",
+      "name": "security_performance_baseline_fixes"
+    },
+    {
+      "version": "20261023235730",
+      "name": "orders_integrity_and_query_indexes"
+    },
+    {
+      "version": "20261023235738",
+      "name": "remove_redundant_orders_index"
+    },
+    {
+      "version": "20261024011444",
+      "name": "explicit_deny_policies_internal_tables"
+    },
+    {
+      "version": "20261024105822",
+      "name": "staff_members_and_permissions"
+    },
+    {
+      "version": "20261024110103",
+      "name": "staff_products_permission"
+    },
+    {
+      "version": "20261024110526",
+      "name": "staff_activity_roles_alerts"
+    },
+    {
+      "version": "20261024134506",
+      "name": "affiliate_program_approval"
+    },
+    {
+      "version": "20261024134803",
+      "name": "affiliate_tiers_monthly"
+    },
+    {
+      "version": "20261024135325",
+      "name": "affiliate_payouts_ledger"
+    },
+    {
+      "version": "20261024215118",
+      "name": "boost_free_quantity_units"
+    },
+    {
+      "version": "20261024215138",
+      "name": "orders_notify_show_units"
+    },
+    {
+      "version": "20261024220057",
+      "name": "boost_units_pricing"
+    },
+    {
+      "version": "20261024221621",
+      "name": "smm_providers_multi"
+    },
+    {
+      "version": "20261024233207",
+      "name": "wallet_per_section"
+    },
+    {
+      "version": "20261025005458",
+      "name": "harden_wallet_and_new_table_grants"
+    },
+    {
+      "version": "20261025005710",
+      "name": "wallet_daily_cap_reconcile_default_privs"
+    },
+    {
+      "version": "20261025010632",
+      "name": "wallet_topup_push_notifications"
+    },
+    {
+      "version": "20261025074401",
+      "name": "telegram_login"
+    },
+    {
+      "version": "20261025074504",
+      "name": "telegram_login_guard_v2"
+    },
+    {
+      "version": "20261025081854",
+      "name": "tg_links_wallet_bonus_alerts"
+    },
+    {
+      "version": "20261025083132",
+      "name": "wallet_hardening"
+    },
+    {
+      "version": "20261025171143",
+      "name": "api_integrations_registry"
+    },
+    {
+      "version": "20261027012717",
+      "name": "admin_user_lookup"
+    },
+    {
+      "version": "20261027014500",
+      "name": "user_uid_profiles"
+    },
+    {
+      "version": "20261027014924",
+      "name": "invoices_system"
+    },
+    {
+      "version": "20261027023846",
+      "name": "guard_reserved_tg_email_cover_telegram_domain"
+    },
+    {
+      "version": "20261027130734",
+      "name": "secure_manual_payment_approval"
+    },
+    {
+      "version": "20261028161625",
+      "name": "amarix_payments_v2_core_safe"
+    },
+    {
+      "version": "20261028175249",
+      "name": "fix_payment_proof_verification_regex"
+    },
+    {
+      "version": "20261028175440",
+      "name": "amarix_fulfillment_queue_safe"
+    },
+    {
+      "version": "20261028175703",
+      "name": "repair_payment_contract_guards"
+    },
+    {
+      "version": "20261028232925",
+      "name": "keep_payments_v2_disabled_until_e2e"
+    },
+    {
+      "version": "20261028233846",
+      "name": "payments_v2_fix_wallet_eligible_and_customer_refund"
+    },
+    {
+      "version": "20261028234123",
+      "name": "drop_legacy_wallet_refund_trigger"
+    },
+    {
+      "version": "20261028234235",
+      "name": "fix_uid_variable_conflict_after_profiles_uid"
+    },
+    {
+      "version": "20261028234306",
+      "name": "fix_payment_confirmation_pgcrypto_search_path"
+    },
+    {
+      "version": "20261028234332",
+      "name": "refunds_idempotency_unique_index"
+    },
+    {
+      "version": "20261028234423",
+      "name": "fix_cancel_refund_on_conflict_partial_index"
+    },
+    {
+      "version": "20261029010120",
+      "name": "payments_refund_controls_dual_approval"
+    },
+    {
+      "version": "20261029010137",
+      "name": "payments_approval_hardening_legacy_fix"
+    },
+    {
+      "version": "20261029010145",
+      "name": "payments_fx_guard_expiry_default_privs"
+    },
+    {
+      "version": "20261029010815",
+      "name": "payments_hardening_fx_band_self_review_settings_validation_fulfillment_cancel"
+    },
+    {
+      "version": "20261029011102",
+      "name": "backup_orders_payments_wallets_before_reset_20261029"
+    },
+    {
+      "version": "20261029011113",
+      "name": "reset_test_orders_payments_wallets_20261029"
+    },
+    {
+      "version": "20261029011452",
+      "name": "payments_allow_cancel_under_review_on_order_cancel"
+    },
+    {
+      "version": "20261029012947",
+      "name": "payment_instructions_expose_requires_tx_ref"
+    },
+    {
+      "version": "20261029015210",
+      "name": "wallet_pays_all_products"
+    },
+    {
+      "version": "20261029015719",
+      "name": "affiliate_to_wallet"
+    },
+    {
+      "version": "20261029020424",
+      "name": "partner_center_payouts_and_api_admin_compat"
+    },
+    {
+      "version": "20261029031002",
+      "name": "cancel_unpaid_order"
+    },
+    {
+      "version": "20261029043220",
+      "name": "publish_store_config_performance_fix"
+    },
+    {
+      "version": "20261029044205",
+      "name": "pending_payment_and_topup_telegram_alerts"
+    },
+    {
+      "version": "20261029044250",
+      "name": "disable_placeholder_sham_cash_payment_method"
+    },
+    {
+      "version": "20261029044321",
+      "name": "notify_telegram_on_published_price_changes"
+    },
+    {
+      "version": "20261029044344",
+      "name": "provider_low_balance_alerts"
+    },
+    {
+      "version": "20261029044420",
+      "name": "exact_admin_home_stats"
+    },
+    {
+      "version": "20261029044521",
+      "name": "include_v2_payment_and_topup_review_counts"
+    },
+    {
+      "version": "20261029044556",
+      "name": "provider_price_drift_telegram_alerts"
+    },
+    {
+      "version": "20261029044822",
+      "name": "secure_telegram_admin_webhook_actions"
+    },
+    {
+      "version": "20261029044929",
+      "name": "telegram_admin_action_fail_closed_validation"
+    },
+    {
+      "version": "20261029044959",
+      "name": "register_secure_telegram_admin_webhook"
+    },
+    {
+      "version": "20261029045211",
+      "name": "remove_duplicate_admin_queue_indexes"
+    },
+    {
+      "version": "20261029045223",
+      "name": "keep_named_admin_queue_indexes_remove_old_duplicates"
+    },
+    {
+      "version": "20261029045409",
+      "name": "telegram_admin_webhook_pending_smoke_test"
+    },
+    {
+      "version": "20261029045917",
+      "name": "split_storefront_catalog_hubs_and_player_id_requirements"
+    },
+    {
+      "version": "20261029050139",
+      "name": "add_pubg_uc_catalog_slot_without_fake_prices"
+    },
+    {
+      "version": "20261029050309",
+      "name": "require_user_ids_for_direct_topups"
+    },
+    {
+      "version": "20261029050435",
+      "name": "correct_chat_and_capcut_account_id_labels"
+    },
+    {
+      "version": "20261029050550",
+      "name": "require_ids_for_verified_single_field_fazer_topups"
+    },
+    {
+      "version": "20261029050727",
+      "name": "hide_password_based_auto_login_topups"
+    },
+    {
+      "version": "20261029050818",
+      "name": "hide_multi_field_topups_until_structured_checkout"
+    },
+    {
+      "version": "20261030011046",
+      "name": "restore_payments_v2_disabled_safety_invariant"
+    },
+    {
+      "version": "20261030011407",
+      "name": "consolidate_equivalent_rls_policies"
+    },
+    {
+      "version": "20261030011423",
+      "name": "split_staff_members_admin_policy"
+    },
+    {
+      "version": "20261030011456",
+      "name": "block_payments_v2_enable_until_e2e_signoff"
+    },
+    {
+      "version": "20261030011700",
+      "name": "protect_order_audit_and_fulfillment_fields"
+    },
+    {
+      "version": "20261030011809",
+      "name": "restrict_support_ticket_write_columns"
+    },
+    {
+      "version": "20261030014553",
+      "name": "store_catalog_product_id_lookup"
+    },
+    {
+      "version": "20261030015047",
+      "name": "catalog_products_pagination"
+    },
+    {
+      "version": "20261030015123",
+      "name": "staff_public_config_catalog_compat"
+    },
+    {
+      "version": "20261030024124",
+      "name": "catalog_category_fast_pages"
+    },
+    {
+      "version": "20261030210908",
+      "name": "harden_payments_v2_store_config_invariant"
+    },
+    {
+      "version": "20261030230214",
+      "name": "stage_large_store_config_publish"
+    },
+    {
+      "version": "20261030230228",
+      "name": "grant_cancel_staged_store_publish"
+    },
+    {
+      "version": "20261030235020",
+      "name": "amarix_full_reset_public_keep_admin_20261031"
+    },
+    {
+      "version": "20261030235042",
+      "name": "amarix_core_schema_v1_20261031"
+    },
+    {
+      "version": "20261030235405",
+      "name": "wallet_orders_topups_atomic_rpcs_v1"
+    },
+    {
+      "version": "20261030235629",
+      "name": "enforce_category_checkout_inputs_v1"
+    },
+    {
+      "version": "20261030235826",
+      "name": "security_and_foreign_key_index_hardening_v1"
+    },
+    {
+      "version": "20261030235840",
+      "name": "fix_checkout_email_validation_v2"
+    },
+    {
+      "version": "20261030235852",
+      "name": "fix_checkout_email_pattern_and_idempotency_v2"
+    },
+    {
+      "version": "20261031003118",
+      "name": "harden_cost_privileges_and_topup_dedupe_v1"
+    },
+    {
+      "version": "20261031003959",
+      "name": "wipe_public_schema"
+    },
+    {
+      "version": "20261031004100",
+      "name": "001_core_schema"
+    },
+    {
+      "version": "20261031004115",
+      "name": "002_rls_policies"
+    },
+    {
+      "version": "20261031004133",
+      "name": "003_seed_defaults"
+    },
+    {
+      "version": "20261031004147",
+      "name": "004_grants_final"
+    },
+    {
+      "version": "20261031004349",
+      "name": "005_catalog_view_hide_cost"
+    },
+    {
+      "version": "20261031183835",
+      "name": "backup_core_v1_and_clear_public_for_repo_schema"
+    },
+    {
+      "version": "20261031183840",
+      "name": "repo_apply_01_supabase_schema"
+    },
+    {
+      "version": "20261031183847",
+      "name": "repo_apply_02_repo_sql_batch"
+    },
+    {
+      "version": "20261031185809",
+      "name": "admins_user_id_fk_index"
+    },
+    {
+      "version": "20261031190036",
+      "name": "restore_authenticated_table_grants_matching_rls"
+    },
+    {
+      "version": "20261031190412",
+      "name": "restore_service_role_privileges_public"
+    },
+    {
+      "version": "20261031193201",
+      "name": "restore_execute_for_publish_and_admin_rpcs"
+    }
+  ]
+}
