@@ -21,3 +21,18 @@ $('#topups').addEventListener('click',async e=>{const b=e.target.closest('.topup
 $('#provider-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{const base=$('#provider-url').value.trim();if(base&&!base.startsWith('https://'))throw new Error('يجب أن يبدأ رابط المزوّد بـ HTTPS');await req('providers',{method:'POST',body:JSON.stringify({name:$('#provider-name').value.trim(),code:$('#provider-code').value.trim(),kind:$('#provider-kind').value,base_url:base||null,secret_name:$('#provider-secret').value.trim()||null,config:{},is_active:false})});e.target.reset();await sectionData();$('#admin-status').textContent='تم حفظ المزوّد متوقفًا. أضف السر في إعدادات Edge Functions قبل تفعيله.'}catch(err){$('#admin-status').textContent=err.message}finally{b.disabled=false}};
 $('#admin-products').addEventListener('click',async e=>{const b=e.target.closest('.product-toggle');if(!b)return;b.disabled=true;try{await req('products?id=eq.'+encodeURIComponent(b.dataset.id),{method:'PATCH',body:JSON.stringify({is_active:b.dataset.active==='true'})});await sectionData();$('#admin-status').textContent='تم تحديث حالة المنتج'}catch(err){$('#admin-status').textContent=err.message;b.disabled=false}});
 $('#admin-categories').addEventListener('click',async e=>{const b=e.target.closest('.category-toggle');if(!b)return;b.disabled=true;try{await req('categories?id=eq.'+encodeURIComponent(b.dataset.id),{method:'PATCH',body:JSON.stringify({is_active:b.dataset.active==='true'})});await sectionData();$('#admin-status').textContent='تم تحديث حالة القسم'}catch(err){$('#admin-status').textContent=err.message;b.disabled=false}});
+
+$('#admin-panel').addEventListener('click',async e=>{
+ const b=e.target.closest('.smmnine-action'); if(!b)return;
+ const out=$('#smmnine-result'); b.disabled=true; out.textContent='جارٍ الاتصال بـ SmmNine…';
+ try{
+  const args={action:b.dataset.action};
+  if(args.action==='numbers_countries')args.service=$('#smmnine-service').value.trim();
+  if(args.action==='email_inbox')args.id=$('#smmnine-inbox-id').value.trim();
+  if(args.action==='email_message')args.id=$('#smmnine-message-id').value.trim();
+  const r=await fetch(URL+'/functions/v1/smmnine-readonly',{method:'POST',headers:{apikey:key(),Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(args)});
+  const d=await r.json(); if(!r.ok||!d.ok)throw new Error(d.error||'فشل اتصال SmmNine');
+  out.textContent=JSON.stringify(d.data,null,2);
+ }catch(err){out.textContent='تعذر التنفيذ: '+err.message}
+ finally{b.disabled=false}
+});
