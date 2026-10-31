@@ -22,7 +22,7 @@ const PTYPE = { games: "game_topup", chat: "app_subscription", apps: "app_subscr
 export default async function (view) {
   await loadCatalog();
   const root = h("div");
-  let providers = [], selected = "", rows = [], loading = false, markup = 30, filter = "";
+  let providers = [], selected = "", rows = [], loading = false, markup = 30, filter = "", page = 0;
   const status = h("div");
   const preview = h("div");
 
@@ -134,9 +134,11 @@ export default async function (view) {
     const provider = providers.find((p) => p.id === selected);
     if (!rows.length) return mount(preview, h("div", { class: "empty" }, "اختر مزوّداً ثم اضغط جلب الخدمات للمعاينة."));
     const filtered = rows.filter((x) => !filter || (x.name + " " + x.category + " " + x.id).toLowerCase().includes(filter));
+    const pageSize = 100, pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    page = Math.min(page, pages - 1);
     const table = h("div", { class: "table-wrap" });
     const body = h("tbody");
-    filtered.slice(0, 250).forEach((x) => {
+    filtered.slice(page * pageSize, (page + 1) * pageSize).forEach((x) => {
       const check = h("input", { type: "checkbox", checked: x.selected, disabled: x.exists || !x.available || !(x.rate > 0), onchange: (e) => { x.selected = e.target.checked; drawPreview(); } });
       body.append(h("tr", null,
         h("td", null, check),
@@ -147,11 +149,15 @@ export default async function (view) {
       ));
     });
     mount(preview, h("div", null,
-      h("div", { class: "toolbar" }, input({ type: "search", placeholder: "بحث في النتائج", value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); drawPreview(); } }),
+      h("div", { class: "toolbar" }, input({ type: "search", placeholder: "بحث في النتائج", value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); page = 0; drawPreview(); } }),
         h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (!x.exists && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الصالح في النتائج"),
         h("button", { class: "btn ghost sm", onclick: () => { rows.forEach((x) => x.selected = false); drawPreview(); } }, "إلغاء التحديد")),
       h("p", { class: "hint" }, `المزوّد: ${provider?.name || selected} · المعروض حتى 250 صفاً من ${filtered.length} · المحدد: ${rows.filter((x) => x.selected).length}`),
-      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))), body))
+      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))), body)),
+      h("div", { class: "page-actions" },
+        h("button", { class: "btn ghost sm", disabled: page <= 0, onclick: () => { page--; drawPreview(); } }, "السابق"),
+        h("span", null, "صفحة " + (page + 1) + " من " + pages),
+        h("button", { class: "btn ghost sm", disabled: page >= pages - 1, onclick: () => { page++; drawPreview(); } }, "التالي"))
     ));
   }
 
