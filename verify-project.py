@@ -6,7 +6,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 errs = []
 def err(m): errs.append(m)
 
-for f in ["index.html","admin.html","app.js","admin.js","sw.js","boot.js","style.css","manifest.json","404.html",
+for f in ["index.html","admin.html","app.js","admin/js/main.js","admin/js/routes.js","admin/css/admin.css","sw.js","boot.js","style.css","manifest.json","404.html",
           "faq/index.html","policies/index.html","sitemap.xml","robots.txt","CNAME","supabase-wallet.sql"]:
     if not (root/f).exists(): err(f"ملف مفقود: {f}")
 

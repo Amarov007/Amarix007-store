@@ -6,7 +6,7 @@ root = pathlib.Path(__file__).resolve().parent.parent
 errs = []
 def err(m): errs.append(m)
 
-for f in ["index.html","admin.html","app.js","admin.js","sw.js","boot.js","style.css","manifest.json","404.html",
+for f in ["index.html","admin.html","app.js","admin/js/main.js","admin/js/routes.js","admin/css/admin.css","sw.js","boot.js","style.css","manifest.json","404.html",
           "faq/index.html","policies/index.html","sitemap.xml","robots.txt","CNAME","supabase-wallet.sql"]:
     if not (root/f).exists(): err(f"ملف مفقود: {f}")
 
@@ -49,8 +49,10 @@ if "approve_manual_payment" not in defs: err("approve_manual_payment غير مع
 if "'approve_manual_payment'" not in grants: err("approve_manual_payment غير ممنوحة في supabase-final-grants.sql")
 lock = (root/"supabase-payment-lockdown.sql").read_text(encoding="utf-8") if (root/"supabase-payment-lockdown.sql").exists() else ""
 if "orders_payment_guard" not in lock: err("حارس payment_status مفقود (supabase-payment-lockdown.sql)")
+def _src(f):
+    return "\n".join(x.read_text(encoding="utf-8", errors="ignore") for x in sorted((root/"admin/js").rglob("*.js"))) if f == "admin.js" else (root/f).read_text(encoding="utf-8", errors="ignore")
 for f in ("admin.js","app.js"):
-    if re.search(r"orders\?id=eq[^`\"']*['\"`][^;]{0,200}payment_status\s*:\s*['\"]paid", (root/f).read_text(encoding="utf-8", errors="ignore")):
+    if re.search(r"orders\?id=eq[^`\"']*['\"`][^;]{0,200}payment_status\s*:\s*['\"]paid", _src(f)):
         err(f"{f}: تحديث مباشر لـ payment_status=paid")
 
 # نظام الدفع الموحّد: كل دالة جديدة ممنوحة، ولا كتابة مباشرة على جداوله، والدوال الحساسة definer + search_path
@@ -70,7 +72,7 @@ for m in re.finditer(r"create or replace function public\.(\w+)\(.*?\$function\$
     if "security definer" in body.lower() and "set search_path" not in body.lower(): err(f"supabase-payments.sql: {m.group(1)} بلا search_path")
 if "payments_v2" not in pay: err("علم payments_v2 مفقود")
 for f in ("app.js","admin.js"):
-    t = (root/f).read_text(encoding="utf-8", errors="ignore")
+    t = _src(f)
     if re.search(r"/rest/v1/(payments|payment_events|refunds)[^\n]{0,80}method:\s*[\"'](POST|PATCH|PUT|DELETE)", t): err(f"{f}: كتابة مباشرة على جداول الدفع")
 
 print("\n".join("✗ "+e for e in errs) if errs else "✓ كل الفحوص نجحت")
