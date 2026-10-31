@@ -5,7 +5,7 @@ import { money, num } from "../core/utils.js";
 
 const DELIV = [[0, "رابط مستودع / منصة"], [1, "بيانات حساب / اعتماد"], [2, "ملف تنفيذي / سورس"], [3, "تنفيذ على رابط حساب العميل"]];
 const PTYPES = [["", "غير محدد"], ["smm", "رشق وخدمات زيادة"], ["game_topup", "شحن ألعاب"], ["app_subscription", "تطبيق واشتراك"], ["gift_card", "بطاقة / كود"]];
-const INPUTS = [["text", "نص"], ["none", "بدون إدخال"], ["url", "رابط"], ["quantity", "كمية"], ["player_id", "Player ID"], ["email", "البريد الإلكتروني"], ["phone", "رقم الهاتف"]];
+const INPUTS = [["", "تلقائي حسب نوع الخدمة"], ["text", "نص"], ["none", "بدون إدخال"], ["url", "رابط"], ["quantity", "كمية"], ["player_id", "Player ID"], ["email", "البريد الإلكتروني"], ["phone", "رقم الهاتف"]];
 const slug = () => "p_" + Math.random().toString(36).slice(2, 9);
 
 export default async function (view) {
@@ -30,7 +30,7 @@ export default async function (view) {
       ptype: sel(PTYPES.some(([v]) => v === (p.ptype || "")) ? PTYPES : [...PTYPES, [p.ptype, `نوع محفوظ: ${p.ptype}`]], p.ptype || ""),
       provider: input({ value: p.smm_provider || "", dir: "ltr", placeholder: "main أو معرّف المزوّد" }),
       service: input({ value: p.smm_service || "", dir: "ltr" }),
-      smmInput: sel(INPUTS, p.smm_input || "text"),
+      smmInput: sel(INPUTS, p.smm_input || ""),
       req: input({ value: Array.isArray(p.req) ? p.req.join(", ") : "", placeholder: "player_id, email, phone" }),
       country: input({ value: p.smm_country || "", dir: "ltr" }),
       qmin: input({ type: "number", min: 0, value: p.qmin ?? 0 }),
