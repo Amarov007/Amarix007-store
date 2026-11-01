@@ -5,4 +5,6 @@ node_modules/
 .env.*
 dist/
 public/assets/aistudio/
+assets/aistudio/
+.aistudio/
 

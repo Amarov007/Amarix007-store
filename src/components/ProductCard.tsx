@@ -2,6 +2,7 @@ import React from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 import { Star, ShoppingCart, Heart, Zap, Check } from 'lucide-react';
+import gameArt from '../data/gameArtData.json';
 
 interface ProductCardProps {
   product: Product;
@@ -80,17 +81,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       {/* Product Image Thumbnail */}
       {(() => {
         const text = (product.ar + ' ' + product.en + ' ' + (product.tg || '')).toLowerCase();
-        const fallback = /world of warcraft|wow\b|وورلد أوف|واركرافت/.test(text) ? '/assets/games/wow.svg' :
-          /pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b/.test(text) ? '/assets/games/pubg.svg' :
-          /free ?fire|freefire|فري ?فاير/.test(text) ? '/assets/games/freefire.svg' :
-          /mobile legends|mlbb|موبايل ليجندز/.test(text) ? '/assets/games/mlbb.svg' :
-          /roblox|robux|روبلوكس|روبوكس/.test(text) ? '/assets/games/roblox.svg' :
-          /valorant|فالورانت|\bvp\b/.test(text) ? '/assets/games/valorant.svg' :
-          product.ptype === 'game_topup' ? '/assets/games/direct_topup.svg' : '';
-        const src = (product.img && /^(https:\/\/|http:\/\/|\/assets\/|data:image\/)/i.test(product.img)) ? product.img : fallback;
+        const fallback = /world of warcraft|wow\b|وورلد أوف|واركرافت/.test(text) ? gameArt.wow :
+          /pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b/.test(text) ? gameArt.pubg :
+          /free ?fire|freefire|فري ?فاير/.test(text) ? gameArt.freefire :
+          /mobile legends|mlbb|موبايل ليجندز/.test(text) ? gameArt.mlbb :
+          product.ptype === 'game_topup' ? gameArt.direct_topup : '';
+        const src = (product.img && !product.img.startsWith('/assets/')) ? product.img : fallback;
         return src ? (
           <div className="w-full h-28 rounded-xl overflow-hidden mb-3 bg-[#12131a] border border-[#2c2e3d] flex items-center justify-center p-2">
-            <img src={src} alt={lang === 'ar' ? product.ar : product.en} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+            <img src={src} alt={lang === 'ar' ? product.ar : product.en} referrerPolicy="no-referrer" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" loading="lazy" />
           </div>
         ) : null;
       })()}

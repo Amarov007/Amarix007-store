@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="syr-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ED1C24"/>
+      <stop offset="100%" stop-color="#C2040D"/>
+    </linearGradient>
+    <filter id="syr-sh" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#C2040D" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#syr-bg)" filter="url(#syr-sh)"/>
+  <g transform="translate(14, 16)">
+    <!-- Syriatel swoosh curves -->
+    <path d="M16 64 C16 42 34 26 56 26 C48 37 40 48 32 64 Z" fill="#FFFFFF"/>
+    <path d="M30 72 C30 54 44 40 64 38 C56 48 48 60 40 72 Z" fill="#F8D12F"/>
+    <circle cx="58" cy="24" r="6" fill="#FFFFFF"/>
+    <!-- Cash text -->
+    <text x="46" y="90" font-family="'Segoe UI', Roboto, system-ui, -apple-system, sans-serif" font-size="16" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="1.5">CASH</text>
+  </g>
+</svg>

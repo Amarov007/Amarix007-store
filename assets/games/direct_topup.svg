@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg_dt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1B221A"/>
+      <stop offset="100%" stop-color="#0E130D"/>
+    </linearGradient>
+    <linearGradient id="neon_dt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4FF70"/>
+      <stop offset="100%" stop-color="#B9FF66"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="24" fill="url(#bg_dt)" stroke="#2D3B28" stroke-width="2"/>
+  
+  <!-- Glowing Bolt & Gamepad -->
+  <g transform="translate(60, 48)">
+    <circle cx="0" cy="0" r="28" fill="#182315" stroke="url(#neon_dt)" stroke-width="2"/>
+    <path d="M2,-18 L-10,0 L0,0 L-2,18 L10,0 L0,0 Z" fill="url(#neon_dt)"/>
+  </g>
+
+  <!-- TOPUP Badge -->
+  <rect x="22" y="86" width="76" height="22" rx="6" fill="url(#neon_dt)"/>
+  <text x="60" y="101" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="900" fill="#0E130D" text-anchor="middle" letter-spacing="1">DIRECT TOPUP</text>
+</svg>

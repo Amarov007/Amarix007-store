@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="usdt-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2EC495"/>
+      <stop offset="100%" stop-color="#1E8B68"/>
+    </linearGradient>
+    <filter id="usdt-sh" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#1E8B68" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#usdt-bg)" filter="url(#usdt-sh)"/>
+  <!-- Tether emblem -->
+  <g transform="translate(18, 14)">
+    <path d="M42 32.5c-.3 0-1.8.2-7.5.2s-7.2-.2-7.5-.2c-12-.4-20.8-2-20.8-4.3 0-2.3 8.8-3.9 20.8-4.3v8c.5 0 2.3.2 7.5.2s7-.2 7.5-.2v-8c12 .4 20.8 2 20.8 4.3 0 2.3-8.8 3.9-20.8 4.3zm0-11v-7h16.5V4H10.5v10.5H27v7C13.5 22 3.5 24.3 3.5 27.2c0 3 10 5.3 23.5 5.8v24.5h15V33c13.5-.5 23.5-2.8 23.5-5.8 0-2.9-10-5.2-23.5-5.7z" fill="#FFFFFF"/>
+    <!-- Network badge -->
+    <rect x="4" y="66" width="60" height="20" rx="10" fill="#181A20"/>
+    <text x="34" y="80.5" font-family="'Segoe UI', Roboto, system-ui, -apple-system, sans-serif" font-size="11.5" font-weight="900" fill="#F0B90B" text-anchor="middle" letter-spacing="1">BEP-20</text>
+  </g>
+</svg>

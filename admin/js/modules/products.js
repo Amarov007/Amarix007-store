@@ -2,6 +2,7 @@ import { loadCatalog, data, edit, subscribe } from "../core/catalog.js";
 import { publishBar, imageField } from "../core/forms.js";
 import { h, mount, pageHeader, toolbar, searchBox, select as sel, dataTable, badge, modal, toast, confirmBox, field, input, spinner, switchEl } from "../core/ui.js";
 import { money, num } from "../core/utils.js";
+import { getGameArtwork } from "../core/game-art.js";
 
 const DELIV = [[0, "رابط مستودع / منصة"], [1, "بيانات حساب / اعتماد"], [2, "ملف تنفيذي / سورس"], [3, "تنفيذ على رابط حساب العميل"]];
 const PTYPES = [["", "غير محدد"], ["smm", "رشق وخدمات زيادة"], ["game_topup", "شحن ألعاب"], ["app_subscription", "تطبيق واشتراك"], ["gift_card", "بطاقة / كود"]];
@@ -47,7 +48,22 @@ export default async function (view) {
     const D = data(), cats = Object.fromEntries(D.categories.map((c) => [c.id, c.ar]));
     const rows = D.products.filter((p) => (!cat || p.c === cat) && (!provider || String(p.smm_provider || "").toLowerCase() === provider.toLowerCase()) && (!q || [p.ar, p.en, p.id, p.tg, p.smm_provider, p.smm_service, p.ptype, p.smm_country].some((x) => String(x || "").toLowerCase().includes(q))));
     mount(box, dataTable({ rows, pageSize: 30, onRow: open, emptyText: "لا منتجات", columns: [
-      { label: "المنتج", render: (p) => [h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } }, p.img ? h("img", { src: p.img, alt: "", width: 38, height: 38, loading: "lazy", style: { objectFit: "cover", borderRadius: "8px" } }) : null, h("div", null, p.ar || p.en, h("small", { class: "sub mono" }, p.id)))] },
+      { label: "المنتج", render: (p) => {
+        const fb = getGameArtwork(p.ar || p.en, p.c);
+        const src = (p.img && !p.img.startsWith("/assets/")) ? p.img : fb;
+        const imgEl = src ? h("img", {
+          src,
+          alt: "",
+          width: 38,
+          height: 38,
+          loading: "lazy",
+          referrerPolicy: "no-referrer",
+          crossOrigin: "anonymous",
+          style: { objectFit: "contain", borderRadius: "8px", background: "rgba(255,255,255,0.06)", flex: "none", border: "1px solid rgba(255,255,255,0.1)" },
+          onerror: (e) => { if (fb && e.target.src !== fb) e.target.src = fb; }
+        }) : null;
+        return [h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } }, imgEl, h("div", null, p.ar || p.en, h("small", { class: "sub mono" }, p.id)))];
+      } },
       { label: "القسم", render: (p) => badge(cats[p.c] || p.c || "—", "info") },
       { label: "المسار", render: (p) => badge(p.ptype || (p.smm_service ? "مزود" : "يدوي"), "info") },
       { label: "المزوّد / الخدمة", render: (p) => [h("span", { class: "mono" }, p.smm_provider || "—"), h("small", { class: "sub mono" }, p.smm_service || "—")] },

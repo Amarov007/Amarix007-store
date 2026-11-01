@@ -2,6 +2,7 @@ import { rpc, fn } from "../core/http.js";
 import { loadCatalog, data, edit } from "../core/catalog.js";
 import { publishBar } from "../core/forms.js";
 import { h, mount, pageHeader, badge, field, input, select as sel, toast, fail, spinner, errorState } from "../core/ui.js";
+import { getGameArtwork } from "../core/game-art.js";
 
 const cleanId = (v) => String(v || "").normalize("NFKD").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "service";
 const text = (v) => String(v ?? "").trim();
@@ -11,21 +12,12 @@ const safeHttps = (v) => {
   if (/^https:\/\//i.test(s)) return s;
   if (/^http:\/\//i.test(s)) return s.replace(/^http:/i, "https:");
   if (/^\/\//.test(s)) return "https:" + s;
-  if (/^(\/assets\/|data:image\/)/i.test(s)) return s;
+  if (/^data:image\//i.test(s)) return s;
   return "";
 };
 
 function gameArtworkFor(name, category) {
-  const s = (String(name || "") + " " + String(category || "")).toLowerCase();
-  if (/world of warcraft|wow\b|وورلد أوف|واركرافت/.test(s)) return "/assets/games/wow.svg";
-  if (/pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b|\b660 uc\b|\b60 uc\b/.test(s)) return "/assets/games/pubg.svg";
-  if (/free ?fire|freefire|فري ?فاير/.test(s)) return "/assets/games/freefire.svg";
-  if (/mobile legends|mlbb|موبايل ليجندز/.test(s)) return "/assets/games/mlbb.svg";
-  if (/roblox|robux|روبلوكس|روبوكس/.test(s)) return "/assets/games/roblox.svg";
-  if (/valorant|فالورانت|\bvp\b/.test(s)) return "/assets/games/valorant.svg";
-  if (/clash of clans|كلاش/.test(s)) return "/assets/games/clash.svg";
-  if (/direct topup|شحن ألعاب|شحن الألعاب/.test(s)) return "/assets/games/direct_topup.svg";
-  return "";
+  return getGameArtwork(name, category);
 }
 
 function classify(name, category, kind, product_type) {
@@ -288,10 +280,29 @@ export default async function (view) {
     const body = h("tbody");
     filtered.slice(page * pageSize, (page + 1) * pageSize).forEach((x) => {
       const check = h("input", { type: "checkbox", checked: x.selected, disabled: x.exists || !x.available || !(x.rate > 0), onchange: (e) => { x.selected = e.target.checked; drawPreview(); } });
+      const fbArt = gameArtworkFor(x.name, x.category);
+      const imgSrc = (x.image && !x.image.startsWith("/assets/")) ? x.image : fbArt;
+      const imgEl = h("img", {
+        src: imgSrc,
+        alt: "",
+        width: 36,
+        height: 36,
+        referrerPolicy: "no-referrer",
+        crossOrigin: "anonymous",
+        loading: "lazy",
+        style: { objectFit: "contain", borderRadius: "8px", background: "rgba(255,255,255,0.06)", flex: "none", border: "1px solid rgba(255,255,255,0.1)" },
+        onerror: (e) => {
+          if (fbArt && e.target.src !== fbArt) {
+            e.target.src = fbArt;
+          } else {
+            e.target.style.display = "none";
+          }
+        }
+      });
       body.append(h("tr", null,
         h("td", null, check),
-        h("td", null, h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
-          x.image ? h("img", { src: x.image, alt: "", width: 34, height: 34, style: { objectFit: "cover", borderRadius: "6px" } }) : null,
+        h("td", null, h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } },
+          imgEl,
           h("div", null, h("b", null, x.name), h("small", { class: "sub mono" }, `#${x.id}`))
         )),
         h("td", null, badge(HUB_LABEL[x.hub] || x.hub, "info")),
