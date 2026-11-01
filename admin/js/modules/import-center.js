@@ -288,14 +288,11 @@ export default async function (view) {
         width: 36,
         height: 36,
         referrerPolicy: "no-referrer",
-        crossOrigin: "anonymous",
         loading: "lazy",
         style: { objectFit: "contain", borderRadius: "8px", background: "rgba(255,255,255,0.06)", flex: "none", border: "1px solid rgba(255,255,255,0.1)" },
-        onerror: (e) => {
-          if (fbArt && e.target.src !== fbArt) {
-            e.target.src = fbArt;
-          } else {
-            e.target.style.display = "none";
+        onerror: () => {
+          if (fbArt && imgEl.src !== fbArt) {
+            imgEl.src = fbArt;
           }
         }
       });

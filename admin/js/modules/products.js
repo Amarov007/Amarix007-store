@@ -58,7 +58,6 @@ export default async function (view) {
           height: 38,
           loading: "lazy",
           referrerPolicy: "no-referrer",
-          crossOrigin: "anonymous",
           style: { objectFit: "contain", borderRadius: "8px", background: "rgba(255,255,255,0.06)", flex: "none", border: "1px solid rgba(255,255,255,0.1)" },
           onerror: (e) => { if (fb && e.target.src !== fb) e.target.src = fb; }
         }) : null;

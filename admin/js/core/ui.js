@@ -1,12 +1,20 @@
 /* مكتبة واجهة صغيرة: كل المحتوى يُبنى بـ DOM API (h) فلا حقن HTML ولا XSS من بيانات الزبائن. */
 export function h(tag, props, ...kids) {
   const e = document.createElement(tag);
+  // Bind event listeners first so handlers like onerror/onload are active before src or other attributes are set
   for (const [k, v] of Object.entries(props || {})) {
     if (v == null || v === false) continue;
+    if (k.startsWith("on") && typeof v === "function") {
+      const evName = k.slice(2).toLowerCase();
+      e.addEventListener(evName, v);
+      try { e[k.toLowerCase()] = v; } catch (_) {}
+    }
+  }
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false || (k.startsWith("on") && typeof v === "function")) continue;
     if (k === "class") e.className = v;
     else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
     else if (k === "dataset") Object.assign(e.dataset, v);
-    else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2).toLowerCase(), v);
     else if (k === "value" || k === "checked" || k === "disabled" || k === "selected" || k === "textContent") e[k] = v;
     else e.setAttribute(k, v === true ? "" : v);
   }
