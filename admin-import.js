@@ -94,6 +94,8 @@
   }
   function classifyService(x, kind) {
     if (kind === "smsactivate") return "app_subscription";
+    // FIX (Shop2Topup): the provider states the product type — "topup" = direct top-up to a player account, "voucher" = a code is returned.
+    if (kind === "custom" && x.product_type) return x.product_type === "voucher" ? "gift_card" : "game_topup";
     return SV().typeOf({ name: x.name, category: x.category, provider_kind: kind || "smm", smm_input: x.type === "Number" ? "none" : undefined });
   }
   function build(x, o) {
@@ -128,7 +130,9 @@
     if (smm) Object.assign(it, typeof smmLimits == "function" ? smmLimits(x.min, x.max, 1) : { qmin: 1, qmax: 0 });
     else { it.qmin = 1; it.qmax = 1; }
     if (!smm) {
-      const req = kind === "smsactivate" ? [] : sv.requiredOf(it);
+      let req = kind === "smsactivate" ? [] : sv.requiredOf(it);
+      // FIX (Shop2Topup): a top-up needs the player's ID (never an e-mail); a voucher needs nothing from the buyer.
+      if (kind === "custom" && x.product_type) req = x.product_type === "voucher" ? [] : ["player_id"];
       if (req.length) it.req = req;
       else delete it.req;
       const dn = sv.denomination(name) || (x.amount ? { amount: parseFloat(x.amount) || 0, unit: "" } : null);
