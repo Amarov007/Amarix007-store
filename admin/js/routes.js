@@ -1,0 +1,22 @@
+/* سجل الصفحات: perm = null يعني للمدير فقط؛ وإلا مفتاح صلاحية الموظف. كل صفحة وحدة مستقلة تُحمَّل عند الطلب. */
+export const routes = [
+  { id: "dashboard", title: "الرئيسية", group: "overview", icon: "home", perm: null, load: () => import("./modules/dashboard.js") },
+  { id: "analytics", title: "التحليلات", group: "overview", icon: "chart", perm: null, load: () => import("./modules/analytics.js") },
+  { id: "orders", title: "الطلبات", group: "sales", icon: "orders", perm: "orders", load: () => import("./modules/orders.js") },
+  { id: "invoices", title: "الفواتير", group: "sales", icon: "file", perm: "orders", load: () => import("./modules/invoices.js") },
+  { id: "users", title: "المستخدمون", group: "sales", icon: "users", perm: "users", load: () => import("./modules/users.js") },
+  { id: "tickets", title: "تذاكر الدعم", group: "sales", icon: "ticket", perm: "tickets", load: () => import("./modules/tickets.js") },
+  { id: "affiliates", title: "الشركاء (Affiliate)", group: "sales", icon: "star", perm: null, load: () => import("./modules/affiliates.js") },
+  { id: "products", title: "المنتجات", group: "catalog", icon: "box", perm: "products", load: () => import("./modules/products.js") },
+  { id: "import-center", title: "مركز الاستيراد", group: "catalog", icon: "download", perm: "products", load: () => import("./modules/import-center.js") },
+  { id: "categories", title: "الأقسام", group: "catalog", icon: "layers", perm: null, load: () => import("./modules/categories.js") },
+  { id: "banners", title: "البانرات", group: "catalog", icon: "image", perm: null, load: () => import("./modules/banners.js") },
+  { id: "coupons", title: "الكوبونات", group: "catalog", icon: "tag", perm: null, load: () => import("./modules/coupons.js") },
+  { id: "settings", title: "إعدادات المتجر", group: "catalog", icon: "globe", perm: null, load: () => import("./modules/settings.js") },
+  { id: "wallets", title: "المحافظ", group: "finance", icon: "wallet", perm: null, load: () => import("./modules/wallets.js") },
+  { id: "payments", title: "المدفوعات", group: "finance", icon: "card", perm: null, load: () => import("./modules/payments.js") },
+  { id: "providers", title: "مزوّدو الخدمات", group: "integrations", icon: "plug", perm: null, load: () => import("./modules/providers.js") },
+  { id: "push", title: "الإشعارات", group: "integrations", icon: "bell", perm: null, load: () => import("./modules/push.js") },
+  { id: "staff", title: "الموظفون", group: "system", icon: "shield", perm: null, load: () => import("./modules/staff.js") },
+  { id: "activity", title: "سجل النشاط", group: "system", icon: "activity", perm: null, load: () => import("./modules/activity.js") },
+];

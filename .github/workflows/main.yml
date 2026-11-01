@@ -1,0 +1,46 @@
+name: Unzip upload
+
+on:
+  push:
+    paths:
+      - '*.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract zip files into the repo
+        run: |
+          shopt -s nullglob
+          zips=(*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then echo "No zip found"; exit 0; fi
+          for z in "${zips[@]}"; do
+            echo "Extracting $z"
+            rm -rf /tmp/x && mkdir /tmp/x
+            unzip -q "$z" -d /tmp/x
+            rm -rf /tmp/x/__MACOSX /tmp/x/.git /tmp/x/.github
+            cd /tmp/x
+            # if the zip has a single top folder, step into it
+            if [ "$(ls -A | wc -l)" -eq 1 ] && [ -d "$(ls -A)" ]; then
+              cd "$(ls -A)"
+              rm -rf .git .github
+            fi
+            cp -a . "$GITHUB_WORKSPACE/"
+            cd "$GITHUB_WORKSPACE"
+            rm -f "$z"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "Upload from zip"
+          git push

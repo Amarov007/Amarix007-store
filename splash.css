@@ -1,0 +1,92 @@
+/* AMARIX007 — animated splash (wave reveal). Pure CSS, no dependencies.
+   v2: every animation uses only transform/opacity (runs on the GPU, stays smooth even while the page's JS is
+   busy), and nothing is drawn or animated until splash.js adds .amx-go (images decoded + sound ready) so the
+   first thing on screen is just the dark background — no static logo flash. */
+html.amx-skip #amx-splash{display:none!important}
+#amx-splash{
+  position:fixed;inset:0;z-index:2147483000;direction:ltr;
+  background:radial-gradient(120% 90% at 78% 6%,#2b2f45 0%,#1b1c26 40%,#12131a 100%);
+  display:flex;align-items:center;justify-content:center;
+  will-change:transform;
+  animation:amxFailsafe 0s linear 7s forwards; /* never trap the user if JS fails */
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
+}
+#amx-splash.amx-out{
+  animation:none;pointer-events:none;
+  transform:none;opacity:0;
+  transition:opacity .32s ease;
+}
+@keyframes amxFailsafe{to{visibility:hidden;opacity:0;pointer-events:none}}
+#amx-splash:not(.amx-go) .amx-stage{opacity:0}
+#amx-splash:not(.amx-go) *{animation-play-state:paused!important}
+
+.amx-stage{position:absolute;inset:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+
+/* soft pulsing glow behind the logo */
+.amx-glow{position:absolute;left:50%;top:46%;width:130vmin;height:130vmin;margin:-65vmin 0 0 -65vmin;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(185,255,102,.34),rgba(185,255,102,.10) 55%,transparent 72%);
+  opacity:0;will-change:transform,opacity;animation:amxGlow 3.2s ease-in-out .15s infinite}
+@keyframes amxGlow{0%{opacity:0;transform:scale(.7)}35%{opacity:1}100%{opacity:.55;transform:scale(1.08)}}
+
+/* sonar ripples */
+.amx-ring{position:absolute;left:50%;top:46%;width:34vmin;height:34vmin;margin:-17vmin 0 0 -17vmin;border-radius:50%;
+  border:2px solid rgba(185,255,102,.7);box-shadow:0 0 24px rgba(185,255,102,.45),inset 0 0 24px rgba(185,255,102,.25);
+  opacity:0;transform:scale(.25);will-change:transform,opacity;animation:amxRing 2.6s cubic-bezier(.2,.6,.3,1) infinite}
+.amx-ring.amx-r2{animation-delay:.4s}
+.amx-ring.amx-r3{animation-delay:.8s}
+@keyframes amxRing{0%{opacity:0;transform:scale(.25)}12%{opacity:.8}100%{opacity:0;transform:scale(3.4)}}
+
+/* layered flowing waves that rise like a tide */
+.amx-wlw{position:absolute;inset:0;transform:translateY(62%);will-change:transform;animation:amxRise 2.7s cubic-bezier(.22,.75,.25,1) forwards}
+.amx-wlw.amx-w1{--to:2%;animation-delay:.05s}
+.amx-wlw.amx-w2{--to:15%;animation-delay:.2s}
+.amx-wlw.amx-w3{--to:28%;animation-delay:.35s}
+@keyframes amxRise{to{transform:translateY(var(--to))}}
+.amx-wl{position:absolute;left:0;bottom:0;width:200%;height:62vh;min-height:380px;will-change:transform;backface-visibility:hidden}
+.amx-wl svg{display:block;width:100%;height:100%}
+.amx-wl.fa{animation:amxFlow 9s linear infinite}
+.amx-wl.fb{animation:amxFlow 6.5s linear infinite reverse}
+.amx-wl.fc{animation:amxFlow 4.6s linear infinite}
+@keyframes amxFlow{to{transform:translateX(-50%)}}
+
+/* logo */
+.amx-logo{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:2.2vh;transform:translateY(-4vh)}
+.amx-mark{position:relative;width:min(62vw,300px);aspect-ratio:773/507;
+  opacity:0;transform:scale(.55);will-change:transform,opacity;
+  animation:amxMark 1.15s cubic-bezier(.2,1.25,.35,1) .3s forwards}
+.amx-mark img{display:block;width:100%;height:100%;filter:drop-shadow(0 0 22px rgba(185,255,102,.55))}
+.amx-shine{position:absolute;inset:0;overflow:hidden;
+  -webkit-mask:url(logo-mark.webp) center/contain no-repeat;mask:url(logo-mark.webp) center/contain no-repeat}
+.amx-shine::before{content:"";position:absolute;top:0;bottom:0;left:0;width:60%;
+  background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,.9) 50%,transparent 100%);
+  transform:translateX(-130%);will-change:transform;animation:amxShine 1.3s ease-in-out 1.15s forwards}
+@keyframes amxMark{0%{opacity:0;transform:scale(.55)}60%{opacity:1}100%{opacity:1;transform:scale(1)}}
+@keyframes amxShine{to{transform:translateX(270%)}}
+.amx-word{width:min(78vw,430px);aspect-ratio:1346/350;
+  opacity:0;transform:translateY(16px) scale(.97);will-change:transform,opacity;
+  animation:amxWord 1s cubic-bezier(.3,.7,.2,1) .85s forwards}
+.amx-word img{display:block;width:100%;height:100%}
+@keyframes amxWord{to{opacity:1;transform:none}}
+
+/* wavy bottom edge of the curtain (visible while it lifts) */
+.amx-edge{position:absolute;left:0;top:100%;width:100%;height:90px;overflow:hidden;margin-top:-1px;pointer-events:none}
+.amx-edge svg{display:block;width:200%;height:100%;animation:amxFlow 2.2s linear infinite}
+
+@media (prefers-reduced-motion:reduce){
+  .amx-glow,.amx-ring,.amx-wlw,.amx-wl,.amx-shine::before,.amx-edge svg{animation:none!important}
+  .amx-ring,.amx-shine{display:none}
+  .amx-wlw{transform:translateY(var(--to,10%))}
+  .amx-mark,.amx-word{animation:amxFade .5s ease forwards!important;transform:none}
+  @keyframes amxFade{to{opacity:1}}
+  #amx-splash.amx-out{transform:none;opacity:0;transition:opacity .4s}
+}
+
+
+/* Stability patch: remove the large moving waves/ripples and keep the intro lightweight on phones. */
+#amx-splash .amx-glow,#amx-splash .amx-ring,#amx-splash .amx-wlw,#amx-splash .amx-wl,#amx-splash .amx-edge svg{animation:none!important;}
+#amx-splash .amx-ring{display:none!important;}
+#amx-splash .amx-wlw{transform:translateY(var(--to,18%));}
+#amx-splash .amx-wl{transform:none!important;}
+#amx-splash .amx-glow{opacity:.22;transform:none!important;}
+@media(max-width:700px){#amx-splash .amx-logo{transform:none;}#amx-splash .amx-mark img{filter:none;}}
+@media(prefers-reduced-motion:reduce){#amx-splash.amx-out{opacity:0;transition:opacity .2s;}}
