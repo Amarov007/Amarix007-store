@@ -251,6 +251,23 @@ function steps(done, current) {
     return `<li class="${cls}"${i === current ? ' aria-current="step"' : ""}><b>${i < done ? ICON.check.replace('width="22" height="22"', 'width="14" height="14"') : i + 1}</b><span>${l}</span></li>`;
   }).join("")}</ol>`;
 }
+function methodLogo(meta, ins, size = 44) {
+  const iconUrl = meta.config?.icon_url || meta.config?.logo_url || meta.config?.image || meta.icon_url || meta.logo_url || meta.logo;
+  const name = meta.config?.ar || meta.config?.en || meta.ar || meta.en || ins?.method || "Payment";
+  if (iconUrl) {
+    return `<span class="pay-method-icon" style="width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(255,255,255,0.06);overflow:hidden;flex:none"><img src="${esc(iconUrl)}" alt="${esc(name)}" style="width:100%;height:100%;object-fit:contain;padding:3px" onerror="this.style.display='none'"></span>`;
+  }
+  if (T()?.payLogo) {
+    try {
+      const rendered = T().payLogo({ id: ins?.method || meta.id, ar: meta.config?.ar || meta.ar, en: meta.config?.en || meta.en, icon: meta.config?.icon || meta.icon, icon_url: iconUrl, logo_url: iconUrl, config: meta.config }, size);
+      if (rendered) return rendered;
+    } catch {}
+  }
+  const nm = String(meta.config?.en || meta.config?.ar || meta.id || "P").trim();
+  const letter = (nm.replace(/[^A-Za-z0-9]/g, "") || "P").slice(0, 1).toUpperCase();
+  return `<span class="pay-method-icon" style="width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;background:var(--card, #1e2029);border:1px solid rgba(255,255,255,0.1);font-weight:900;font-size:${Math.round(size * 0.44)}px;color:var(--ac, #b9ff66);flex:none">${letter}</span>`;
+}
+
 async function renderPayment(paymentId, { silent = false } = {}) {
   showModal();
   const d = draftOf(paymentId);
@@ -279,8 +296,11 @@ async function renderPayment(paymentId, { silent = false } = {}) {
   const done = isCaptured ? 4 : isReviewed ? 3 : hasProof ? 2 : 1;
   const current = isCaptured ? -1 : isReviewed ? 3 : hasProof ? 2 : 1;
 
+  const network = meta.config?.network
+    ? `<div class="pay-acc" style="margin-bottom:8px"><div><small>${tx("الشبكة / نوع التحويل", "Network / transfer type")}</small><bdi dir="ltr">${esc(meta.config.network)}</bdi></div></div>`
+    : "";
   const account = ins?.acc
-    ? `<div class="pay-acc"><div><small>${tx("الحساب أو العنوان", "Account / address")}</small><bdi dir="ltr" id="amx-pay-acc">${esc(ins.acc)}</bdi></div><button type="button" class="pay-copy" data-pay-action="copy-account" data-value="${esc(ins.acc)}">${ICON.copy}<span>${tx("نسخ", "Copy")}</span></button></div>`
+    ? `<div class="pay-acc"><div><small>${tx("الحساب أو العنوان المطلوب التحويل إليه", "Target account / address")}</small><bdi dir="ltr" id="amx-pay-acc">${esc(ins.acc)}</bdi></div><button type="button" class="pay-copy" data-pay-action="copy-account" data-value="${esc(ins.acc)}">${ICON.copy}<span>${tx("نسخ", "Copy")}</span></button></div>`
     : ins ? `<p class="pay-note warn">${tx("لم يُضبط عنوان لهذه الوسيلة بعد. راجع الإدارة قبل التحويل.", "No account is configured for this method yet. Contact support before transferring.")}</p>` : "";
   const body = ins ? fmtText(A() ? ins.da : (ins.de || ins.da)) : "";
   const text = body ? `<div class="pay-text">${body}</div>` : "";
@@ -311,7 +331,7 @@ async function renderPayment(paymentId, { silent = false } = {}) {
     <div class="pay-top"><span class="pay-pill s-${esc(state)}">${esc(statusText(state))}</span>${live && Number.isFinite(end) ? `<span class="pay-timer${expired ? " off" : ""}">${ICON.clock}<span>${tx("ينتهي خلال", "Expires in")}</span> <bdi id="amx-pay-countdown" dir="ltr">${countdown(end)}</bdi></span>` : ""}</div>
     <div class="pay-hero"><small>${tx("المبلغ المطلوب", "Amount due")}</small><bdi class="pay-amt" dir="ltr">${amount(ins?.pay_amount ?? p.pay_amount, ins?.pay_currency || p.pay_currency)}</bdi>${showBase ? `<span class="pay-base">${tx("المبلغ الأساسي", "Base amount")}: <bdi dir="ltr">${amount(ins?.amount_base ?? p.amount_base, "USDT")}</bdi></span>` : ""}${showFx ? `<span class="pay-base">${tx("سعر الصرف المثبّت", "Locked FX rate")}: <bdi dir="ltr">1 USDT = ${esc(rate)}</bdi></span>` : ""}</div>
     ${steps(done, current)}
-    ${ins ? `<section class="pay-card"><div class="pay-method">${T()?.payLogo ? T().payLogo({ id: ins.method, ar: meta.config?.ar, en: meta.config?.en, icon: meta.config?.icon }, 40) : ""}<h3>${esc(methodName)}</h3></div>${account}${text}</section>` : ""}
+    ${ins ? `<section class="pay-card"><div class="pay-method">${methodLogo(meta, ins, 44)}<div><h3>${esc(methodName)}</h3>${meta.config?.network ? `<small class="pay-sub" style="display:block;color:var(--muted,#a4a7b5);font-size:12px;margin-top:2px">${esc(meta.config.network)}</small>` : ""}</div></div>${network}${account}${text}</section>` : ""}
     ${expired ? `<p class="pay-note warn">${tx("انتهت مهلة هذه الدفعة. أنشئ طلباً جديداً للمتابعة.", "This payment has expired. Create a new order to continue.")}</p>` : ""}
     ${proofBlock}${refBlock}${actions}${review}${refund}
     <p class="pay-note">${tx("لا يتم تأكيد الدفع لمجرد رفع صورة. تنتقل الدفعة للمراجعة ثم يُتحقق من وصول المبلغ.", "Uploading a receipt does not confirm payment. The transfer is reviewed and verified first.")}</p>`);

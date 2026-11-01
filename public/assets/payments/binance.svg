@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bin-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22262E"/>
+      <stop offset="100%" stop-color="#14171A"/>
+    </linearGradient>
+    <filter id="bin-sh" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#F0B90B" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#bin-bg)" stroke="#F0B90B" stroke-width="2" filter="url(#bin-sh)"/>
+  <!-- Binance diamonds -->
+  <g transform="translate(60, 48)">
+    <!-- Center diamond -->
+    <polygon points="0,-10 10,0 0,10 -10,0" fill="#F0B90B"/>
+    <!-- Top & bottom -->
+    <polygon points="0,-28 8,-20 0,-12 -8,-20" fill="#F0B90B"/>
+    <polygon points="0,12 8,20 0,28 -8,20" fill="#F0B90B"/>
+    <!-- Left & right -->
+    <polygon points="-28,0 -20,-8 -12,0 -20,8" fill="#F0B90B"/>
+    <polygon points="12,0 20,-8 28,0 20,8" fill="#F0B90B"/>
+    <!-- Interlocking corner chevrons -->
+    <polygon points="-10,-10 -6,-14 0,-8 -4,-4" fill="#F0B90B"/>
+    <polygon points="10,-10 6,-14 0,-8 4,-4" fill="#F0B90B"/>
+    <polygon points="-10,10 -6,14 0,8 -4,4" fill="#F0B90B"/>
+    <polygon points="10,10 6,14 0,8 4,4" fill="#F0B90B"/>
+  </g>
+  <!-- Pay badge -->
+  <rect x="36" y="86" width="48" height="20" rx="10" fill="#F0B90B"/>
+  <text x="60" y="100.5" font-family="'Segoe UI', Roboto, system-ui, -apple-system, sans-serif" font-size="12" font-weight="900" fill="#14171A" text-anchor="middle" letter-spacing="1.5">PAY</text>
+</svg>

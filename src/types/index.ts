@@ -77,6 +77,9 @@ export interface PaymentMethod {
   da: string;
   de: string;
   qrCode?: string;
+  icon_url?: string;
+  logo_url?: string;
+  network?: string;
 }
 
 export type OrderStatus = 'new' | 'processing' | 'done' | 'cancelled';

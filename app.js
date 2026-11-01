@@ -1370,14 +1370,17 @@ function paySvgIcon(key, size = 44) {
   return "";
 }
 function payLogo(m, size = 44) {
+  if (!m) return "";
   const st = `width:${size}px;height:${size}px`;
+  const cfg = m.config && typeof m.config === "object" ? m.config : {};
+  const uploaded = String(m.icon_url || m.logo_url || m.image_url || m.logo || m.image || cfg.icon_url || cfg.logo_url || cfg.image || cfg.logo || "").trim();
+  if (/^(https:\/\/|http:\/\/|\/assets\/|\/|\.\/|data:image\/)/i.test(uploaded)) {
+    return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center;flex:none"><img src="${ex(uploaded)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="display:block;width:100%;height:100%;object-fit:contain;padding:0;border-radius:8px"></span>`;
+  }
   const key = payKey(m);
-  const uploaded = String(m.logo || m.logo_url || m.image_url || "").trim();
-  if (/^(https:\/\/|data:image\/)/i.test(uploaded))
-    return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${ex(uploaded)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
   const svg = paySvgIcon(key, size);
   if (svg) return svg;
-  const nmRaw = plain(m.en || m.ar || pmReadable(m) || "");
+  const nmRaw = plain(cfg.en || cfg.ar || m.en || m.ar || pmReadable(m) || "");
   const nm = nmRaw.replace(/[^A-Za-z0-9؀-ۿ ]/g, "").trim();
   const letter = (nm || "P").slice(0, 1).toUpperCase();
   return `<span class="pl" style="${st};display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:${Math.round(size*.46)}px">${letter}</span>`;
@@ -2357,7 +2360,7 @@ function paymentsSection() {
   if (!PM.length) return "";
   const A = lang == "ar";
   const methods = [...PM].sort((x, y) => (+x.sort || 0) - (+y.sort || 0));
-  return `<section class="pay-showcase" aria-labelledby="pay-showcase-title"><div class="pay-head"><span class="pay-kicker">${ic("shield",14)} ${A ? "دفع يدوي آمن" : "SECURE MANUAL PAYMENT"}</span><h2 id="pay-showcase-title">${t("paymethods")}</h2><p>${A ? "اختر طريقة الدفع المناسبة لك، وأكمل طلبك بخطوات بسيطة" : "Choose your preferred method and complete your order in a few simple steps."}</p></div><div class="pays pay-method-grid">${methods.map((m,i)=>`<article class="pm pay-method-card" style="--pc:${safeColor(m.color)||"var(--ac)"}"><span class="pay-card-top"><span class="pay-card-index">0${i+1}</span><span class="pay-card-status">${A?"متاحة":"AVAILABLE"}</span></span><span class="pay-card-logo">${payLogo(m,60)}</span><b>${pmName(m)}</b><small>${m.id==="sham"||m.id==="pmmvgmi1ib8qm"?(A?"شام كاش · بيانات تجريبية مؤقتة":"Sham Cash · temporary test details"):m.id==="usdt"?(A?"تحويل رقمي · شبكة BEP20":"Digital transfer · BEP20 network"):m.id==="binance"?(A?"تحويل سريع عبر Binance Pay":"Fast transfer with Binance Pay"):(A?"تحويل محلي عبر سيريتل كاش":"Local transfer via Syriatel Cash")}</small></article>`).join("")}</div><div class="pay-trust-row"><div><span>${ic("shield-check",20)}</span><b>${A?"دفع موثّق يدوياً":"Manual verification"}</b></div><div><span>${ic("zap",20)}</span><b>${A?"معالجة سريعة":"Fast processing"}</b></div><div><span>${ic("lock",20)}</span><b>${A?"إثبات دفع محمي":"Protected payment proof"}</b></div><div><span>${ic("headset",20)}</span><b>${A?"دعم متواصل":"Ongoing support"}</b></div></div>${methods.some(m=>m.id==="sham"||m.id==="pmmvgmi1ib8qm")?`<p class="pay-test-note">${A?"تنبيه: بيانات شام كاش الحالية تجريبية مؤقتة، وسيتم استبدالها ببياناتك الحقيقية قبل استقبال التحويلات.":"Note: Sham Cash details are temporary test data and must be replaced before accepting transfers."}</p>`:""}</section>`;
+  return `<section class="pay-showcase" aria-labelledby="pay-showcase-title"><div class="pay-head"><span class="pay-kicker">${ic("shield",14)} ${A ? "دفع يدوي آمن" : "SECURE MANUAL PAYMENT"}</span><h2 id="pay-showcase-title">${t("paymethods")}</h2><p>${A ? "اختر طريقة الدفع المناسبة لك، وأكمل طلبك بخطوات بسيطة" : "Choose your preferred method and complete your order in a few simple steps."}</p></div><div class="pays pay-method-grid">${methods.map((m,i)=>`<article class="pm pay-method-card" style="--pc:${safeColor(m.color)||"var(--ac)"}"><span class="pay-card-top"><span class="pay-card-index">0${i+1}</span><span class="pay-card-status">${A?"متاحة":"AVAILABLE"}</span></span><span class="pay-card-logo">${payLogo(m,60)}</span><b>${pmName(m)}</b><small>${m.config?.network || (m.id==="usdt"?(A?"تحويل رقمي · شبكة BEP20":"Digital transfer · BEP20 network"):m.id==="binance"?(A?"تحويل سريع عبر Binance Pay":"Fast transfer with Binance Pay"):m.id==="syriatel"?(A?"تحويل محلي عبر سيريتل كاش":"Local transfer via Syriatel Cash"):m.id==="sham"?(A?"تحويل محلي عبر شام كاش":"Local transfer via Sham Cash"):(A?"تحويل دفع يدوي موثّق":"Verified manual payment"))}</small></article>`).join("")}</div><div class="pay-trust-row"><div><span>${ic("shield-check",20)}</span><b>${A?"دفع موثّق يدوياً":"Manual verification"}</b></div><div><span>${ic("zap",20)}</span><b>${A?"معالجة سريعة":"Fast processing"}</b></div><div><span>${ic("lock",20)}</span><b>${A?"إثبات دفع محمي":"Protected payment proof"}</b></div><div><span>${ic("headset",20)}</span><b>${A?"دعم متواصل":"Ongoing support"}</b></div></div></section>`;
 }
 function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
@@ -2764,18 +2767,20 @@ function cartPage() {
 /* Payment instructions card (success page) */
 function payInstructions(m) {
   if (!m) return "";
-  const note = lang == "ar" ? m.da : m.de;
-  const network = String(m.network || "").trim();
-  const min = Number(m.min || 0), max = Number(m.max || 0);
+  const cfg = m.config && typeof m.config === "object" ? m.config : {};
+  const note = lang == "ar" ? (m.da || cfg.da) : (m.de || cfg.de || m.da || cfg.da);
+  const network = String(m.network || cfg.network || "").trim();
+  const acc = String(m.acc || cfg.acc || "").trim();
+  const min = Number(m.min || m.min_base || 0), max = Number(m.max || m.max_base || 0);
   const lk = pmCur(m);
   const limits = (min > 0 || max > 0) ? `<p class="pd"><b>${lang == "ar" ? "حدود التحويل:" : "Transfer limits:"}</b> ${min > 0 ? (lang == "ar" ? "من " : "Min ") + `<bdi dir="ltr">${pmAmt(min, lk)}</bdi>` : ""}${min > 0 && max > 0 ? " — " : ""}${max > 0 ? (lang == "ar" ? "حتى " : "Max ") + `<bdi dir="ltr">${pmAmt(max, lk)}</bdi>` : (min > 0 ? (lang == "ar" ? " (لا حد أعلى)" : " (no upper limit)") : "")}</p>` : "";
-  const memo = String(m.memo || "").trim();
-  return `<div class="box payi"><div class="payi-h">${payLogo(m, 46)}<div><small>${t("payhow")}</small><b>${pmName(m)}</b><small>${lang == "ar" ? "دفع يدوي — تتم مراجعة التحويل قبل اعتماد الطلب" : "Manual payment — transfer is reviewed before order approval"}</small></div></div>${
+  const memo = String(m.memo || cfg.memo || "").trim();
+  return `<div class="box payi"><div class="payi-h">${payLogo(m, 48)}<div><small>${t("payhow")}</small><b>${pmName(m)}</b><small>${lang == "ar" ? "دفع يدوي موثّق — تتم مراجعة التحويل قبل اعتماد الطلب" : "Verified manual payment — transfer is reviewed before order approval"}</small></div></div>${
     network ? `<div class="payi-acc"><small>${lang == "ar" ? "الشبكة / نوع التحويل" : "Network / transfer type"}</small><div><bdi dir="ltr">${ex(network)}</bdi></div></div>` : ""
   }${
-    m.acc
-      ? `<div class="payi-acc"><small>${t("payto")}</small><div class="acc"><bdi dir="ltr" class="acc-v">${ex(m.acc)}</bdi><button type="button" class="b b2 sm acc-b" data-a="copy" data-v="${ex(m.acc)}">${ic("copy", 14)}<span>${t("copy")}</span></button></div></div>`
-      : ""
+    acc
+      ? `<div class="payi-acc"><small>${t("payto")}</small><div class="acc"><bdi dir="ltr" class="acc-v">${ex(acc)}</bdi><button type="button" class="b b2 sm acc-b" data-a="copy" data-v="${ex(acc)}">${ic("copy", 14)}<span>${t("copy")}</span></button></div></div>`
+      : `<p class="pay-note warn" style="margin:8px 0">${lang == "ar" ? "لم يُضبط عنوان لهذه الوسيلة بعد. راجع الإدارة قبل التحويل." : "No target account is configured yet. Please contact support before transferring."}</p>`
   }${memo ? `<div class="payi-acc"><small>${lang == "ar" ? "ملاحظة / مرجع مطلوب" : "Required note / reference"}</small><p class="pd">${ex(memo)}</p></div>` : ""}${limits}${note ? `<p class="pd">${ex(note)}</p>` : ""}<p class="pd">${lang == "ar" ? "لا ترفع صورة فقط وتفترض أن الدفع تم؛ سيُعتمد الطلب بعد التحقق الفعلي من وصول الأموال." : "Uploading a receipt does not complete payment; the order is approved only after the funds are independently verified."}</p></div>`;
 }
 /* Success page after an order */
@@ -6549,12 +6554,18 @@ async function boot() {
         const pp = await pr.json();
         if (pp && Array.isArray(pp.methods)) {
           paymentMethodsRead = true;
-          d = { ...(d || {}), payments: pp.methods.filter((m) => m && m.kind !== "wallet").map((m) => ({
-            ...m, ...(m.config && typeof m.config === "object" ? m.config : {}),
-            on: true, acc: "", currency: String(m.currency || "USD"),
-            min: m.min_amount ?? m.min_base ?? 0, max: m.max_amount ?? m.max_base ?? 0,
-            requires_proof: m.requires_proof !== false,
-          })),
+          d = { ...(d || {}), payments: pp.methods.filter((m) => m && m.kind !== "wallet").map((m) => {
+            const cfg = m.config && typeof m.config === "object" ? m.config : {};
+            return {
+              ...m, ...cfg,
+              on: true, acc: cfg.acc || "", currency: String(m.currency || "USD"),
+              min: m.min_amount ?? m.min_base ?? 0, max: m.max_amount ?? m.max_base ?? 0,
+              requires_proof: m.requires_proof !== false,
+              icon_url: cfg.icon_url || cfg.logo_url || cfg.image || "",
+              logo_url: cfg.logo_url || cfg.icon_url || "",
+              network: cfg.network || "",
+            };
+          }),
         };
         if (pp.fx && d.rates && d.rates.SYP) d.rates = { ...d.rates, SYP: [Number(pp.fx), d.rates.SYP[1] || "ل.س"] };
       }

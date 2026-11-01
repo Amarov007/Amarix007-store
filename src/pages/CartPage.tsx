@@ -229,30 +229,96 @@ export const CartPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {paymentMethods.map(pm => {
                 const isSelected = selectedPaymentMethodId === pm.id;
+                const iconSrc = pm.icon_url || pm.logo_url;
                 return (
                   <button
                     key={pm.id}
                     type="button"
                     onClick={() => setSelectedPaymentMethodId(pm.id)}
-                    className={`p-4 rounded-2xl text-start transition-all border flex flex-col justify-between ${
+                    className={`p-3.5 rounded-2xl text-start transition-all border flex flex-col justify-between ${
                       isSelected
                         ? 'bg-[#12131a] border-[#b9ff66] shadow-md shadow-[#b9ff66]/10'
                         : 'bg-[#12131a]/60 border-[#2c2e3d] hover:border-[#b9ff66]/40'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-[#f3f3f3]">
-                        {lang === 'ar' ? pm.ar : pm.en}
-                      </span>
-                      <span className={`w-3 h-3 rounded-full border flex items-center justify-center ${isSelected ? 'border-[#b9ff66] bg-[#b9ff66]' : 'border-[#a4a7b5]'}`} />
+                      <div className="flex items-center gap-2.5">
+                        {iconSrc ? (
+                          <img
+                            src={iconSrc}
+                            alt=""
+                            className="w-7 h-7 object-contain rounded-lg p-0.5 bg-white/5 shrink-0"
+                            onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-[#b9ff66]/10 text-[#b9ff66] flex items-center justify-center font-black text-xs shrink-0">
+                            {(pm.en || pm.ar || 'P')[0]}
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-xs font-bold text-[#f3f3f3] block leading-tight">
+                            {lang === 'ar' ? pm.ar : pm.en}
+                          </span>
+                          {pm.network && (
+                            <span className="text-[10px] text-[#717588] block">
+                              {pm.network}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'border-[#b9ff66] bg-[#b9ff66]' : 'border-[#a4a7b5]'}`} />
                     </div>
-                    <div className="text-[10px] text-[#a4a7b5] line-clamp-2">
+                    <div className="text-[10px] text-[#a4a7b5] line-clamp-2 mt-1">
                       {lang === 'ar' ? pm.da : pm.de}
                     </div>
                   </button>
                 );
               })}
             </div>
+
+            {/* Selected Method Account Details Box */}
+            {(() => {
+              const activePm = paymentMethods.find(x => x.id === selectedPaymentMethodId) || paymentMethods[0];
+              if (!activePm) return null;
+              return (
+                <div className="p-4 rounded-xl bg-[#14161f] border border-[#2c2e3d] space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#a4a7b5]">
+                      {lang === 'ar' ? 'تفاصيل الحساب للتحويل:' : 'Transfer Account Details:'}
+                    </span>
+                    {activePm.network && (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-[#b9ff66]/10 text-[#b9ff66] font-mono">
+                        {activePm.network}
+                      </span>
+                    )}
+                  </div>
+                  {activePm.acc ? (
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#0e1017] border border-[#2c2e3d]">
+                      <span className="font-mono text-xs text-[#b9ff66] break-all select-all font-bold" dir="ltr">
+                        {activePm.acc}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(activePm.acc);
+                          showToast(lang === 'ar' ? 'تم نسخ الحساب!' : 'Copied!', 'ok');
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-[#b9ff66]/20 text-[#b9ff66] hover:bg-[#b9ff66] hover:text-[#191a23] transition-all shrink-0 ml-2"
+                      >
+                        {lang === 'ar' ? 'نسخ' : 'Copy'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-[#eab308]">
+                      {lang === 'ar' ? 'لم يُحدد رقم حساب لهذه الوسيلة؛ راجع الدعم الفني قبل التحويل.' : 'No account details configured yet. Contact support before paying.'}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-[#717588] leading-relaxed">
+                    {lang === 'ar' ? activePm.da : activePm.de}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
         </div>
