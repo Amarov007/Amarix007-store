@@ -219,10 +219,13 @@
   }
   const BRANDS = [
     ["pubg","PUBG Mobile","ببجي موبايل",/\b(pubg|pubg mobile|uc|ببجي|شدات)\b/i,"games"],
+    ["wow","World of Warcraft","وورلد أوف ووركرافت",/\b(wow|world of warcraft|وورلد أوف|واركرافت)\b/i,"games"],
     ["free_fire","Free Fire","فري فاير",/\b(free ?fire|freefire|فري ?فاير|جواهر فري)\b/i,"games"],
     ["mobile_legends","Mobile Legends","موبايل ليجندز",/\b(mobile legends|mlbb|موبايل ليجندز)\b/i,"games"],
     ["genshin","Genshin Impact","جينشن إمباكت",/\b(genshin|جينشن)\b/i,"games"],
-    ["roblox","Roblox","روبلوكس",/\b(roblox|روبلوكس)\b/i,"games"],
+    ["roblox","Roblox","روبلوكس",/\b(roblox|روبلوكس|robux)\b/i,"games"],
+    ["valorant","Valorant","فالورانت",/\b(valorant|فالورانت|\bvp\b)\b/i,"games"],
+    ["clash","Clash of Clans","كلاش أوف كلانس",/\b(clash of clans|كلاش|clash)\b/i,"games"],
     ["netflix","Netflix","نتفلكس",/\b(netflix|نتفلكس)\b/i,"apps"],
     ["shahid","Shahid","شاهد",/\b(shahid|شاهد)\b/i,"apps"],
     ["spotify","Spotify","سبوتيفاي",/\b(spotify|سبوتيفاي)\b/i,"apps"],

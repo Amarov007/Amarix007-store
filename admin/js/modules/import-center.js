@@ -8,8 +8,25 @@ const text = (v) => String(v ?? "").trim();
 const number = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 const safeHttps = (v) => {
   const s = String(v ?? "").trim();
-  return /^https:\/\//i.test(s) ? s : "";
+  if (/^https:\/\//i.test(s)) return s;
+  if (/^http:\/\//i.test(s)) return s.replace(/^http:/i, "https:");
+  if (/^\/\//.test(s)) return "https:" + s;
+  if (/^(\/assets\/|data:image\/)/i.test(s)) return s;
+  return "";
 };
+
+function gameArtworkFor(name, category) {
+  const s = (String(name || "") + " " + String(category || "")).toLowerCase();
+  if (/world of warcraft|wow\b|وورلد أوف|واركرافت/.test(s)) return "/assets/games/wow.svg";
+  if (/pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b|\b660 uc\b|\b60 uc\b/.test(s)) return "/assets/games/pubg.svg";
+  if (/free ?fire|freefire|فري ?فاير/.test(s)) return "/assets/games/freefire.svg";
+  if (/mobile legends|mlbb|موبايل ليجندز/.test(s)) return "/assets/games/mlbb.svg";
+  if (/roblox|robux|روبلوكس|روبوكس/.test(s)) return "/assets/games/roblox.svg";
+  if (/valorant|فالورانت|\bvp\b/.test(s)) return "/assets/games/valorant.svg";
+  if (/clash of clans|كلاش/.test(s)) return "/assets/games/clash.svg";
+  if (/direct topup|شحن ألعاب|شحن الألعاب/.test(s)) return "/assets/games/direct_topup.svg";
+  return "";
+}
 
 function classify(name, category, kind, product_type) {
   if (kind === "smm") return "smm";
@@ -18,7 +35,7 @@ function classify(name, category, kind, product_type) {
   if (pt === "topup") return "games";
   if (pt === "voucher") return "apps";
   const s = (name + " " + category).toLowerCase();
-  if (/pubg|free fire|freefire|mobile legends|mlbb|fortnite|roblox|clash|game|لعبة|العاب|ألعاب/.test(s)) return "games";
+  if (/pubg|wow|warcraft|free fire|freefire|mobile legends|mlbb|fortnite|roblox|clash|game|لعبة|العاب|ألعاب/.test(s)) return "games";
   if (/chatgpt|openai|midjourney|claude|gemini|ai |artificial|ذكاء|صناعي/.test(s)) return "ai";
   if (/whatsapp|telegram|discord|snapchat|tiktok|instagram|messenger|واتساب|تلغرام|دردشة/.test(s)) return "chat";
   return "apps";
@@ -87,8 +104,11 @@ export default async function (view) {
       const rate = number(x.rate ?? x.price ?? x.cost ?? x.price_per_1000);
       const min = number(x.min ?? x.min_qty ?? x.minimum, 1);
       const max = number(x.max ?? x.max_qty ?? x.maximum, 0);
-      const image = safeHttps(x.image ?? x.icon ?? x.image_url ?? x.thumbnail ?? x.product_image);
-      const category_image = safeHttps(x.category_image ?? x.categoryImage ?? x.category_icon ?? x.game_image ?? x.brand_image);
+      const rawImage = safeHttps(x.image ?? x.icon ?? x.image_url ?? x.thumbnail ?? x.product_image);
+      const rawCatImg = safeHttps(x.category_image ?? x.categoryImage ?? x.category_icon ?? x.game_image ?? x.brand_image);
+      const autoArt = gameArtworkFor(name, category);
+      const image = rawImage || rawCatImg || autoArt;
+      const category_image = rawCatImg || rawImage || autoArt;
       const product_type = text(x.product_type ?? x.productType ?? x.type ?? x.service_type);
       const country = text(x.country ?? x.country_code ?? x.region);
       const count = x.count != null ? x.count : x.amount;
@@ -134,12 +154,39 @@ export default async function (view) {
       if (!c) { c = { id: "hub_smm", ty: "boost", i: "trend", ar: "خدمات الرشق", en: "Social services", hub: "smm", f: [] }; D.categories.push(c); }
       return c.id;
     }
-    const brand = cleanId(row.category || row.name.split(/[—–-]/)[0]);
-    const id = "imp_" + row.hub + "_" + brand;
+    let catName = text(row.category);
+    let brand = cleanId(catName);
+    const autoArt = gameArtworkFor(row.name, row.category);
+    if (!catName || brand === "direct_topup" || brand === "topup" || brand === "services" || brand === "other") {
+      const s = (row.name + " " + catName).toLowerCase();
+      if (/world of warcraft|wow\b|وورلد أوف|واركرافت/.test(s)) {
+        catName = "World of Warcraft";
+        brand = "wow";
+      } else if (/pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b/.test(s)) {
+        catName = "PUBG Mobile";
+        brand = "pubg";
+      } else if (/free ?fire|freefire|فري ?فاير/.test(s)) {
+        catName = "Free Fire";
+        brand = "free_fire";
+      } else if (/mobile legends|mlbb|موبايل ليجندز/.test(s)) {
+        catName = "Mobile Legends";
+        brand = "mobile_legends";
+      } else if (/roblox|robux|روبلوكس/.test(s)) {
+        catName = "Roblox";
+        brand = "roblox";
+      } else {
+        const first = text(row.name.split(/[—–-]/)[0]);
+        if (first) {
+          catName = first;
+          brand = cleanId(first);
+        }
+      }
+    }
+    const id = "imp_" + row.hub + "_" + (brand || "general");
     let c = D.categories.find((x) => x.id === id);
-    const catImg = safeHttps(row.category_image);
+    const catImg = safeHttps(row.category_image) || safeHttps(row.image) || autoArt;
     if (!c) {
-      c = { id, ty: "shop", i: row.hub === "numbers" ? "phone" : row.hub === "games" ? "bolt" : row.hub === "ai" ? "bot" : "users", ar: text(row.category || row.name), en: text(row.category || row.name), hub: row.hub, bk: brand, f: [], image_url: catImg || "" };
+      c = { id, ty: "shop", i: row.hub === "numbers" ? "phone" : row.hub === "games" ? "bolt" : row.hub === "ai" ? "bot" : "users", ar: catName || text(row.name), en: catName || text(row.name), hub: row.hub, bk: brand, f: [], image_url: catImg || "" };
       D.categories.push(c);
     } else if (!c.image_url && catImg) {
       c.image_url = catImg;
@@ -211,7 +258,7 @@ export default async function (view) {
           d: 0,
           r: 5,
           t: 3,
-          img: safeHttps(row.image),
+          img: safeHttps(row.image) || safeHttps(row.category_image) || gameArtworkFor(row.name, row.category),
           images: [],
           ptype,
           smm_provider: provider.id,

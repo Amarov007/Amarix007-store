@@ -1316,22 +1316,62 @@ const hue = (s) => {
   for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return 110 + (h % 60);
 };
+function gameArtwork(p, c) {
+  if (!p && !c) return "";
+  const s = [
+    p?.ar, p?.en, p?.id, p?.tg, p?.sp, p?.smm_service,
+    c?.ar, c?.en, c?.id, c?.bk
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (/world of warcraft|wow\b|وورلد أوف|واركرافت/.test(s)) {
+    return "/assets/games/wow.svg";
+  }
+  if (/pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b|\b660 uc\b|\b60 uc\b/.test(s)) {
+    return "/assets/games/pubg.svg";
+  }
+  if (/free ?fire|freefire|فري ?فاير/.test(s)) {
+    return "/assets/games/freefire.svg";
+  }
+  if (/mobile legends|mlbb|موبايل ليجندز/.test(s)) {
+    return "/assets/games/mlbb.svg";
+  }
+  if (/roblox|robux|روبلوكس|روبوكس/.test(s)) {
+    return "/assets/games/roblox.svg";
+  }
+  if (/valorant|فالورانت|\bvp\b/.test(s)) {
+    return "/assets/games/valorant.svg";
+  }
+  if (p?.ptype === "game_topup" || c?.hub === "games" || /direct topup|شحن ألعاب|شحن الألعاب/.test(s)) {
+    return "/assets/games/direct_topup.svg";
+  }
+  return "";
+}
 function placeholder(p, c) {
   const icon = p.ptype === "game_topup" ? "gamepad" : ((c && c.i) || "box");
   return `<span class="ph" style="--h:${hue(p.id)}" aria-hidden="true">${ic(icon, 42)}</span>`;
 }
 const art = (p, c) => {
-  const im = p.img || (c && /^https:\/\//.test(c.image_url || "") && c.ty != "boost" ? c.image_url : ""); // no own picture: use the game / app icon of its category
-  return im ? `<img class="pim" loading="lazy" src="${ex(im)}" alt="" data-ph="${ex( p.id )}">` : placeholder(p, c);
+  const catImg = (c && /^(https:\/\/|\/assets\/|data:image\/)/i.test(c.image_url || "") && c.ty != "boost") ? c.image_url : "";
+  const ownImg = (p && p.img && /^(https:\/\/|http:\/\/|\/assets\/|data:image\/)/i.test(p.img)) ? p.img : "";
+  const fallback = gameArtwork(p, c);
+  const im = ownImg || catImg || fallback;
+  return im ? `<img class="pim" loading="lazy" src="${ex(im)}" alt="${ex((p && (p[lang] || p.ar || p.en)) || "")}" data-ph="${ex( p ? p.id : "" )}">` : placeholder(p, c);
 };
-// If a product image fails to load, swap in the placeholder
+// If a product image fails to load, swap in the game artwork if available, otherwise placeholder
 document.addEventListener(
   "error",
   (e) => {
     const el = e.target;
     if (el && el.tagName == "IMG" && el.dataset.ph) {
       const p = prod(el.dataset.ph);
-      if (p) el.outerHTML = placeholder(p, cat(p.c));
+      const c = p ? cat(p.c) : null;
+      const fb = p ? gameArtwork(p, c) : "";
+      if (fb && !el.dataset.triedFb && el.getAttribute("src") !== fb) {
+        el.dataset.triedFb = "1";
+        el.src = fb;
+        return;
+      }
+      if (p) el.outerHTML = placeholder(p, c);
     }
   },
   true
@@ -2638,8 +2678,7 @@ function prodPage(id) {
   }
   if (needsLink(p)) bq = qClamp(p, bq);
   const c = cat(p.c),
-    old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "",
-    imgs = [p.img || (c && /^https:\/\//.test(c.image_url || "") && c.ty != "boost" ? c.image_url : ""), ...(p.images || [])].filter(Boolean); // no own picture: show the category icon automatically (same rule as art())
+    imgs = [p.img || (c && /^(https:\/\/|\/assets\/|data:image\/)/i.test(c.image_url || "") && c.ty != "boost" ? c.image_url : "") || gameArtwork(p, c), ...(p.images || [])].filter(Boolean); // no own picture: show the game artwork or category icon automatically
   const gallery = imgs.length
     ? `<div class="main-img zoomable" data-a="zoom" role="button" tabindex="0" aria-label="${t("zoom")}"><img src="${ex(imgs[0])}" id="main-img" alt="${ex(p[lang] || "")}" fetchpriority="high" decoding="async" data-ph="${ex(p.id)}"><span class="zm" aria-hidden="true">${ic("search", 18)}</span></div>${imgs.length > 1 ? `<div class="thumbs">${imgs.map((u, i) => `<img src="${ex(u)}" alt="" class="${i ? "" : "on"}" data-a="thumb" loading="lazy" decoding="async">`).join("")}</div>` : ""}`
     : `<div class="main-img">${placeholder(p, c)}</div>`;

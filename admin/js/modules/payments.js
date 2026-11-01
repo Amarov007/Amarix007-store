@@ -1,5 +1,6 @@
 import { select, rpc } from "../core/http.js";
-import { h, mount, pageHeader, dataTable, badge, modal, toast, fail, promptBox, confirmBox, field, input, select as sel, switchEl, spinner, errorState, withBusy } from "../core/ui.js";
+import { uploadImage } from "../core/media.js";
+import { h, mount, pageHeader, dataTable, badge, modal, toast, fail, promptBox, confirmBox, field, input, select as sel, switchEl, spinner, errorState, withBusy, setBusy, icon } from "../core/ui.js";
 import { money, fmtDate, clone } from "../core/utils.js";
 
 const tone = { under_review: "warn", approved: "ok", rejected: "err", pending: "info", expired: "mute" };
@@ -240,12 +241,73 @@ export default async function (view) {
       expiry_minutes: input({ type: "number", value: v.expiry_minutes ?? "60" }),
       ar: input({ value: v.config.ar || "", placeholder: "اسم الوسيلة بالعربية (مثال: سيرياتيل كاش)" }),
       en: input({ value: v.config.en || "", placeholder: "Method name in English (e.g. Syriatel Cash)" }),
-      icon_url: input({ value: initialIconUrl, dir: "ltr", placeholder: "https://... أو /assets/payments/syriatel.svg", oninput: (e) => updatePreview(e.target.value) }),
+      icon_url: input({ value: initialIconUrl, dir: "ltr", placeholder: "https://... أو /assets/payments/syriatel.svg أو ارفع صورة", oninput: (e) => updatePreview(e.target.value) }),
       acc: input({ value: v.config.acc || "", dir: "ltr", placeholder: "رقم المحفظة / العنوان / Pay ID / الحساب البنكي" }),
       network: input({ value: v.config.network || "", placeholder: "الشبكة / نوع التحويل (مثال: سيرياتيل كاش، BEP20، بايننس Pay)" }),
       da: input({ value: v.config.da || "", placeholder: "تعليمات التحويل للعميل بالعربية" }),
       de: input({ value: v.config.de || "", placeholder: "Transfer instructions for customer in English" })
     };
+
+    const fileInput = h("input", {
+      type: "file",
+      accept: "image/*",
+      style: { display: "none" },
+      onchange: async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setBusy(uploadBtn, true);
+        try {
+          let url = "";
+          try {
+            url = await uploadImage(file, 260);
+          } catch (storageErr) {
+            console.warn("[Payments] Storage upload failed, converting to optimized Data URL:", storageErr);
+          }
+          if (url && /^https:\/\//i.test(url)) {
+            f.icon_url.value = url;
+            updatePreview(url);
+            toast("تم رفع صورة الوسيلة بنجاح");
+          } else {
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (file.type === "image/svg+xml") return resolve(reader.result);
+                const img = new Image();
+                img.onload = () => {
+                  const maxDim = 180;
+                  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                  const canvas = document.createElement("canvas");
+                  canvas.width = Math.round(img.width * scale);
+                  canvas.height = Math.round(img.height * scale);
+                  const ctx = canvas.getContext("2d");
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  resolve(canvas.toDataURL("image/webp", 0.88));
+                };
+                img.onerror = () => resolve(reader.result);
+                img.src = reader.result;
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            f.icon_url.value = dataUrl;
+            updatePreview(dataUrl);
+            toast("تم تحميل صورة الوسيلة بنجاح");
+          }
+        } catch (err) {
+          fail(err, "فشل تحميل الصورة");
+        } finally {
+          setBusy(uploadBtn, false);
+          fileInput.value = "";
+        }
+      }
+    });
+
+    const uploadBtn = h("button", {
+      type: "button",
+      class: "btn sm ghost",
+      style: { whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: "6px" },
+      onclick: () => fileInput.click()
+    }, icon("upload", 14), "رفع صورة من جهازك");
 
     updatePreview(initialIconUrl);
     let enabled = v.enabled, proof = v.requires_proof;
@@ -323,7 +385,14 @@ export default async function (view) {
           field("اسم الوسيلة (English)", f.en),
           field("العملة", f.currency),
           h("div", { style: { gridColumn: "1 / -1" } },
-            field("رابط الصورة الرسمية (الأيقونة)", f.icon_url),
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" } },
+              h("label", { style: { fontWeight: "bold" } }, "صورة وأيقونة وسيلة الدفع (رابط أو رفع ملف)"),
+              h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } }, uploadBtn, fileInput)
+            ),
+            h("div", { class: "toolbar", style: { flexWrap: "nowrap" } },
+              f.icon_url
+            ),
+            h("small", { class: "sub", style: { display: "block", marginTop: "4px" } }, "يمكنك الضغط على «رفع صورة من جهازك» لاختيار ملف من الهاتف أو الحاسوب، أو إدخال رابط خارجي HTTPS أو أيقونة محلية (/assets/payments/...)."),
             imgPreview
           ),
           h("div", { style: { gridColumn: "1 / -1" } },

@@ -77,12 +77,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </button>
       </div>
 
-      {/* Product Image Thumbnail if present */}
-      {product.img && /^https:\/\//.test(product.img) && (
-        <div className="w-full h-28 rounded-xl overflow-hidden mb-3 bg-[#12131a] border border-[#2c2e3d]">
-          <img src={product.img} alt={lang === 'ar' ? product.ar : product.en} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-        </div>
-      )}
+      {/* Product Image Thumbnail */}
+      {(() => {
+        const text = (product.ar + ' ' + product.en + ' ' + (product.tg || '')).toLowerCase();
+        const fallback = /world of warcraft|wow\b|وورلد أوف|واركرافت/.test(text) ? '/assets/games/wow.svg' :
+          /pubg|شدات|ببجي|prime plus|elite pass|deal pack|mythic emblem|firearm materials|\buc\b/.test(text) ? '/assets/games/pubg.svg' :
+          /free ?fire|freefire|فري ?فاير/.test(text) ? '/assets/games/freefire.svg' :
+          /mobile legends|mlbb|موبايل ليجندز/.test(text) ? '/assets/games/mlbb.svg' :
+          /roblox|robux|روبلوكس|روبوكس/.test(text) ? '/assets/games/roblox.svg' :
+          /valorant|فالورانت|\bvp\b/.test(text) ? '/assets/games/valorant.svg' :
+          product.ptype === 'game_topup' ? '/assets/games/direct_topup.svg' : '';
+        const src = (product.img && /^(https:\/\/|http:\/\/|\/assets\/|data:image\/)/i.test(product.img)) ? product.img : fallback;
+        return src ? (
+          <div className="w-full h-28 rounded-xl overflow-hidden mb-3 bg-[#12131a] border border-[#2c2e3d] flex items-center justify-center p-2">
+            <img src={src} alt={lang === 'ar' ? product.ar : product.en} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+          </div>
+        ) : null;
+      })()}
 
       {/* Main Info */}
       <div className="mb-4">
