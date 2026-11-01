@@ -1385,6 +1385,21 @@ function clearSession() {
   } catch {}
   stopOrdersRealtimeListener();
 }
+/* Decodes JWT exp claim without external dependencies */
+function jwtExp(token) {
+  try {
+    if (!token || typeof token !== "string") return 0;
+    const parts = token.split(".");
+    if (parts.length < 2) return 0;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
+    const json = atob(pad);
+    const parsed = JSON.parse(json);
+    return Number(parsed.exp) || 0;
+  } catch {
+    return 0;
+  }
+}
 /* Returns a valid access token (refreshing if needed) or null when signed out */
 async function getToken() {
   const tk = ls.get("amx_token");
@@ -2862,20 +2877,30 @@ async function loadWallet(force) {
     const rs = await Promise.all([
       sb(`/rest/v1/wallets?user_id=eq.${q}&select=section,balance`),
       sb(`/rest/v1/wallet_transactions?user_id=eq.${q}&select=id,created_at,section,kind,amount,balance_after,ref&order=id.desc&limit=30`),
+      sb(`/rest/v1/wallet_topups?user_id=eq.${q}&select=id,created_at,section,amount,payment_method,pay_currency,payment_proof,status,admin_note&order=id.desc&limit=20`),
     ]);
     if (rs.some((r) => r.status == 404)) {
       wl.setup = true; // tables not created yet (supabase-wallet.sql)
       throw new Error("setup");
     }
-    if (rs.some((r) => !r.ok)) throw new Error("http");
-    const [a, b] = await Promise.all(rs.map((r) => r.json()));
-    wl.bal = {};
-    a.forEach((x) => (wl.bal.main = (wl.bal.main || 0) + (+x.balance || 0)));
+    for (const r of rs) {
+      if (!r.ok) {
+        const errBody = await r.text().catch(() => "");
+        console.error(`[AMARIX] loadWallet HTTP error ${r.status}:`, errBody);
+        throw new Error(`HTTP ${r.status}: ${errBody}`);
+      }
+    }
+    const [a, b, c] = await Promise.all(rs.map((r) => r.json()));
+    wl.bal = { main: 0 };
+    if (Array.isArray(a)) {
+      a.forEach((x) => (wl.bal.main = (wl.bal.main || 0) + (+x.balance || 0)));
+    }
     wl.tx = Array.isArray(b) ? b : [];
-    wl.tops = [];
+    wl.tops = Array.isArray(c) ? c : [];
     wl.err = false;
     wl.setup = false;
-  } catch {
+  } catch (err) {
+    console.error("[AMARIX] loadWallet error:", err);
     wl.err = !wl.setup;
   }
   wl.loaded = true;
@@ -2888,7 +2913,7 @@ function walletErr(err) {
   const k = [
     [/PGRST202|PGRST205|Could not find the function|42883|42P01/i, A ? "المحفظة غير مفعّلة بعد في قاعدة البيانات" : "The wallet is not set up in the database yet"],
     [/insufficient_balance/, A ? "الرصيد غير كافٍ" : "Insufficient balance"],
-    [/wallet_not_eligible/, A ? "المحفظة تعمل مع خدمات الرشق فقط" : "The wallet only works for boost services"],
+    [/wallet_not_eligible/, A ? "المحفظة غير متاحة لهذا الطلب" : "Wallet not available for this order"],
     [/below_min/, A ? "المبلغ أقل من الحد الأدنى للشحن" : "Amount is below the minimum top-up"],
     [/above_max/, A ? "المبلغ أكبر من الحد الأعلى للشحن" : "Amount is above the maximum top-up"],
     [/invalid_method/, A ? "وسيلة الدفع غير متاحة" : "Payment method is not available"],
@@ -2925,8 +2950,8 @@ const walletPayBox = (id) => {
   const A = lang == "ar";
   return `<div class="wl-pay"><p class="pd">${ic("wallet", 14)} ${A ? "هذا الطلب بانتظار الدفع من المحفظة" : "This order is waiting to be paid from your wallet"}${walletReady() ? ` · ${A ? "رصيدك" : "Balance"}: ${money(walletBal())}` : ""}</p><div class="acts"><button class="b" data-a="wl-pay" data-id="${ex(id)}">${ic("check", 16)} ${A ? "ادفع من المحفظة" : "Pay from wallet"}</button><a class="b b2" href="#/wallet">${A ? "شحن المحفظة" : "Top up"}</a></div></div>`;
 };
-/* A pending manual-transfer order whose items the wallet can pay (all boost) can switch to the wallet instead; pay_order_with_wallet() re-checks everything and sets payment_method = 'wallet' */
-const orderWalletOk = (items) => !!user && walletOn() && !wl.setup && items.length > 0 && items.every((i) => { const p = prod(i && i.id); return !!p && needsLink(p); });
+/* A pending manual-transfer order whose items the wallet can pay can switch to the wallet instead; pay_order_with_wallet() re-checks everything and sets payment_method = 'wallet' */
+const orderWalletOk = (items) => !!user && walletOn() && !wl.setup && Array.isArray(items) && items.length > 0;
 const walletAltBox = (id) => {
   const A = lang == "ar";
   return `<div class="wl-pay"><p class="pd">${ic("wallet", 14)} ${A ? "أو ادفع هذا الطلب فوراً من رصيد محفظتك بدل التحويل" : "Or pay this order instantly from your wallet balance instead of transferring"}${walletReady() ? ` · ${A ? "رصيدك" : "Balance"}: ${money(walletBal())}` : ""}</p><div class="acts"><button class="b b2" data-a="wl-pay" data-id="${ex(id)}">${ic("wallet", 16)} ${A ? "ادفع من المحفظة" : "Pay from wallet"}</button><a class="b b2" href="#/wallet">${A ? "شحن المحفظة" : "Top up"}</a></div></div>`;
@@ -3004,14 +3029,36 @@ async function walletTopup(btn) {
   if (!(amt >= min)) return toast(`${A ? "أقل مبلغ للشحن" : "Minimum top-up"}: ${fmt(min, BASE)}`, "wn");
   if (max > 0 && amt > max) return toast(`${A ? "أعلى مبلغ للشحن" : "Maximum top-up"}: ${fmt(max, BASE)}`, "wn");
   if (!wl.method || !pmOf(wl.method)) return toast(t("paypick"), "wn");
-  const le = pmLimitErr(pmOf(wl.method), amt);
+  const m = pmOf(wl.method);
+  const le = pmLimitErr(m, amt);
   if (le) return toast(le, "wn");
   setBusy(btn, true);
   try {
-    if (!window.AMXPay) throw new Error("payments_v2_ui_unavailable");
-    const pay = await window.AMXPay.createTopup(amt, wl.method, "main");
-    await window.AMXPay.showPayment(String(pay.id));
-    toast(A ? "تم إنشاء دفعة الشحن؛ اتبع التعليمات في النافذة" : "Top-up payment created; follow the instructions in the dialog");
+    let payV2On = false;
+    try {
+      const cfg = await window.AMXPay?.getConfig();
+      payV2On = cfg?.on === true;
+    } catch {}
+    if (payV2On && window.AMXPay) {
+      const pay = await window.AMXPay.createTopup(amt, wl.method, "main");
+      await window.AMXPay.showPayment(String(pay.id));
+      toast(A ? "تم إنشاء دفعة الشحن؛ اتبع التعليمات في النافذة" : "Top-up payment created; follow the instructions in the dialog");
+    } else {
+      const cur = m && m.currency ? m.currency : null;
+      const r = await sb("/rest/v1/rpc/wallet_topup_create", {
+        method: "POST",
+        body: { p_amount: amt, p_method: String(wl.method), p_currency: cur, p_section: "main" },
+      });
+      if (walletSession(r)) return;
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(txt);
+      }
+      toast(A ? "تم إنشاء طلب الشحن بنجاح. حوّل المبلغ وأرفق صورة الإثبات أدناه." : "Top-up request created. Transfer the amount and attach proof below.");
+      beep("ok");
+      await loadWallet(true);
+      render();
+    }
   } catch (err) {
     console.error("[AMARIX] wallet topup", err);
     toast(walletErr(err), "er");

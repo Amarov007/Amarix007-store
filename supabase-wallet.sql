@@ -1,6 +1,6 @@
 -- =====================================================================
 -- AMARIX007 — محفظة المستخدم (Wallet)
--- لكل مستخدم رصيد منفصل لكل «قسم» (section). حالياً القسم الوحيد: smm (خدمات الرشق).
+-- رصيد موحّد بقسم رئيسي: 'main' (لكل المنتجات والخدمات المؤهلة).
 -- شغّل هذا الملف مرة واحدة في Supabase > SQL Editor (آمن للتشغيل أكثر من مرة).
 --
 -- المبدأ الأمني: العميل لا يكتب في جداول المحفظة أبداً. كل التعديلات تتم عبر دوال
@@ -15,7 +15,7 @@
 -- ---------- الجداول ----------
 create table if not exists public.wallets (
   user_id uuid not null references public.profiles(id) on delete cascade,
-  section text not null default 'smm' check (section ~ '^[a-z0-9_]{2,30}$'),
+  section text not null default 'main' check (section ~ '^[a-z0-9_]{2,30}$'),
   balance numeric(14,2) not null default 0 check (balance >= 0),
   updated_at timestamptz not null default now(),
   primary key (user_id, section)
@@ -39,7 +39,7 @@ create table if not exists public.wallet_topups (
   id bigint generated always as identity primary key,
   created_at timestamptz not null default now(),
   user_id uuid not null references public.profiles(id) on delete cascade,
-  section text not null default 'smm',
+  section text not null default 'main',
   amount numeric(14,2) not null check (amount > 0),   -- بعملة المتجر الأساسية (USD)
   payment_method text,
   pay_currency text,
@@ -78,26 +78,23 @@ create policy "wallet topups read own or admin" on public.wallet_topups for sele
 -- لا سياسات insert/update/delete عمداً: الكتابة فقط عبر الدوال أدناه.
 
 -- ---------- دوال مساعدة داخلية ----------
--- الأقسام المسموحة (من الإعدادات، والافتراضي smm فقط)
+-- الأقسام المسموحة (من الإعدادات، والافتراضي main)
 create or replace function public.wallet_sections(cfg jsonb) returns text[]
 language sql stable set search_path = public as $$
   select coalesce(
     (select array_agg(x) from jsonb_array_elements_text(
        case when jsonb_typeof(cfg->'wallet'->'sections') = 'array' then cfg->'wallet'->'sections' else '[]'::jsonb end) x
       where x ~ '^[a-z0-9_]{2,30}$'),
-    array['smm']);
+    array['main']);
 $$;
 
 -- أي قسم محفظة يصلح لهذا المنتج؟ (null = لا يُدفع من المحفظة)
--- ► لإضافة قسم جديد عدّل هنا.
 create or replace function public.wallet_item_section(p jsonb, cfg jsonb) returns text
 language sql stable set search_path = public as $$
   select case
     when p is null then null
-    when coalesce(nullif(btrim(p->>'smm_service'), ''), '0') <> '0' then 'smm'
-    when exists (select 1 from jsonb_array_elements(coalesce(cfg->'categories', '[]'::jsonb)) c
-                  where c->>'id' = p->>'c' and c->>'ty' = 'boost') then 'smm'
-    else null
+    when p->>'id' is null or btrim(p->>'id') = '' then null
+    else 'main'
   end;
 $$;
 
@@ -113,7 +110,25 @@ begin
     if s is null then return null; end if;
     if first_s is null then first_s := s; elsif first_s <> s then return null; end if;
   end loop;
-  return first_s;
+  return coalesce(first_s, 'main');
+end $$;
+
+-- فحص أهلية الدفع من المحفظة للطلب
+create or replace function public.wallet_eligible(p_items jsonb) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare
+  cfg jsonb;
+  sec text;
+begin
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    return false;
+  end if;
+  select data into cfg from public.store_config where id = 1;
+  if coalesce(cfg->'wallet'->>'on', 'true') = 'false' then
+    return false;
+  end if;
+  sec := public.wallet_order_section(p_items, cfg);
+  return sec is not null and sec = any(public.wallet_sections(cfg));
 end $$;
 
 -- تعديل الرصيد + تسجيل الحركة (يُستدعى فقط من دوال security definer)
@@ -133,7 +148,7 @@ end $$;
 
 -- ---------- دوال العميل ----------
 -- 1) طلب شحن
-CREATE OR REPLACE FUNCTION public.wallet_topup_create(p_amount numeric, p_method text, p_currency text DEFAULT NULL::text, p_section text DEFAULT 'smm'::text)
+CREATE OR REPLACE FUNCTION public.wallet_topup_create(p_amount numeric, p_method text, p_currency text DEFAULT NULL::text, p_section text DEFAULT 'main'::text)
  RETURNS bigint
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -332,6 +347,7 @@ revoke execute on function public.wallet_sections(jsonb)                     fro
 revoke execute on function public.wallet_item_section(jsonb, jsonb)          from public, anon, authenticated;
 revoke execute on function public.wallet_order_section(jsonb, jsonb)         from public, anon, authenticated;
 revoke execute on function public.wallet_apply(uuid, text, numeric, text, text, text) from public, anon, authenticated;
+revoke execute on function public.wallet_eligible(jsonb)                     from public, anon;
 revoke execute on function public.wallet_topup_create(numeric, text, text, text) from public, anon;
 revoke execute on function public.wallet_topup_set_proof(bigint, text, text) from public, anon;
 revoke execute on function public.wallet_topup_claim(bigint, text)       from public, anon;
@@ -341,6 +357,7 @@ revoke execute on function public.wallet_topup_reject(bigint, text)          fro
 revoke execute on function public.wallet_admin_adjust(uuid, text, numeric, text) from public, anon;
 revoke execute on function public.wallet_reconcile()                        from public, anon;
 
+grant execute on function public.wallet_eligible(jsonb)                     to authenticated;
 grant execute on function public.wallet_topup_create(numeric, text, text, text) to authenticated;
 grant execute on function public.wallet_topup_set_proof(bigint, text, text) to authenticated;
 grant execute on function public.wallet_topup_claim(bigint, text)       to authenticated;

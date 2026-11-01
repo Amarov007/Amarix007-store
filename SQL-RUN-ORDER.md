@@ -18,6 +18,7 @@
 | 7d | `supabase-payment-lockdown.sql` | **جديد (إصلاح عاجل):** يمنع تغيير `payment_status` مباشرة من REST، سجل تدقيق `order_payment_audit`، ويعرّف `approve_manual_payment`. بعد 7c. على قاعدة حية: اقرأ نسختك الحالية من الدالة أولاً (انظر رأس الملف). |
 | 7e | `supabase-payments.sql` | **جديد:** نظام الدفع الموحّد (payments، الأحداث، الاسترجاع، آلة الحالات، الدوال، cron انتهاء الصلاحية). بعد 7d. يعمل خلف العلم `payments_v2.on` (مغلق افتراضياً). |
 | 7f | `supabase-payments-migrate.sql` | **يدوي مرة واحدة** قبل تفعيل العلم: ترحيل الطلبات/الشحنات القديمة وأرصدة الأقسام إلى الرصيد العام مع مطابقة المجموع. |
+| 7g | `supabase/migrations/20261101000000_wallet_unify_main.sql` | **توحيد قسم المحفظة:** ضبط الافتراضي على `'main'`، دمج أرصدة smm، تحديث `wallet_sections` و`wallet_item_section` و`wallet_eligible` و`wallet_topup_create`. |
 | 8 | `supabase-rls-audit.sql` | استعلامات قراءة فقط للتدقيق (لا تغيّر شيئاً). الاستعلام 1 يجب أن يعود فارغاً. |
 | 9 | `supabase-final-grants.sql` | **الأخير دائماً.** `revoke` شامل ثم كل صلاحيات `grant execute` (بالاسم لا بالتوقيع)، مطابقة لصلاحيات القاعدة الحية. آمن لإعادة التشغيل في أي وقت. |
 
