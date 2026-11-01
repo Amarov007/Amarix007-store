@@ -21,7 +21,6 @@ const PTYPE = { games: "game_topup", chat: "app_subscription", apps: "app_subscr
 
 export default async function (view) {
   await loadCatalog();
-  const root = h("div");
   let providers = [], selected = "", rows = [], loading = false, markup = 30, filter = "", page = 0;
   const status = h("div");
   const preview = h("div");
@@ -163,7 +162,7 @@ export default async function (view) {
 
   function draw() {
     const opts = providers.map((p) => [p.id, `${p.name || p.id} · ${p.kind || "smm"}`]);
-    mount(root,
+    mount(view,
       pageHeader("مركز استيراد الخدمات", "جلب الخدمات من كل مزوّد، معاينة تصنيفها وأسعارها، ثم إضافتها كمسودة قبل النشر.",
         h("button", { class: "btn primary", disabled: loading || !selected, onclick: fetchCatalog }, "جلب الخدمات")),
       h("div", { class: "card" },
