@@ -47,6 +47,7 @@ export interface Product {
   smm_qty?: number;
   smm_country?: string;
   smm_input?: string;
+  req?: string[];
   ptype?: 'game_topup' | 'app_subscription' | 'gift_card' | 'smm' | 'digital_tool';
   min?: number;
   max?: number;

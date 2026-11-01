@@ -202,11 +202,19 @@
     const cat = String((x && (x.category || x.smm_cat || "")) || "");
     const explicit = String((x && (x.ptype || x.product_type || x.service_type)) || "").toLowerCase();
     if (["smm","game_topup","app_subscription","gift_card"].includes(explicit)) return explicit;
+    if (explicit === "topup") return "game_topup";
+    if (explicit === "voucher") return "gift_card";
+    const prov = String((x && (x.smm_provider || x.provider || "")) || "").toLowerCase();
+    if (prov === "toupup" || (x && x.provider_kind === "custom")) {
+      const pt = String((x && (x.product_type || x.productType)) || "").toLowerCase();
+      if (pt === "topup" || (x && Array.isArray(x.req) && x.req.includes("player_id")) || (x && x.smm_input === "text") || GAME_RE.test(name + " " + cat)) return "game_topup";
+      if (pt === "voucher" || (x && x.smm_input === "none")) return "gift_card";
+      return "game_topup";
+    }
     if (x && (x.smm_input === "none" || x.input_type === "none" || x.delivery_type === "pin")) return "gift_card";
     if (GAME_RE.test(name + " " + cat) || x && (x.requires_player_id || x.player_id_required)) return "game_topup";
     if (APP_RE.test(name + " " + cat) || x && (x.requires_email || x.requires_phone)) return "app_subscription";
     if (SMM_RE.test(name + " " + cat) && (x && (x.provider_kind === "smm" || x.smm_service || x.smm_provider || x.min != null || x.max != null))) return "smm";
-    if (x && x.provider_kind === "custom") return APP_RE.test(name + " " + cat) ? "app_subscription" : GAME_RE.test(name + " " + cat) ? "game_topup" : "gift_card";
     return "smm";
   }
   const BRANDS = [
@@ -252,11 +260,21 @@
   const availOf = (x) => x && (x.oos === true || x.available === false || x.active === false || x.hidden === true) ? "hidden" : "available";
   const typeLabel = (t, en) => ({ smm: en ? "SMM" : "رشق متابعين", game_topup: en ? "Game top-up" : "شحن ألعاب", app_subscription: en ? "App subscription" : "تطبيق / اشتراك", gift_card: en ? "Gift card / PIN" : "بطاقة / كود فوري" })[t] || String(t || "");
   function requiredOf(x) {
+    if (x && Array.isArray(x.req)) return x.req;
+    const prov = String((x && (x.smm_provider || x.provider || "")) || "").toLowerCase();
+    const pt = String((x && (x.product_type || x.productType)) || "").toLowerCase();
+    if (prov === "toupup" || (x && x.provider_kind === "custom")) {
+      if (pt === "topup" || (x && x.ptype === "game_topup") || (x && x.smm_input === "text") || (x && x.smm_input === "player_id")) return ["player_id"];
+      if (pt === "voucher" || (x && x.ptype === "gift_card") || (x && x.smm_input === "none")) return [];
+      return ["player_id"];
+    }
+    if (pt === "topup") return ["player_id"];
+    if (pt === "voucher") return [];
     const t = typeOf(x);
     if (t === "smm") return [];
     if (t === "gift_card") return [];
-    if (t === "game_topup") return Array.isArray(x && x.req) ? x.req : ["player_id"];
-    return Array.isArray(x && x.req) ? x.req : (/\b(email|mail|إيميل|بريد)\b/i.test(String((x && x.name) || "")) ? ["email"] : ["email"]);
+    if (t === "game_topup") return ["player_id"];
+    return (/\b(email|mail|إيميل|بريد)\b/i.test(String((x && x.name) || "")) ? ["email"] : ["email"]);
   }
   function denomination(name) {
     const m = String(name || "").match(/(\d[\d,]*(?:\.\d+)?)\s*(UC|diamonds?|gems?|coins?|credits?|months?|days?|GB|USD|EUR|ليرة|شدات|جوهرة|جواهر|كريديت)/i);

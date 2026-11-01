@@ -43,7 +43,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
     .filter(p => p.c === product.c && p.id !== product.id)
     .slice(0, 3);
 
-  const needsLink = product.smm_input !== 'none' && (product.c === 'boost' || product.c === 'games' || product.ptype === 'game_topup' || product.ptype === 'smm');
+  const isPlayerIdProduct = !!(product.req?.includes('player_id') || product.smm_input === 'player_id' || product.smm_provider === 'toupup' || product.ptype === 'game_topup' || product.c === 'games');
+  const needsLink = product.smm_input !== 'none' && (isPlayerIdProduct || product.c === 'boost' || product.ptype === 'smm');
 
   const handleAddToCart = () => {
     if (needsLink && !itemLink.trim()) {
@@ -87,14 +88,18 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
         <div className="lg:col-span-5 p-8 rounded-3xl bg-[#1b1c26] border border-[#2c2e3d] flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#b9ff66]/10 rounded-full blur-2xl pointer-events-none" />
           
-          {/* Logo Mark Graphic */}
-          <div className="w-28 h-28 rounded-3xl bg-[#12131a] border border-[#b9ff66]/30 flex items-center justify-center shadow-xl shadow-[#b9ff66]/10 mb-6 group-hover:scale-105 transition-transform">
-            <svg width="60" height="60" viewBox="0 0 32 32" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6.5 25.5L14 7L16.5 12" stroke="#B9FF66" strokeWidth="2.75" />
-              <path d="M10 18.5H19" stroke="#F3F3F3" strokeWidth="2.25" />
-              <path d="M16.5 12L20.5 18L26 8" stroke="#B9FF66" strokeWidth="2.75" />
-              <circle cx="26" cy="8" r="1.75" fill="#B9FF66" />
-            </svg>
+          {/* Logo Mark or Product Image Graphic */}
+          <div className="w-28 h-28 rounded-3xl bg-[#12131a] border border-[#b9ff66]/30 flex items-center justify-center shadow-xl shadow-[#b9ff66]/10 mb-6 group-hover:scale-105 transition-transform overflow-hidden">
+            {product.img && /^https:\/\//i.test(product.img) ? (
+              <img src={product.img} alt={lang === 'ar' ? product.ar : product.en} className="w-full h-full object-cover" />
+            ) : (
+              <svg width="60" height="60" viewBox="0 0 32 32" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6.5 25.5L14 7L16.5 12" stroke="#B9FF66" strokeWidth="2.75" />
+                <path d="M10 18.5H19" stroke="#F3F3F3" strokeWidth="2.25" />
+                <path d="M16.5 12L20.5 18L26 8" stroke="#B9FF66" strokeWidth="2.75" />
+                <circle cx="26" cy="8" r="1.75" fill="#B9FF66" />
+              </svg>
+            )}
           </div>
 
           <span className="px-3 py-1 rounded-full text-xs font-black bg-[#232430] text-[#b9ff66] border border-[#2c2e3d] mb-2 font-['Urbanist',sans-serif]">
@@ -201,7 +206,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
             <div className="p-4 rounded-2xl bg-[#1b1c26] border border-[#2c2e3d] space-y-2">
               <label className="text-xs font-bold text-[#f3f3f3] flex items-center justify-between">
                 <span>
-                  {product.c === 'games' || product.ptype === 'game_topup'
+                  {isPlayerIdProduct
                     ? (lang === 'ar' ? 'معرّف اللاعب (Player ID):' : 'Player ID:')
                     : (lang === 'ar' ? 'رابط الحساب أو اسم المستخدم:' : 'Account Link or Username:')}
                 </span>
@@ -210,8 +215,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
               <input
                 type="text"
                 placeholder={
-                  product.c === 'games' || product.ptype === 'game_topup'
-                    ? (lang === 'ar' ? 'مثال: 512398412' : 'e.g. 512398412')
+                  isPlayerIdProduct
+                    ? (lang === 'ar' ? 'أدخل معرّف اللاعب (Player ID) هنا...' : 'e.g. 512398412')
                     : (lang === 'ar' ? 'https://instagram.com/user أو @username' : 'https://instagram.com/user or @user')
                 }
                 value={itemLink}

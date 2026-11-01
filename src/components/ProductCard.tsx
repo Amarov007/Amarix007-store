@@ -77,6 +77,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </button>
       </div>
 
+      {/* Product Image Thumbnail if present */}
+      {product.img && /^https:\/\//.test(product.img) && (
+        <div className="w-full h-28 rounded-xl overflow-hidden mb-3 bg-[#12131a] border border-[#2c2e3d]">
+          <img src={product.img} alt={lang === 'ar' ? product.ar : product.en} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+        </div>
+      )}
+
       {/* Main Info */}
       <div className="mb-4">
         <h3 className="text-sm font-bold text-[#f3f3f3] group-hover:text-[#b9ff66] transition-colors line-clamp-2 leading-snug">

@@ -35,7 +35,7 @@ function loginView(message = "") {
     try { await withBusy(btn, () => signIn(email.value.trim(), pass.value, captcha, remember.checked)); await boot(); }
     catch (x) { err.textContent = x.message; captcha = ""; try { window.turnstile.reset(wid); } catch {} }
   } },
-    h("div", { class: "brand-mark lg" }, "A"),
+    h("div", { class: "brand-mark lg" }, h("img", { src: "logo-mark.webp", alt: "AMARIX007", style: { width: "100%", height: "100%", objectFit: "contain" } })),
     h("h1", null, "لوحة التحكم"), h("p", null, "AMARIX007 · إدارة المتجر"),
     h("label", { class: "field" }, h("span", null, "البريد الإلكتروني"), email),
     h("label", { class: "field" }, h("span", null, "كلمة المرور"), pass),
@@ -53,7 +53,7 @@ function shell() {
   const main = h("main", { class: "main", id: "main", tabindex: "-1" });
   const crumb = h("span", { class: "crumb" });
   const side = h("aside", { class: "sidebar" },
-    h("div", { class: "brand" }, h("span", { class: "brand-mark" }, "A"), h("div", null, h("b", null, "AMARIX007"), h("small", null, "STORE CONSOLE"))), nav,
+    h("div", { class: "brand" }, h("span", { class: "brand-mark" }, h("img", { src: "logo-mark.webp", alt: "AMARIX007", style: { width: "100%", height: "100%", objectFit: "contain" } })), h("div", null, h("b", null, "AMARIX007"), h("small", null, "STORE CONSOLE"))), nav,
     h("div", { class: "side-foot" }, h("div", { class: "me" }, h("span", { class: "avatar" }, (getSession()?.email || "?")[0].toUpperCase()), h("div", null, h("b", null, getSession()?.email || ""), h("small", null, isAdmin() ? "مدير" : "موظف"))),
       h("button", { class: "icon-btn", title: "تسجيل الخروج", onclick: () => signOut() }, icon("logout"))));
   const scrim = h("div", { class: "scrim", onclick: () => document.body.classList.remove("nav-open") });

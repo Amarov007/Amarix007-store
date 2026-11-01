@@ -6,10 +6,17 @@ import { h, mount, pageHeader, badge, field, input, select as sel, toast, fail, 
 const cleanId = (v) => String(v || "").normalize("NFKD").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "service";
 const text = (v) => String(v ?? "").trim();
 const number = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
+const safeHttps = (v) => {
+  const s = String(v ?? "").trim();
+  return /^https:\/\//i.test(s) ? s : "";
+};
 
-function classify(name, category, kind) {
+function classify(name, category, kind, product_type) {
   if (kind === "smm") return "smm";
   if (kind === "smsactivate") return "numbers";
+  const pt = String(product_type || "").toLowerCase();
+  if (pt === "topup") return "games";
+  if (pt === "voucher") return "apps";
   const s = (name + " " + category).toLowerCase();
   if (/pubg|free fire|freefire|mobile legends|mlbb|fortnite|roblox|clash|game|لعبة|العاب|ألعاب/.test(s)) return "games";
   if (/chatgpt|openai|midjourney|claude|gemini|ai |artificial|ذكاء|صناعي/.test(s)) return "ai";
@@ -56,21 +63,51 @@ export default async function (view) {
       const countries = new Map((raw.countries || []).map((x) => [String(x.id), String(x.name || x.id)]));
       return (raw.offers || []).map((o) => {
         const service = String(o.s), country = String(o.c);
-        return { id: service + "_" + country, service, country, name: (services.get(service) || service) + " — " + (countries.get(country) || country), category: services.get(service) || "أرقام التفعيل", rate: number(o.p), amount: o.n, available: o.n == null || number(o.n) > 0 };
+        return {
+          id: service + "_" + country,
+          service,
+          country,
+          name: (services.get(service) || service) + " — " + (countries.get(country) || country),
+          category: services.get(service) || "أرقام التفعيل",
+          rate: number(o.p),
+          amount: o.n,
+          available: o.n == null || number(o.n) > 0,
+          image: "",
+          category_image: "",
+          product_type: ""
+        };
       });
     }
     const list = Array.isArray(raw) ? raw : Array.isArray(raw?.services) ? raw.services : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw?.results) ? raw.results : [];
-    return list.map((x) => ({
-      id: text(x.id ?? x.service ?? x.service_id ?? x.offer_id ?? x.product_id),
-      service: text(x.service ?? x.service_id ?? x.id),
-      name: text(x.name ?? x.title ?? x.product_name ?? x.offer_name ?? x.service_name),
-      category: text(x.category ?? x.category_name ?? x.group ?? x.type),
-      rate: number(x.rate ?? x.price ?? x.cost),
-      min: number(x.min ?? x.min_qty ?? x.minimum, 1),
-      max: number(x.max ?? x.max_qty ?? x.maximum, 0),
-      image: text(x.image ?? x.icon ?? x.image_url),
-      available: x.available !== false && x.enabled !== false
-    })).filter((x) => x.id && x.name);
+    return list.map((x) => {
+      const id = text(x.id ?? x.service ?? x.service_id ?? x.offer_id ?? x.product_id);
+      const service = text(x.service ?? x.service_id ?? x.id);
+      const name = text(x.name ?? x.title ?? x.product_name ?? x.offer_name ?? x.service_name);
+      const category = text(x.category ?? x.category_name ?? x.group ?? x.game ?? x.brand ?? x.category_id);
+      const rate = number(x.rate ?? x.price ?? x.cost ?? x.price_per_1000);
+      const min = number(x.min ?? x.min_qty ?? x.minimum, 1);
+      const max = number(x.max ?? x.max_qty ?? x.maximum, 0);
+      const image = safeHttps(x.image ?? x.icon ?? x.image_url ?? x.thumbnail ?? x.product_image);
+      const category_image = safeHttps(x.category_image ?? x.categoryImage ?? x.category_icon ?? x.game_image ?? x.brand_image);
+      const product_type = text(x.product_type ?? x.productType ?? x.type ?? x.service_type);
+      const country = text(x.country ?? x.country_code ?? x.region);
+      const count = x.count != null ? x.count : x.amount;
+      return {
+        id,
+        service,
+        name,
+        category,
+        rate,
+        min,
+        max,
+        image,
+        category_image,
+        product_type,
+        country,
+        count,
+        available: x.available !== false && x.enabled !== false
+      };
+    }).filter((x) => x.id && x.name);
   }
 
   async function fetchCatalog() {
@@ -82,7 +119,7 @@ export default async function (view) {
       const action = provider.kind === "smsactivate" ? "numbers_catalog" : "services";
       const raw = await fn("smm-order", { action, provider: provider.id });
       if (raw?.error) throw new Error(raw.error);
-      rows = normalize(raw, provider).map((x) => ({ ...x, hub: classify(x.name, x.category, provider.kind), selected: false }));
+      rows = normalize(raw, provider).map((x) => ({ ...x, hub: classify(x.name, x.category, provider.kind, x.product_type), selected: false }));
       const current = data().products;
       const exists = new Set(current.map((p) => [String(p.smm_provider || "main"), String(p.smm_service || ""), String(p.smm_country || "")].join("|")));
       rows.forEach((x) => { x.exists = exists.has([provider.id, x.service || x.id, x.country || ""].join("|")); x.selected = !x.exists && x.available && x.rate > 0; });
@@ -100,9 +137,12 @@ export default async function (view) {
     const brand = cleanId(row.category || row.name.split(/[—–-]/)[0]);
     const id = "imp_" + row.hub + "_" + brand;
     let c = D.categories.find((x) => x.id === id);
+    const catImg = safeHttps(row.category_image);
     if (!c) {
-      c = { id, ty: "shop", i: row.hub === "numbers" ? "phone" : row.hub === "games" ? "bolt" : row.hub === "ai" ? "bot" : "users", ar: text(row.category || row.name), en: text(row.category || row.name), hub: row.hub, bk: brand, f: [] };
+      c = { id, ty: "shop", i: row.hub === "numbers" ? "phone" : row.hub === "games" ? "bolt" : row.hub === "ai" ? "bot" : "users", ar: text(row.category || row.name), en: text(row.category || row.name), hub: row.hub, bk: brand, f: [], image_url: catImg || "" };
       D.categories.push(c);
+    } else if (!c.image_url && catImg) {
+      c.image_url = catImg;
     }
     return c.id;
   }
@@ -122,14 +162,63 @@ export default async function (view) {
         const category = categoryFor(D, row, provider);
         const price = hub === "smm" ? row.rate * (1 + markup / 100) / 1000 : row.rate * (1 + markup / 100);
         const productId = ("imp_" + cleanId(provider.id) + "_" + cleanId(service) + (row.country ? "_" + cleanId(row.country) : "")).slice(0, 60);
-        const required = hub === "games" ? ["player_id"] : ["email"];
+
+        let ptype = PTYPE[hub] || "app_subscription";
+        let req = [];
+        let smm_input = "none";
+
+        if (provider.kind === "custom" || row.product_type || provider.id === "toupup") {
+          const pt = String(row.product_type || "").toLowerCase();
+          if (pt === "topup" || (!pt && hub === "games")) {
+            ptype = "game_topup";
+            req = ["player_id"];
+            smm_input = "text";
+          } else if (pt === "voucher") {
+            ptype = "gift_card";
+            req = [];
+            smm_input = "none";
+          } else {
+            ptype = hub === "games" ? "game_topup" : (PTYPE[hub] || "app_subscription");
+            req = hub === "games" ? ["player_id"] : [];
+            smm_input = req.length ? "text" : "none";
+          }
+        } else if (provider.kind === "smsactivate") {
+          ptype = "app_subscription";
+          req = ["phone"];
+          smm_input = "phone";
+        } else if (hub === "smm") {
+          ptype = "smm";
+          req = [];
+          smm_input = "";
+        } else if (hub === "games") {
+          ptype = "game_topup";
+          req = ["player_id"];
+          smm_input = "player_id";
+        } else {
+          ptype = "app_subscription";
+          req = ["email"];
+          smm_input = "email";
+        }
+
         const auto = provider.kind === "smsactivate" || provider.config?.self_service === true;
         D.products.unshift({
-          id: productId, c: category, ar: row.name, en: row.name, p: Math.max(0.000001, Math.round(price * 1000000) / 1000000),
-          o: 0, d: 0, r: 5, t: 3, img: row.image || "", images: [], ptype: PTYPE[hub],
-          smm_provider: provider.id, smm_service: service, smm_qty: 1,
-          smm_input: provider.kind === "smsactivate" ? "phone" : hub === "smm" ? "" : hub === "games" ? "player_id" : "email",
-          req: provider.kind === "smsactivate" ? ["phone"] : hub === "smm" ? [] : required,
+          id: productId,
+          c: category,
+          ar: row.name,
+          en: row.name,
+          p: Math.max(0.000001, Math.round(price * 1000000) / 1000000),
+          o: 0,
+          d: 0,
+          r: 5,
+          t: 3,
+          img: safeHttps(row.image),
+          images: [],
+          ptype,
+          smm_provider: provider.id,
+          smm_service: service,
+          smm_qty: 1,
+          smm_input,
+          req,
           ...(row.country ? { smm_country: row.country } : {}),
           ...(hub === "smm" ? { qmin: Math.max(1, row.min || 1), qmax: Math.max(0, row.max || 0) } : { qmin: 1, qmax: 1 }),
           auto
@@ -154,7 +243,10 @@ export default async function (view) {
       const check = h("input", { type: "checkbox", checked: x.selected, disabled: x.exists || !x.available || !(x.rate > 0), onchange: (e) => { x.selected = e.target.checked; drawPreview(); } });
       body.append(h("tr", null,
         h("td", null, check),
-        h("td", null, h("b", null, x.name), h("small", { class: "sub mono" }, `#${x.id}`)),
+        h("td", null, h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } },
+          x.image ? h("img", { src: x.image, alt: "", width: 34, height: 34, style: { objectFit: "cover", borderRadius: "6px" } }) : null,
+          h("div", null, h("b", null, x.name), h("small", { class: "sub mono" }, `#${x.id}`))
+        )),
         h("td", null, badge(HUB_LABEL[x.hub] || x.hub, "info")),
         h("td", { class: "mono" }, x.rate),
         h("td", null, x.exists ? badge("موجود", "mute") : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "ok"))
@@ -165,7 +257,7 @@ export default async function (view) {
         h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (!x.exists && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الصالح في النتائج"),
         h("button", { class: "btn ghost sm", onclick: () => { rows.forEach((x) => x.selected = false); drawPreview(); } }, "إلغاء التحديد")),
       h("p", { class: "hint" }, `المزوّد: ${provider?.name || selected} · المعروض حتى 250 صفاً من ${filtered.length} · المحدد: ${rows.filter((x) => x.selected).length}`),
-      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))), body)),
+      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة والصورة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))), body)),
       h("div", { class: "page-actions" },
         h("button", { class: "btn ghost sm", disabled: page <= 0, onclick: () => { page--; drawPreview(); } }, "السابق"),
         h("span", null, "صفحة " + (page + 1) + " من " + pages),

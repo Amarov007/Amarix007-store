@@ -1023,9 +1023,10 @@ const apiInput = (p) => apiMode(p) && String(p.smm_input).trim() != "none";
 /* Product-aware destination fields: virtual numbers -> WhatsApp phone; subscriptions/AI -> email; games -> provider IDs. */
 const apiFieldKind = (p) => {
   const c = cat(p.c), req = Array.isArray(p.req) ? p.req : [];
+  if (req.includes("player_id") || req.includes("user_id") || p.smm_input === "player_id" || p.ptype === "game_topup" || p.smm_provider === "toupup") return "id";
   if (isVirtualNumberCategory(c)) return "phone";
-  if (req.includes("phone")) return "phone";
-  if (req.includes("email") || p.ptype === "app_subscription" || c?.hub === "ai" || c?.id === "ai-subscriptions") return "email";
+  if (req.includes("phone") || p.smm_input === "phone") return "phone";
+  if (req.includes("email") || p.smm_input === "email" || (p.ptype === "app_subscription" && p.smm_provider !== "toupup") || c?.hub === "ai" || c?.id === "ai-subscriptions") return "email";
   return "id";
 };
 const normalizeApiInput = (v, p) => {
@@ -1049,11 +1050,16 @@ const needsLink = (p) => {
 /* what the buyer must type for an API product (set per product in the admin: req = player_id / server_id / email / phone) */
 const REQ_L = { player_id: ["معرّف اللاعب (Player ID)", "Player ID"], user_id: ["معرّف المستخدم (User ID)", "User ID"], unique_id: ["المعرّف الفريد (Unique ID)", "Unique ID"], account_id: ["معرّف الحساب (Account ID)", "Account ID"], role_id: ["معرّف الشخصية (Role ID)", "Role ID"], server_id: ["رقم السيرفر (Server ID)", "Server ID"], email: ["البريد الإلكتروني", "Email"], phone: ["رقم الهاتف", "Phone"] };
 const reqHint = (p) => {
+  const req = Array.isArray(p.req) ? p.req : [];
+  if (req.includes("player_id") || p.smm_input === "player_id" || p.smm_provider === "toupup" || p.ptype === "game_topup") {
+    return lang == "ar" ? "معرّف اللاعب (Player ID)" : "Player ID";
+  }
+  if (req.includes("user_id")) return lang == "ar" ? "معرّف المستخدم (User ID)" : "User ID";
   const kind = apiFieldKind(p);
   if (kind === "phone") return lang == "ar" ? "رقم واتساب مع رمز الدولة" : "WhatsApp number with country code";
   if (kind === "email") return lang == "ar" ? "البريد الإلكتروني" : "Email address";
-  const r = Array.isArray(p.req) ? p.req.filter((k) => REQ_L[k]) : [];
-  if (!r.length) return lang == "ar" ? "معرّف اللاعب أو المستخدم" : "Player or user ID";
+  const r = req.filter((k) => REQ_L[k]);
+  if (!r.length) return lang == "ar" ? "معرّف اللاعب (Player ID)" : "Player ID";
   return r.map((k) => REQ_L[k][lang == "ar" ? 0 : 1]).join(r.length > 1 ? " | " : "");
 };
 const qLimited = (p) => needsLink(p) || apiMode(p); // products whose quantity follows the product's own min / max
@@ -1343,20 +1349,34 @@ function socialLink([code, url, logo], label) {
 }
 const payKey = (m) => {
   const k = [m.id, m.icon, m.en, m.ar, m.name].join(" ").toLowerCase();
-  return /binance|بايننس/.test(k) ? "binance" : /usdt|tether|bep20/.test(k) ? "usdt" : /syriatel|سيريتل|سيرياتيل/.test(k) ? "syriatel" : /sham|شام/.test(k) ? "sham" : "";
+  return /binance|بايننس|باينس/.test(k) ? "binance" : /usdt|tether|bep20|بيب/.test(k) ? "usdt" : /syriatel|سيريتل|سيرياتيل/.test(k) ? "syriatel" : /sham|شام/.test(k) ? "sham" : "";
 };
+function paySvgIcon(key, size = 44) {
+  const s = Number(size) || 44;
+  const k = String(key || "").toLowerCase().trim();
+  const rad = Math.max(6, Math.round(s * 0.24));
+  if (k === "syriatel" || /سيريتل|سيرياتيل/.test(k)) {
+    return `<span class="pl pl-syriatel" style="width:${s}px;height:${s}px;display:inline-flex;align-items:center;justify-content:center;border-radius:${rad}px;overflow:hidden;background:#E30613;box-shadow:0 3px 10px rgba(227,6,19,0.3);flex:none" title="سيرياتيل كاش"><svg viewBox="0 0 48 48" width="${s}" height="${s}" style="display:block"><rect width="48" height="48" rx="12" fill="#E30613"/><path d="M12 30C12 21 19 14 28 14C24.5 18.5 21 23 18 30H12Z" fill="#FFFFFF"/><path d="M19 34C19 26.5 25 20 33 19C29.5 23.5 26 28.5 23 34H19Z" fill="#F8D12F"/><circle cx="30" cy="13" r="3" fill="#FFFFFF"/><text x="24" y="42" font-size="7.5" font-weight="900" text-anchor="middle" fill="#FFFFFF" font-family="system-ui,sans-serif" letter-spacing="0.5">CASH</text></svg></span>`;
+  }
+  if (k === "sham" || /شام/.test(k)) {
+    return `<span class="pl pl-sham" style="width:${s}px;height:${s}px;display:inline-flex;align-items:center;justify-content:center;border-radius:${rad}px;overflow:hidden;background:#0B7A4B;box-shadow:0 3px 10px rgba(11,122,75,0.3);flex:none" title="شام كاش"><svg viewBox="0 0 48 48" width="${s}" height="${s}" style="display:block"><rect width="48" height="48" rx="12" fill="#0B7A4B"/><circle cx="24" cy="21" r="14" fill="none" stroke="#F5D061" stroke-width="2"/><path d="M24 11L26.8 18.2L34 21L26.8 23.8L24 31L21.2 23.8L14 21L21.2 18.2Z" fill="#F5D061"/><circle cx="24" cy="21" r="4.2" fill="#FFFFFF"/><text x="24" y="41.5" font-size="6.8" font-weight="900" text-anchor="middle" fill="#F5D061" font-family="system-ui,sans-serif" letter-spacing="0.5">SHAM</text></svg></span>`;
+  }
+  if (k === "usdt" || /usdt|tether|bep20|بيب/.test(k)) {
+    return `<span class="pl pl-usdt" style="width:${s}px;height:${s}px;display:inline-flex;align-items:center;justify-content:center;border-radius:${rad}px;overflow:hidden;background:#26A17B;box-shadow:0 3px 10px rgba(38,161,123,0.3);flex:none" title="USDT (BEP20)"><svg viewBox="0 0 48 48" width="${s}" height="${s}" style="display:block"><rect width="48" height="48" rx="12" fill="#26A17B"/><path d="M27 22.2c-.1 0-.7.1-3 .1s-2.8-.1-3-.1c-4.7-.2-8.2-.8-8.2-1.7 0-.9 3.5-1.5 8.2-1.7v3.2c.2 0 .9.1 3 .1s2.8-.1 3-.1v-3.2c4.7.2 8.2.8 8.2 1.7 0 .9-3.5 1.5-8.2 1.7zm0-4.3v-2.8h6.6V11H14.4v4.1H21v2.8c-5.4.2-9.4 1.1-9.4 2.3 0 1.2 4 2.1 9.4 2.3v9.6h6v-9.6c5.4-.2 9.4-1.1 9.4-2.3 0-1.2-4-2.1-9.4-2.3z" fill="#FFFFFF"/><rect x="8" y="34.5" width="32" height="10" rx="5" fill="#181A20"/><text x="24" y="41.8" font-size="6.2" font-weight="900" text-anchor="middle" fill="#F0B90B" font-family="system-ui,sans-serif" letter-spacing="0.4">BEP-20</text></svg></span>`;
+  }
+  if (k === "binance" || /binance|بايننس|باينس/.test(k)) {
+    return `<span class="pl pl-binance" style="width:${s}px;height:${s}px;display:inline-flex;align-items:center;justify-content:center;border-radius:${rad}px;overflow:hidden;background:#181A20;border:1px solid #F0B90B;box-shadow:0 3px 10px rgba(240,185,11,0.25);flex:none" title="Binance Pay"><svg viewBox="0 0 48 48" width="${s}" height="${s}" style="display:block"><rect width="48" height="48" rx="12" fill="#181A20"/><path d="M24 10.5l4.2 4.2-8.4 8.4-4.2-4.2L24 10.5zm9.3 9.3l4.2 4.2-4.2 4.2-4.2-4.2 4.2-4.2zM24 37.5l-4.2-4.2 8.4-8.4 4.2 4.2-8.4 8.4zm-9.3-9.3l-4.2-4.2 4.2-4.2 4.2 4.2-4.2 4.2zm9.3-4.2l4.2-4.2 4.2 4.2-4.2 4.2-4.2-4.2z" fill="#F0B90B"/><text x="24" y="42" font-size="6.6" font-weight="900" text-anchor="middle" fill="#F0B90B" font-family="system-ui,sans-serif" letter-spacing="0.5">PAY</text></svg></span>`;
+  }
+  return "";
+}
 function payLogo(m, size = 44) {
   const st = `width:${size}px;height:${size}px`;
   const key = payKey(m);
-  // One controlled set of four payment marks, reused in the homepage, checkout and wallet top-up.
   const uploaded = String(m.logo || m.logo_url || m.image_url || "").trim();
-  const fallback = {
-    usdt: "https://tether.io/wp-content/uploads/tether-io_logos/tether_USDt_token_COLOR_v1_v2_SVG/tether_USDt_token_v2%403x.svg",
-    binance: "https://cdn.simpleicons.org/binance/F0B90B",
-  };
-  const logo = uploaded || fallback[key] || "";
-  if (/^(https:\/\/|data:image\/)/i.test(logo))
-    return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${ex(logo)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
+  if (/^(https:\/\/|data:image\/)/i.test(uploaded))
+    return `<span class="pl pl-img" style="${st};background:transparent;overflow:visible;display:inline-flex;align-items:center;justify-content:center"><img src="${ex(uploaded)}" alt="${ex(pmName(m))}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="display:block;width:100%;height:100%;object-fit:contain;padding:0"></span>`;
+  const svg = paySvgIcon(key, size);
+  if (svg) return svg;
   const nmRaw = plain(m.en || m.ar || pmReadable(m) || "");
   const nm = nmRaw.replace(/[^A-Za-z0-9؀-ۿ ]/g, "").trim();
   const letter = (nm || "P").slice(0, 1).toUpperCase();
@@ -2131,8 +2151,8 @@ function head() {
   });
   const meta = document.querySelector("meta[name=theme-color]");
   if (meta) meta.content = th == "dark" ? "#12131A" : "#FFFFFF";
-  const logo = CFG.site.logo;
-  if (logo) $(".logo .tile").innerHTML = `<img src="${ex(logo)}" alt="">`;
+  const logo = CFG.site.logo || "logo-mark.webp";
+  if (logo && $(".logo .tile")) $(".logo .tile").innerHTML = `<img src="${ex(logo)}" alt="AMARIX007" style="width:100%;height:100%;object-fit:contain">`;
   $("#bn").innerHTML = `${ex(CFG.site.n1)}<b>${ex(CFG.site.n2)}</b>`;
   $("#sb").textContent = lang == "ar" ? CFG.site.sa : CFG.site.se;
   $("#q").placeholder = t("ph");

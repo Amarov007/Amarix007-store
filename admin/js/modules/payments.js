@@ -5,6 +5,77 @@ import { money, fmtDate, clone } from "../core/utils.js";
 const tone = { under_review: "warn", approved: "ok", rejected: "err", pending: "info", expired: "mute" };
 const KINDS = [["manual", "manual"], ["wallet", "wallet"], ["crypto_auto", "crypto_auto"]];
 
+const PRESETS = {
+  syriatel: {
+    id: "syriatel",
+    kind: "manual",
+    currency: "SYP",
+    enabled: true,
+    sort: 10,
+    requires_proof: true,
+    expiry_minutes: 60,
+    config: {
+      ar: "سيرياتيل كاش",
+      en: "Syriatel Cash",
+      network: "سيرياتيل كاش (Syriatel Cash)",
+      acc: "",
+      da: "حوّل المبلغ المطلوب إلى رقم سيرياتيل كاش أعلاه، ثم اضغط «تم الدفع» وأرفق إشعار التحويل.",
+      de: "Transfer the amount to the Syriatel Cash wallet number, then tap 'Paid' and attach proof."
+    }
+  },
+  sham: {
+    id: "sham",
+    kind: "manual",
+    currency: "SYP",
+    enabled: true,
+    sort: 20,
+    requires_proof: true,
+    expiry_minutes: 60,
+    config: {
+      ar: "شام كاش",
+      en: "Sham Cash",
+      network: "شام كاش (Sham Cash)",
+      acc: "",
+      da: "حوّل المبلغ المطلوب إلى رقم حساب شام كاش أعلاه، ثم اضغط «تم الدفع» وأرفق إشعار التحويل.",
+      de: "Transfer the amount to the Sham Cash account, then tap 'Paid' and attach proof."
+    }
+  },
+  usdt: {
+    id: "usdt",
+    kind: "manual",
+    currency: "USD",
+    enabled: true,
+    sort: 30,
+    requires_proof: true,
+    expiry_minutes: 60,
+    config: {
+      ar: "USDT (BEP20)",
+      en: "USDT (BEP20)",
+      network: "BEP20 (Binance Smart Chain)",
+      acc: "",
+      da: "أرسل USDT عبر شبكة BEP20 حصراً إلى العنوان أعلاه، ثم الصق TxID وأرفق صورة التحويل.",
+      de: "Send USDT on BEP20 (BSC) network only to the address above, then paste TxID and attach screenshot."
+    }
+  },
+  binance: {
+    id: "binance",
+    kind: "manual",
+    currency: "USD",
+    enabled: true,
+    sort: 40,
+    requires_proof: true,
+    expiry_minutes: 60,
+    config: {
+      ar: "Binance Pay",
+      en: "Binance Pay",
+      network: "Binance Pay (Pay ID / Email)",
+      acc: "",
+      da: "ادفع عبر تطبيق بايننس باستخدام معرّف Binance Pay أعلاه، ثم اضغط «تم الدفع» وأرفق صورة العملية.",
+      de: "Pay via Binance app using the Pay ID above, then tap 'Paid' and attach payment screenshot."
+    }
+  }
+};
+
 export default async function (view) {
   const body = h("div", { class: "view" });
   let status = "under_review";
@@ -38,9 +109,18 @@ export default async function (view) {
           { label: "", render: (r) => h("div", { class: "page-actions" },
             h("button", { class: "btn primary sm", onclick: async () => { if (!(await confirmBox(`اعتماد استرداد ${money(r.amount)} إلى المحفظة؟`))) return; try { await rpc("refund_approve", { p_id: Number(r.id) }); toast("تم الاعتماد"); load(); } catch (e) { fail(e); } } }, "اعتماد"),
             h("button", { class: "btn danger sm", onclick: async () => { const n = await promptBox("سبب الرفض", { okLabel: "رفض" }); if (n == null) return; try { await rpc("refund_reject", { p_id: Number(r.id), p_note: n }); toast("تم الرفض"); load(); } catch (e) { fail(e); } } }, "رفض")) }] }),
-        h("div", { class: "toolbar" }, h("h3", { style: { margin: 0 } }, `وسائل الدفع (${methods.length})`), h("button", { class: "btn sm", onclick: () => editMethod(null, methods) }, "+ وسيلة")),
+        h("div", { class: "card", style: { background: "var(--card)", border: "1px solid rgba(185,255,102,.25)" } },
+          h("div", { class: "toolbar", style: { flexWrap: "wrap", gap: "8px", justifyContent: "space-between" } },
+            h("h3", { style: { margin: 0 } }, `إضافة وسائل الدفع الرسمية (${methods.length})`),
+            h("button", { class: "btn sm", onclick: () => editMethod(null, methods) }, "+ وسيلة مخصصة")),
+          h("p", { class: "muted", style: { margin: "4px 0 12px" } }, "أضف وسائل الدفع الرسمية بنقرة واحدة مع إعداداتها المعتمدة:"),
+          h("div", { class: "page-actions", style: { flexWrap: "wrap", gap: "8px" } },
+            h("button", { class: "btn sm", style: { background: "#E30613", color: "#fff", borderColor: "#E30613" }, onclick: () => editMethod(PRESETS.syriatel, methods) }, "+ سيرياتيل كاش"),
+            h("button", { class: "btn sm", style: { background: "#0B7A4B", color: "#fff", borderColor: "#0B7A4B" }, onclick: () => editMethod(PRESETS.sham, methods) }, "+ شام كاش"),
+            h("button", { class: "btn sm", style: { background: "#26A17B", color: "#fff", borderColor: "#26A17B" }, onclick: () => editMethod(PRESETS.usdt, methods) }, "+ USDT (BEP20)"),
+            h("button", { class: "btn sm", style: { background: "#181A20", color: "#F0B90B", borderColor: "#F0B90B" }, onclick: () => editMethod(PRESETS.binance, methods) }, "+ Binance Pay"))),
         dataTable({ rows: methods, pageSize: 20, onRow: (m) => editMethod(m, methods), columns: [
-          { label: "المعرّف", render: (m) => h("span", { class: "mono" }, m.id) }, { label: "الاسم", render: (m) => m.config?.ar || "—" }, { label: "النوع", render: (m) => m.kind }, { label: "العملة", render: (m) => m.currency },
+          { label: "المعرّف", render: (m) => h("span", { class: "mono" }, m.id) }, { label: "الاسم", render: (m) => [h("b", null, m.config?.ar || m.id), h("small", { class: "sub" }, m.config?.network || "")] }, { label: "النوع", render: (m) => m.kind }, { label: "العملة", render: (m) => m.currency },
           { label: "الحدود", render: (m) => `${m.min_base ?? "—"} → ${m.max_base ?? "—"}` }, { label: "الحالة", render: (m) => badge(m.enabled ? "مفعّلة" : "موقوفة", m.enabled ? "ok" : "mute") }] }));
     } catch (e) { mount(body, errorState(e, load)); }
   }

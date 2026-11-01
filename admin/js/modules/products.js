@@ -10,11 +10,42 @@ const slug = () => "p_" + Math.random().toString(36).slice(2, 9);
 
 export default async function (view) {
   await loadCatalog();
-  let q = "", cat = "";
+  let q = "", cat = "", provider = "";
   const box = h("div");
+  const toolbarContainer = h("div");
+
+  const drawToolbar = () => {
+    const D = data();
+    const providersList = [...new Set(D.products.map((p) => String(p.smm_provider || "").trim()).filter(Boolean))].sort();
+    const provCount = provider ? D.products.filter((p) => String(p.smm_provider || "").toLowerCase() === provider.toLowerCase()).length : 0;
+
+    mount(toolbarContainer,
+      toolbar(
+        searchBox((v) => { q = v; draw(); }, "اسم أو معرّف أو مزوّد أو رقم خدمة"),
+        sel([["", "كل الأقسام"], ...D.categories.map((c) => [c.id, c.ar])], cat, { style: { width: "auto" }, onchange: (e) => { cat = e.target.value; draw(); } }),
+        sel([["", "كل المزوّدين"], ...providersList.map((pv) => [pv, `المزوّد: ${pv}`])], provider, { style: { width: "auto" }, onchange: (e) => { provider = e.target.value; draw(); drawToolbar(); } }),
+        provider ? h("button", {
+          class: "btn danger sm",
+          onclick: async () => {
+            const count = D.products.filter((p) => String(p.smm_provider || "").toLowerCase() === provider.toLowerCase()).length;
+            if (!count) return toast("لا توجد منتجات لهذا المزوّد", "err");
+            if (!(await confirmBox(`هل تريد حذف جميع منتجات المزوّد «${provider}» البالغ عددها ${count} منتجاً؟\n(لن يُطبّق الحذف نهائياً قبل الضغط على زر «نشر» بالأعلى)`, { danger: true, okLabel: `حذف ${count} منتج` }))) return;
+            edit((draft) => {
+              draft.products = draft.products.filter((p) => String(p.smm_provider || "").toLowerCase() !== provider.toLowerCase());
+            });
+            toast(`تم حذف ${count} منتج للمزوّد «${provider}». اضغط «نشر» لتطبيق التغيير.`);
+            provider = "";
+            draw();
+            drawToolbar();
+          }
+        }, `حذف كل منتجات «${provider}» (${provCount})`) : null
+      )
+    );
+  };
+
   const draw = () => {
     const D = data(), cats = Object.fromEntries(D.categories.map((c) => [c.id, c.ar]));
-    const rows = D.products.filter((p) => (!cat || p.c === cat) && (!q || [p.ar, p.en, p.id, p.tg, p.smm_provider, p.smm_service, p.ptype, p.smm_country].some((x) => String(x || "").toLowerCase().includes(q))));
+    const rows = D.products.filter((p) => (!cat || p.c === cat) && (!provider || String(p.smm_provider || "").toLowerCase() === provider.toLowerCase()) && (!q || [p.ar, p.en, p.id, p.tg, p.smm_provider, p.smm_service, p.ptype, p.smm_country].some((x) => String(x || "").toLowerCase().includes(q))));
     mount(box, dataTable({ rows, pageSize: 30, onRow: open, emptyText: "لا منتجات", columns: [
       { label: "المنتج", render: (p) => [h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } }, p.img ? h("img", { src: p.img, alt: "", width: 38, height: 38, loading: "lazy", style: { objectFit: "cover", borderRadius: "8px" } }) : null, h("div", null, p.ar || p.en, h("small", { class: "sub mono" }, p.id)))] },
       { label: "القسم", render: (p) => badge(cats[p.c] || p.c || "—", "info") },
@@ -58,7 +89,15 @@ export default async function (view) {
   }
   const D0 = data();
   mount(view, pageHeader("المنتجات", `${D0.products.length} منتج — التعديلات تُنشر عند الضغط على «نشر»`, h("button", { class: "btn primary", onclick: () => open() }, "+ منتج")),
-    toolbar(searchBox((v) => { q = v; draw(); }, "اسم أو معرّف أو مزوّد أو رقم خدمة"), sel([["", "كل الأقسام"], ...D0.categories.map((c) => [c.id, c.ar])], "", { style: { width: "auto" }, onchange: (e) => { cat = e.target.value; draw(); } })), box, publishBar());
+    toolbarContainer, box, publishBar());
+  drawToolbar();
   draw();
-  const off = subscribe(() => (view.isConnected ? draw() : off()));
+  const off = subscribe(() => {
+    if (view.isConnected) {
+      drawToolbar();
+      draw();
+    } else {
+      off();
+    }
+  });
 }
