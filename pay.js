@@ -240,7 +240,12 @@ function setError(message) {
   if (message) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 function steps(done, current) {
-  const labels = [tx("حوّل المبلغ", "Transfer"), tx("ارفع الإثبات", "Upload receipt"), tx("مراجعة الإدارة", "Admin review")];
+  const labels = [
+    tx("تفاصيل الطلب", "Order Info"),
+    tx("بيانات التحويل", "Transfer Info"),
+    tx("إرفاق الإثبات", "Upload Receipt"),
+    tx("التحقق اليدوي", "Manual Review")
+  ];
   return `<ol class="pay-steps" aria-label="${tx("خطوات الدفع", "Payment steps")}">${labels.map((l, i) => {
     const cls = i < done ? "done" : i === current ? "now" : "";
     return `<li class="${cls}"${i === current ? ' aria-current="step"' : ""}><b>${i < done ? ICON.check.replace('width="22" height="22"', 'width="14" height="14"') : i + 1}</b><span>${l}</span></li>`;
@@ -269,8 +274,10 @@ async function renderPayment(paymentId, { silent = false } = {}) {
   if (ins?.tx_ref && !d.txref) d.txref = ins.tx_ref;
 
   const expired = Number.isFinite(end) && end <= Date.now() && live;
-  const done = state === "captured" || state === "refunded" || state === "refunded_partially" ? 3 : state === "under_review" ? 2 : hasProof ? 2 : 0;
-  const current = done === 3 ? -1 : state === "under_review" ? 2 : hasProof ? 2 : 0;
+  const isReviewed = state === "under_review" || state === "proof_submitted";
+  const isCaptured = state === "captured" || state === "refunded" || state === "refunded_partially";
+  const done = isCaptured ? 4 : isReviewed ? 3 : hasProof ? 2 : 1;
+  const current = isCaptured ? -1 : isReviewed ? 3 : hasProof ? 2 : 1;
 
   const account = ins?.acc
     ? `<div class="pay-acc"><div><small>${tx("الحساب أو العنوان", "Account / address")}</small><bdi dir="ltr" id="amx-pay-acc">${esc(ins.acc)}</bdi></div><button type="button" class="pay-copy" data-pay-action="copy-account" data-value="${esc(ins.acc)}">${ICON.copy}<span>${tx("نسخ", "Copy")}</span></button></div>`
@@ -365,6 +372,14 @@ document.addEventListener("click", async event => {
       }
       await renderPayment(id, { silent: true });
       T().toast(tx("أُرسلت الدفعة للمراجعة", "Payment submitted for review"));
+      closeModal();
+      if (typeof window.showManualVerificationModal === "function") {
+        window.showManualVerificationModal({
+          orderId: p?.order_id || id,
+          method: methodName,
+          txref: ref
+        });
+      }
       return;
     }
     if (action === "refund") {

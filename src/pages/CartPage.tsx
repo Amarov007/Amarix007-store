@@ -85,8 +85,34 @@ export const CartPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       
+      {/* Checkout Step-by-Step Progress Indicator */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#1b1c26] border border-[#2c2e3d] shadow-lg">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { n: 1, title: lang === 'ar' ? 'السلة والطلب' : 'Cart & Order', desc: lang === 'ar' ? 'مراجعة البنود والكميات' : 'Review items', active: true, done: false },
+            { n: 2, title: lang === 'ar' ? 'وسيلة الدفع' : 'Payment Method', desc: lang === 'ar' ? 'اختيار طريقة التحويل' : 'Select method', active: false, done: false },
+            { n: 3, title: lang === 'ar' ? 'إشعار التحويل' : 'Transfer Proof', desc: lang === 'ar' ? 'إرفاق الإيصال / TXID' : 'Attach receipt', active: false, done: false },
+            { n: 4, title: lang === 'ar' ? 'التحقق والتنفيذ' : 'Manual Review', desc: lang === 'ar' ? 'مراجعة الإدارة والتسليم' : 'Admin verification', active: false, done: false },
+          ].map((s) => (
+            <div key={s.n} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${s.active ? 'bg-[#12131a] border-[#b9ff66]/70 shadow-sm shadow-[#b9ff66]/10' : 'bg-[#12131a]/40 border-[#2c2e3d]'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${s.active ? 'bg-[#b9ff66] text-[#191a23] shadow-md shadow-[#b9ff66]/30' : 'bg-[#232430] text-[#a4a7b5]'}`}>
+                {s.n}
+              </div>
+              <div className="min-w-0">
+                <div className={`text-xs font-bold truncate ${s.active ? 'text-[#f3f3f3]' : 'text-[#a4a7b5]'}`}>
+                  {s.title}
+                </div>
+                <div className="text-[10px] text-[#717588] truncate hidden sm:block">
+                  {s.desc}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Title */}
       <div className="flex items-center justify-between pb-4 border-b border-[#2c2e3d]">
         <div className="flex items-center gap-3">

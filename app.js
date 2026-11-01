@@ -1437,6 +1437,7 @@ window.AMXPayTransport = {
   toast: (message, kind) => toast(message, kind),
   lang: () => lang,
   ex: (value) => ex(value),
+  showManualVerificationModal: (opts) => window.showManualVerificationModal && window.showManualVerificationModal(opts),
 };
 
 
@@ -2435,6 +2436,56 @@ function policiesPage() {
   );
 }
 
+/* Checkout Step-by-Step Stepper */
+function checkoutStepper(currentStep) {
+  const A = lang == "ar";
+  const steps = [
+    { n: 1, t: A ? "السلة والطلب" : "Cart & Order", sub: A ? "مراجعة المنتجات" : "Review items" },
+    { n: 2, t: A ? "وسيلة الدفع" : "Payment Method", sub: A ? "تحديد طريقة الدفع" : "Select method" },
+    { n: 3, t: A ? "التحويل والإشعار" : "Transfer & Proof", sub: A ? "إرفاق إيصال الدفع" : "Attach receipt" },
+    { n: 4, t: A ? "التحقق والتنفيذ" : "Manual Review", sub: A ? "مراجعة الإدارة والاعتماد" : "Admin verification" }
+  ];
+  return `<nav class="checkout-stepper" aria-label="${A ? "مراحل إتمام الطلب" : "Checkout progress"}"><ol class="co-steps">${steps.map((s) => {
+    const isDone = s.n < currentStep;
+    const isNow = s.n === currentStep;
+    const cls = isDone ? "done" : isNow ? "now" : "";
+    return `<li class="${cls}"${isNow ? ' aria-current="step"' : ""}><div class="co-step-badge"><span class="co-step-num">${isDone ? ic("check", 14) : s.n}</span></div><div class="co-step-txt"><strong class="co-step-title">${s.t}</strong><small class="co-step-sub">${s.sub}</small></div></li>`;
+  }).join("")}</ol></nav>`;
+}
+
+/* Manual Verification Confirmation Modal */
+function ensureVerifyModal() {
+  let m = document.getElementById("amx-verify-modal");
+  if (m) return m;
+  m = document.createElement("div");
+  m.id = "amx-verify-modal";
+  m.className = "amx-verify-overlay";
+  m.hidden = true;
+  m.setAttribute("role", "dialog");
+  m.setAttribute("aria-modal", "true");
+  m.setAttribute("aria-labelledby", "amx-vm-title");
+  document.body.appendChild(m);
+  return m;
+}
+
+function closeManualVerificationModal() {
+  const m = document.getElementById("amx-verify-modal");
+  if (m) m.hidden = true;
+}
+
+function showManualVerificationModal({ orderId, method, txref, isWallet } = {}) {
+  const m = ensureVerifyModal();
+  const A = lang == "ar";
+  const displayId = orderId ? String(orderId) : "";
+  m.innerHTML = `<div class="amx-verify-backdrop" data-a="vm-close"></div><div class="amx-verify-dialog"><header class="amx-vm-header"><div class="amx-vm-icon-wrap"><span class="amx-vm-glow"></span><span class="amx-vm-icon">${ic("shield-check", 28) || ic("check", 28)}</span></div><button type="button" class="amx-vm-close" data-a="vm-close" aria-label="${A ? "إغلاق" : "Close"}">×</button></header><div class="amx-vm-body"><span class="amx-vm-pill">${A ? "✓ تم استلام إشعار الدفع" : "✓ Payment Claim Submitted"}</span><h2 id="amx-vm-title" class="amx-vm-title">${A ? "طلبك الآن قيد التحقق والمراجعة اليدوية" : "Your Payment is Under Manual Review"}</h2><p class="amx-vm-desc">${A ? "شكراً لك! تم استلام إشعار الدفع وبدأت مرحلة المراجعة والتدقيق اليدوي من قبل فريق العمليات للتأكد من وصول المبلغ واعتماد الطلب فوراً." : "Thank you! Your payment notice was received and our operations team is manually verifying the transfer to approve and fulfill your order."}</p>${displayId ? `<div class="amx-vm-order-chip"><div class="amx-vm-chip-id"><small>${isWallet ? (A ? "معرّف عملية الشحن:" : "Top-up ID:") : (A ? "رقم الطلب الخاص بك:" : "Your Order Number:")}</small><strong dir="ltr">${ex(displayId)}</strong></div><button type="button" class="b b2 sm amx-vm-copy" data-a="copy" data-v="${ex(displayId)}">${ic("copy", 14)} <span>${A ? "نسخ الرقم" : "Copy ID"}</span></button></div>` : ""}<div class="amx-vm-steps-box"><h3 class="amx-vm-steps-heading">${A ? "خطوات التحقق اليدوي المتبقية:" : "Manual Verification Workflow:"}</h3><div class="amx-vm-step-item"><div class="amx-vm-step-icon">1</div><div class="amx-vm-step-content"><h4>${A ? "مطابقة إيصال التحويل ومعرف العملية" : "Receipt & TXID Matching"}</h4><p>${A ? "يقوم موظف العمليات بمطابقة صورة الإيصال أو رقم العملية (TXID) فوراً مع كشف الحساب المصرفي أو المحفظة الرقمية لضمان وصول المبلغ بالكامل." : "Our operations team matches your receipt image or transaction ID (TXID) against our official statement."}</p></div></div><div class="amx-vm-step-item"><div class="amx-vm-step-icon">2</div><div class="amx-vm-step-content"><h4>${A ? "فترة المراجعة والاعتماد (5 - 30 دقيقة)" : "Review Window (5 - 30 minutes)"}</h4><p>${A ? "تتم المراجعة اليدوية عادةً خلال 5 إلى 30 دقيقة ضمن ساعات الدوام اليومية، وفور مطابقة الحوالة يتم تأكيد الدفعة مباشرة." : "Manual verification usually completes within 5 to 30 minutes during active operating hours."}</p></div></div><div class="amx-vm-step-item"><div class="amx-vm-step-icon">3</div><div class="amx-vm-step-content"><h4>${A ? "التنفيذ الآلي والتسليم الفوري" : "Automated Delivery & Crediting"}</h4><p>${A ? (isWallet ? "بمجرد اعتماد الدفع، يُضاف الرصيد تلقائياً إلى محفظتك لتتمكن من الشراء به مباشرة." : "بمجرد اعتماد الدفع، يتحول طلبك إلى «قيد التنفيذ / مكتمل» وتصلك بيانات الخدمة أو الشحن تلقائياً.") : (isWallet ? "Once approved, the balance is instantly credited to your wallet." : "Once approved, your order is executed and delivery details are automatically provided.")}</p></div></div><div class="amx-vm-step-item"><div class="amx-vm-step-icon">4</div><div class="amx-vm-step-content"><h4>${A ? "التنبيهات وتتبع الحالة المباشر" : "Notifications & Live Tracking"}</h4><p>${A ? "ستصلك إشعارات المتصفح لحظة اكتمال المعالجة، ويمكنك دائماً تتبع كل التفاصيل من صفحة «طلباتي»." : "You will receive real-time notifications as soon as processed, and can track status anytime under 'My Orders'."}</p></div></div></div><div class="amx-vm-tip"><span>💡</span><p>${A ? "نصيحة: احتفظ برقم الطلب وصورة التحويل في جهازك للمتابعة السريعة مع الدعم الفني إذا دعت الحاجة." : "Tip: Keep your order ID and payment receipt saved for quick support assistance if needed."}</p></div><div class="amx-vm-actions"><a href="#/orders" class="b amx-vm-btn-primary" data-a="vm-orders">${ic("box", 16)} <span>${A ? "تتبّع الطلب في «طلباتي»" : "Track in My Orders"}</span></a><a href="#/support" class="b b2 amx-vm-btn-support" data-a="vm-close">${ic("headset", 16)} <span>${A ? "مركز الدعم والاستفسارات" : "Contact Support"}</span></a><button type="button" class="amx-vm-btn-dismiss" data-a="vm-close">${A ? "حسناً، فهمت" : "Got it, Close"}</button></div></div></div>`;
+  m.hidden = false;
+}
+window.showManualVerificationModal = showManualVerificationModal;
+window.closeManualVerificationModal = closeManualVerificationModal;
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeManualVerificationModal();
+});
+
 /* Cart with order summary, coupon, payment method and the two ways to order */
 function cartPage() {
   const lines = cartLines();
@@ -2459,6 +2510,7 @@ function cartPage() {
       ? `<div class="box wpay"><h3>${ic("wallet", 16)} ${AW ? "الدفع من المحفظة" : "Pay from wallet"}</h3><p class="pd">${AW ? "سجّل الدخول لاستخدام رصيد محفظتك وإتمام الطلب." : "Sign in to use your wallet balance and place the order."}</p><a class="b b2 block" href="#/login">${AW ? "تسجيل الدخول" : "Sign in"}</a></div>`
       : `<div class="box wpay"><h3>${ic("wallet", 16)} ${AW ? "الدفع من المحفظة" : "Pay from wallet"}</h3><div class="wpay-row"><span class="wpay-ic">${ic("wallet", 22)}</span><div><small>${AW ? "رصيدك الحالي" : "Your balance"}</small><b class="n">${walletReady() ? money(wBal) : "…"}</b></div><a class="b b2 sm" href="#/wallet">${ic("plus", 14)} ${AW ? "شحن المحفظة" : "Top up"}</a></div>${wLow ? `<p class="wpay-low">${ic("warn", 14)} ${AW ? "رصيدك لا يكفي لهذا الطلب. اشحن محفظتك ثم عُد لإتمامه." : "Your balance is not enough for this order. Top up, then come back."}</p>` : ""}</div>`;
   return (
+    checkoutStepper(1) +
     rows +
     payBox +
     `<div class="box"> ${couponBox} <div class="sum"> <div class="row"><span>${t("sub")}</span><b class="n">${money( T_.sub )}</b></div> ${ T_.disc > 0 ? `<div class="row disc"><span>${t( "dis" )}</span><b class="n">− ${money(T_.disc)}</b></div>` : "" } <div class="row tot"><span>${t("tot")}</span><b class="n">${money( T_.total )}</b></div>${convRow(T_.total)} </div> <div class="pay"> <button class="b" data-a="co">${ic("check", 16)} ${t("co")}</button> </div></div>`
@@ -2492,7 +2544,7 @@ function donePage(id) {
   const hp = !!proofDone[id];
   const v2Slot = !o.wpaid && o.method !== "wallet" && o.paymentV2 ? `<div class="box" id="amx-payment-slot" data-order-id="${ex(o.id)}"><p class="pd">${lang == "ar" ? "جارٍ تحميل تعليمات الدفع الآمن…" : "Loading secure payment instructions…"}</p></div>` : "";
   const legacyPay = !o.wpaid && o.method !== "wallet" && !o.paymentV2 && m ? `${payInstructions(m)}<div class="box"><div class="ord-act">${hp ? proofOkCard() : proofPick(o.id) + `<p class="pd lockhint">${ic("upload", 14)} ${t("prooflock")}</p>`}${claimBtn(o.id, hp)}</div></div>` : "";
-  return `<div class="box done"><div class="okc">${ic( "check", 36 )}</div><h1>${t("donet")}</h1> <p class="pd">${t("doned")}</p><div class="oid" dir="ltr">${ex(o.id)}</div> ${ o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : "" }</div>${v2Slot}${legacyPay}${o.wpaid ? walletDonePage(o) : ""}${!done && o.wok && walletOn() && !wl.setup ? `<div class="box">${walletAltBox(o.id)}</div>` : ""}${ticketBox(o.id)}<div class="box"><div class="acts"><a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a><a class="b b2" href="#/">${t("keep")}</a></div></div>`;
+  return checkoutStepper(done ? 4 : 3) + `<div class="box done"><div class="okc">${ic( "check", 36 )}</div><h1>${t("donet")}</h1> <p class="pd">${t("doned")}</p><div class="oid" dir="ltr">${ex(o.id)}</div> ${ o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : "" }</div>${v2Slot}${legacyPay}${o.wpaid ? walletDonePage(o) : ""}${!done && o.wok && walletOn() && !wl.setup ? `<div class="box">${walletAltBox(o.id)}</div>` : ""}${ticketBox(o.id)}<div class="box"><div class="acts"><a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a><a class="b b2" href="#/">${t("keep")}</a></div></div>`;
 }
 
 /* Account & favourites */
@@ -2686,7 +2738,7 @@ function walletRow() {
 function walletDonePage(o) {
   const A = lang == "ar",
     paid = walletPaid[o.id] || o.wpaid;
-  return `<div class="box done"><div class="okc">${ic("check", 36)}</div><h1>${paid ? (A ? "تم الدفع من المحفظة" : "Paid from your wallet") : t("donet")}</h1><p class="pd">${paid ? (A ? "استلمنا طلبك وسيبدأ تنفيذه قريباً." : "We received your order and it will start shortly.") : A ? "تم إنشاء الطلب لكن لم يكتمل الدفع من المحفظة." : "The order was created but the wallet payment did not go through."}</p><div class="oid" dir="ltr">${ex(o.id)}</div>${o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : ""}</div>${paid ? "" : `<div class="box">${walletPayBox(o.id)}</div>`}${ticketBox(o.id)}<div class="box"><div class="acts"><a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a><a class="b b2" href="#/wallet">${ic("wallet", 16)} ${A ? "محفظتي" : "My wallet"}</a><a class="b b2" href="#/">${t("keep")}</a></div></div>`;
+  return checkoutStepper(paid ? 4 : 2) + `<div class="box done"><div class="okc">${ic("check", 36)}</div><h1>${paid ? (A ? "تم الدفع من المحفظة" : "Paid from your wallet") : t("donet")}</h1><p class="pd">${paid ? (A ? "استلمنا طلبك وسيبدأ تنفيذه قريباً." : "We received your order and it will start shortly.") : A ? "تم إنشاء الطلب لكن لم يكتمل الدفع من المحفظة." : "The order was created but the wallet payment did not go through."}</p><div class="oid" dir="ltr">${ex(o.id)}</div>${o.total != null ? `<p class="pd">${t("tot")}: <b class="n">${money(o.total)}</b></p>` : ""}</div>${paid ? "" : `<div class="box">${walletPayBox(o.id)}</div>`}${ticketBox(o.id)}<div class="box"><div class="acts"><a class="b b2" href="#/orders">${ic("box", 16)} ${t("vieword")}</a><a class="b b2" href="#/wallet">${ic("wallet", 16)} ${A ? "محفظتي" : "My wallet"}</a><a class="b b2" href="#/">${t("keep")}</a></div></div>`;
 }
 function walletTopupCard(x) {
   const A = lang == "ar",
@@ -2807,6 +2859,7 @@ async function walletClaim(btn, id) {
     beep("ok");
     await loadWallet(true);
     render();
+    showManualVerificationModal({ orderId: "WL-" + id, isWallet: true });
   } catch (err) {
     console.error("[AMARIX] wallet claim", err);
     toast(walletErr(err), "er");
@@ -3491,6 +3544,7 @@ async function claimPayment(btn, id) {
     toast(t("claimed"));
     beep("ok");
     render();
+    showManualVerificationModal({ orderId: id });
   } catch (err) {
     console.error("[AMARIX] claim", err);
     const m = String((err && err.message) || ""),
@@ -4305,8 +4359,13 @@ document.addEventListener("click", async (e) => {
     q = "";
     $("#q").value = "";
     render();
-  } else if (a == "claim") claimPayment(b, id);
-  else if (a == "rate") rateItem(b);
+  } else if (a == "claim") {
+    claimPayment(b, id);
+  } else if (a == "vm-close") {
+    closeManualVerificationModal();
+  } else if (a == "vm-orders") {
+    closeManualVerificationModal();
+  } else if (a == "rate") rateItem(b);
   else if (a == "wa-contact") openWhatsApp(`${t("hi")}\n${t("ordno")}: ${id}`);
   else if (a == "aff-share") {
     const link = partnerLink();
