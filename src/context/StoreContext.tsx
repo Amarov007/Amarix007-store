@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
   Language,
   Theme,
@@ -302,6 +303,82 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('amx_orders', JSON.stringify(orders));
   }, [orders]);
+
+  // Supabase Realtime channel listener for user order status updates
+  useEffect(() => {
+    if (!user || !user.id) return;
+    const SB_URL = "https://pvuobngrybygohendwaz.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2dW9ibmdyeWJ5Z29oZW5kd2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMTI0ODIsImV4cCI6MjEwNzg4ODQ4Mn0.enSKw1_Wt58iK8-Y0eaHMWtBGQ7HyYXP_JEwYLsSfpU";
+
+    let channel: any = null;
+    let client: any = null;
+
+    try {
+      client = createClient(SB_URL, SB_KEY);
+      channel = client.channel(`store-context-orders-${user.id}`);
+
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          const newRow = payload?.new;
+          if (!newRow || !newRow.id) return;
+
+          const orderId = String(newRow.id);
+          const currentOrder = orders.find(o => String(o.id) === orderId);
+          const prevStatus = (currentOrder?.status || payload?.old?.status || 'pending').toLowerCase();
+          const nextStatus = (newRow.status || '').toLowerCase();
+          const prevPay = (currentOrder?.paymentStatus || payload?.old?.payment_status || 'pending').toLowerCase();
+          const nextPay = (newRow.payment_status || '').toLowerCase();
+
+          setOrders(prev => prev.map(o => {
+            if (String(o.id) === orderId) {
+              return {
+                ...o,
+                status: (newRow.status as any) || o.status,
+                paymentStatus: (newRow.payment_status as any) || o.paymentStatus,
+              };
+            }
+            return o;
+          }));
+
+          const isPending = (s: string) => !s || s === 'pending' || s === 'new' || s === 'awaiting_payment';
+          const isConfirmed = (s: string) => s === 'processing' || s === 'confirmed' || s === 'paid' || s === 'under_review';
+          const isCompleted = (s: string) => s === 'done' || s === 'completed';
+
+          const becameConfirmed =
+            (isPending(prevStatus) && (isConfirmed(nextStatus) || nextPay === 'paid' || nextPay === 'review')) ||
+            (prevPay === 'pending' && (nextPay === 'review' || nextPay === 'paid'));
+
+          const becameCompleted = isCompleted(nextStatus) && !isCompleted(prevStatus);
+
+          if (becameCompleted) {
+            showToast(lang === 'ar' ? `تهانينا! تم اكتمال طلبك رقم #${orderId} بنجاح.` : `Congratulations! Order #${orderId} is now completed.`, 'ok');
+            playSynthSound('success');
+            confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+          } else if (becameConfirmed) {
+            showToast(lang === 'ar' ? `تم تأكيد طلبك رقم #${orderId}، وهو الآن قيد التنفيذ!` : `Order #${orderId} has been confirmed and is now being processed!`, 'ok');
+            playSynthSound('success');
+          }
+        }
+      );
+
+      channel.subscribe();
+    } catch (err) {
+      console.warn('[AMARIX] StoreContext realtime subscription error:', err);
+    }
+
+    return () => {
+      if (client && channel) {
+        try { client.removeChannel(channel); } catch {}
+      }
+    };
+  }, [user?.id, lang]);
 
   useEffect(() => {
     localStorage.setItem('amx_favs', JSON.stringify(favorites));

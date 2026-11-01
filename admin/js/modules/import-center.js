@@ -20,19 +20,32 @@ const HUB_LABEL = { games: "الألعاب", chat: "تطبيقات الدردش�
 const PTYPE = { games: "game_topup", chat: "app_subscription", apps: "app_subscription", ai: "app_subscription", numbers: "app_subscription", smm: "smm" };
 
 export default async function (view) {
-  await loadCatalog();
+  try {
+    await Promise.race([
+      loadCatalog(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000))
+    ]);
+  } catch (err) {
+    console.warn("[Admin Import] Catalog load fallback:", err);
+  }
   let providers = [], selected = "", rows = [], loading = false, markup = 30, filter = "", page = 0;
   const status = h("div");
   const preview = h("div");
 
   async function loadProviders() {
     try {
-      const extra = await rpc("smm_providers_admin_list");
+      const extra = await Promise.race([
+        rpc("smm_providers_admin_list"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000))
+      ]);
       providers = [{ id: "main", name: "المزوّد الرئيسي", kind: "smm", enabled: true }, ...(Array.isArray(extra) ? extra : []).filter((p) => p.enabled !== false)];
       selected = providers.some((p) => p.id === selected) ? selected : providers[0]?.id || "";
       draw();
     } catch (e) {
-      mount(status, errorState(new Error("تعذّر تحميل المزوّدين: " + e.message), loadProviders));
+      providers = [{ id: "main", name: "المزوّد الرئيسي", kind: "smm", enabled: true }];
+      selected = "main";
+      draw();
+      mount(status, h("p", { class: "hint warn" }, "تعذّر جلب قائمة المزوّدين الإضافيين — تم تفعيل المزوّد الرئيسي افتراضياً."));
     }
   }
 

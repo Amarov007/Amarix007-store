@@ -1370,6 +1370,7 @@ function storeSession(j) {
     user = j.user;
     setTimeout(pushSync, 0);
     setTimeout(cartSync, 0);
+    if (user.id) setTimeout(() => initOrdersRealtimeListener(user.id), 50);
   }
 }
 function clearSession() {
@@ -1382,6 +1383,7 @@ function clearSession() {
   try {
     walletReset();
   } catch {}
+  stopOrdersRealtimeListener();
 }
 /* Returns a valid access token (refreshing if needed) or null when signed out */
 async function getToken() {
@@ -1438,6 +1440,213 @@ window.AMXPayTransport = {
   lang: () => lang,
   ex: (value) => ex(value),
   showManualVerificationModal: (opts) => window.showManualVerificationModal && window.showManualVerificationModal(opts),
+};
+
+/* ---------- Supabase Realtime Orders Listener ---------- */
+let realtimeClient = null;
+let ordersRealtimeChannel = null;
+const orderStatusCache = {};
+
+function getRealtimeClient() {
+  if (realtimeClient) return realtimeClient;
+  const Lib = window.SupabaseRealtime;
+  if (!Lib || typeof Lib.RealtimeClient !== "function") return null;
+  try {
+    realtimeClient = new Lib.RealtimeClient(SB_URL + "/realtime/v1", {
+      params: { apikey: SB_KEY },
+    });
+    realtimeClient.connect();
+    return realtimeClient;
+  } catch (err) {
+    console.warn("[AMARIX] realtime client connect error:", err);
+    return null;
+  }
+}
+
+async function initOrdersRealtimeListener(userId) {
+  if (!userId) return;
+  const client = getRealtimeClient();
+  if (!client) {
+    setTimeout(() => {
+      if (!ordersRealtimeChannel && user && user.id === userId) {
+        initOrdersRealtimeListener(userId);
+      }
+    }, 1000);
+    return;
+  }
+
+  const topic = `orders-user-${userId}`;
+  if (ordersRealtimeChannel && ordersRealtimeChannel.topic === `realtime:${topic}`) {
+    return;
+  }
+
+  if (ordersRealtimeChannel) {
+    try {
+      ordersRealtimeChannel.unsubscribe();
+    } catch {}
+    ordersRealtimeChannel = null;
+  }
+
+  try {
+    const tk = await getToken();
+    if (tk && client.setAuth) {
+      try { client.setAuth(tk); } catch {}
+    }
+
+    ordersRealtimeChannel = client.channel(topic, {
+      config: {
+        broadcast: { ack: false, self: false },
+        presence: { key: "" },
+      },
+    });
+
+    ordersRealtimeChannel.on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "orders",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        handleOrderRealtimeUpdate(payload);
+      }
+    );
+
+    ordersRealtimeChannel.on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "orders",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        if (payload?.new?.id) {
+          orderStatusCache[String(payload.new.id)] = {
+            status: String(payload.new.status || "new").toLowerCase(),
+            payment_status: String(payload.new.payment_status || "pending").toLowerCase(),
+            raw: payload.new,
+          };
+        }
+      }
+    );
+
+    ordersRealtimeChannel.subscribe((status, err) => {
+      if (status === "SUBSCRIBED") {
+        console.log("[AMARIX] Realtime subscribed to orders channel for user", userId);
+      } else if (status === "CHANNEL_ERROR") {
+        console.warn("[AMARIX] Realtime channel error, reconnecting:", err);
+      }
+    });
+  } catch (e) {
+    console.warn("[AMARIX] initOrdersRealtimeListener failed:", e);
+  }
+}
+
+function stopOrdersRealtimeListener() {
+  if (ordersRealtimeChannel) {
+    try {
+      ordersRealtimeChannel.unsubscribe();
+    } catch {}
+    ordersRealtimeChannel = null;
+  }
+  for (const k in orderStatusCache) delete orderStatusCache[k];
+}
+
+function handleOrderRealtimeUpdate(payload) {
+  const newRow = payload?.new;
+  if (!newRow || !newRow.id) return;
+  const orderId = String(newRow.id);
+
+  const cached = orderStatusCache[orderId] || payload?.old || {};
+  const prevStatus = String(cached.status || "new").toLowerCase();
+  const nextStatus = String(newRow.status || "").toLowerCase();
+  const prevPay = String(cached.payment_status || "pending").toLowerCase();
+  const nextPay = String(newRow.payment_status || "").toLowerCase();
+
+  orderStatusCache[orderId] = {
+    status: nextStatus,
+    payment_status: nextPay,
+    raw: newRow,
+  };
+
+  const isPendingLike = (s) => !s || s === "pending" || s === "new" || s === "created" || s === "awaiting_payment";
+  const isConfirmedLike = (s) => s === "processing" || s === "confirmed" || s === "under_review" || s === "paid";
+  const isCompletedLike = (s) => s === "done" || s === "completed";
+
+  const becameConfirmed =
+    (isPendingLike(prevStatus) && (isConfirmedLike(nextStatus) || nextPay === "paid" || nextPay === "review")) ||
+    (prevPay === "pending" && (nextPay === "review" || nextPay === "paid"));
+
+  const becameCompleted =
+    isCompletedLike(nextStatus) && !isCompletedLike(prevStatus);
+
+  const A = lang === "ar";
+
+  if (becameCompleted) {
+    const msg = A
+      ? `تهانينا! تم اكتمال طلبك رقم #${orderId} بنجاح.`
+      : `Congratulations! Order #${orderId} has been completed successfully.`;
+    notifyOrderStatusChange(orderId, msg, "completed", newRow);
+  } else if (becameConfirmed) {
+    const msg = A
+      ? `تم تأكيد طلبك رقم #${orderId}، وهو الآن قيد التنفيذ!`
+      : `Order #${orderId} has been confirmed and is now being processed!`;
+    notifyOrderStatusChange(orderId, msg, "confirmed", newRow);
+  }
+
+  liveRefreshOrderViews(orderId, newRow);
+}
+
+function notifyOrderStatusChange(orderId, msg, type, row) {
+  toast(msg, "ok");
+  try { beep("ok"); } catch {}
+  try { if (navigator.vibrate) navigator.vibrate([150, 70, 150]); } catch {}
+
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      const isAr = lang === "ar";
+      const title = isAr
+        ? (type === "completed" ? "AMARIX007 | اكتمل طلبك بنجاح 🎉" : "AMARIX007 | تم تأكيد طلبك ⚡")
+        : (type === "completed" ? "AMARIX007 | Order Completed 🎉" : "AMARIX007 | Order Confirmed ⚡");
+      const notif = new Notification(title, {
+        body: msg,
+        icon: "icon-192.png",
+        badge: "favicon-64.png",
+        tag: `amx-order-${orderId}-${type}`,
+        data: { url: "#/orders" },
+      });
+      notif.onclick = () => {
+        try { window.focus && window.focus(); } catch {}
+        location.hash = "#/orders";
+      };
+    }
+  } catch {}
+}
+
+function liveRefreshOrderViews(orderId, newRow) {
+  if (/^#\/orders/.test(location.hash)) {
+    ordersPage(routeSeq);
+  } else if (location.hash.startsWith("#/done")) {
+    const activeDoneId = location.hash.replace("#/done/", "").trim();
+    if (!activeDoneId || activeDoneId === orderId) {
+      if (lastOrder && lastOrder.id === orderId) {
+        lastOrder.status = newRow.status;
+        lastOrder.payment_status = newRow.payment_status;
+      }
+      render();
+    }
+  } else if (location.hash.startsWith("#/account")) {
+    accStatsLoad();
+  }
+}
+
+window.AMXRealtime = {
+  init: initOrdersRealtimeListener,
+  stop: stopOrdersRealtimeListener,
+  handleUpdate: handleOrderRealtimeUpdate,
+  cache: orderStatusCache,
 };
 
 
@@ -3791,6 +4000,20 @@ async function ordersPage(seq) {
     }
     if (!r.ok) throw new Error(await r.text());
     const rows = await r.json();
+    if (Array.isArray(rows)) {
+      rows.forEach((o) => {
+        if (o && o.id) {
+          orderStatusCache[String(o.id)] = {
+            status: String(o.status || "").toLowerCase(),
+            payment_status: String(o.payment_status || "").toLowerCase(),
+            raw: o,
+          };
+        }
+      });
+      if (user && user.id && !ordersRealtimeChannel) {
+        initOrdersRealtimeListener(user.id);
+      }
+    }
     await loadMyReviews();
     if (seq === routeSeq) {
       $("#m").innerHTML = ordersHTML(rows);
@@ -6226,6 +6449,7 @@ async function boot() {
   checkGoogle();
   if (!user) tgPrep();
   await handleAuthRedirect();
+  if (user && user.id) setTimeout(() => initOrdersRealtimeListener(user.id), 100);
   /* Stale-while-revalidate: the last published config is cached in localStorage ('amx_remote') and used for the first paint, so returning visitors never see the embedded placeholder store. With no cache yet (first visit) we show a skeleton instead of the placeholders, and fall back to the embedded copy only if the request fails or is too slow. */
   const cached =
     REMOTE_CFG && Array.isArray(REMOTE_CFG.products) ? REMOTE_CFG : null;
