@@ -2060,16 +2060,16 @@ function cardBig(p) {
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "";
   const rating = ratingHtml(p);
   const vis = isVisit(p);
-  return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div> <button class="b add" data-a="add" data-id="${ex(p.id)}">${ic( "cart", 15 )} ${t("add")}</button>`}</div></div>`;
+  return `<div class="cd${vis ? " visit" : ""}"> <button class="hb ${ fav.includes(p.id) ? "on" : "" }" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic( "heart", 16 )}</button> ${!vis && p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}${vis ? `<i class="vchip">${ic("ext", 12)}</i>` : ""} <a class="art" href="#/p/${ex(p.id)}">${art(p, c)}</a> <div class="bd2"><small>${c[lang]}</small><a href="#/p/${ex(p.id)}"><h3>${ p[lang] }</h3></a>${rating} ${isVisit(p) ? `<div class="vnote">${ic("ext", 13)} ${t("visitshort")}</div>${visitBtn(p)}` : `<div class="pr"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div> <button class="b add" data-a="buy" data-id="${ex(p.id)}">${ic( "bolt", 15 )} ${t("buy")}</button>`}</div></div>`;
 }
-/* Compact product row (default everywhere): thumbnail · name · category · price · quick add. Same look as the boost list. */
+/* Compact product row (default everywhere): thumbnail · name · category · price · quick buy. Same look as the boost list. */
 function card(p) {
   const c = cat(p.c),
     old = p.o > pr(p) ? `<s>${money(p.o)}</s>` : "",
     vis = isVisit(p),
     price = p.smm_service && !apiMode(p) ? money(sbPrice(p).v) + " <small>" + ex(sbPrice(p).l) + "</small>" : money(pr(p));
   const href = `#/p/${ex(p.id)}`;
-  return `<div class="pr-r${vis ? " visit" : ""}"><a class="pr-t" href="${href}" tabindex="-1" aria-hidden="true">${art(p, c)}</a><a class="pr-b" href="${href}"><h3>${p[lang]}</h3><small>${c[lang]}</small><span class="pr-p">${vis ? `<i class="vchip">${ic("ext", 12)}</i> ${t("visitshort")}` : `<b class="n">${price}</b>${old}${p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}`}</span></a><span class="pr-x"><button class="hb ${fav.includes(p.id) ? "on" : ""}" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic("heart", 15)}</button>${vis ? visitBtn(p) : `<button class="pr-add" data-a="add" data-id="${ex(p.id)}" aria-label="${t("add")}">${ic("cart", 16)}</button>`}</span></div>`;
+  return `<div class="pr-r${vis ? " visit" : ""}"><a class="pr-t" href="${href}" tabindex="-1" aria-hidden="true">${art(p, c)}</a><a class="pr-b" href="${href}"><h3>${p[lang]}</h3><small>${c[lang]}</small><span class="pr-p">${vis ? `<i class="vchip">${ic("ext", 12)}</i> ${t("visitshort")}` : `<b class="n">${price}</b>${old}${p.d > 0 ? `<i class="bd">-${Math.round(p.d)}%</i>` : ""}`}</span></a><span class="pr-x"><button class="hb ${fav.includes(p.id) ? "on" : ""}" data-a="fav" data-id="${ex(p.id)}" aria-label="${t("fav")}">${ic("heart", 15)}</button>${vis ? visitBtn(p) : `<button class="pr-add" data-a="buy" data-id="${ex(p.id)}" aria-label="${t("buy")}">${ic("bolt", 16)}</button>`}</span></div>`;
 }
 /* Large product lists are rendered in small DOM batches. The full catalogue remains
    available in memory for search, cart validation and admin publishing; only card DOM is paged. */
@@ -2261,19 +2261,18 @@ function footer() {
 function nav() {
   const r = (location.hash || "#/").split("?")[0].split("/")[1] || "",
     active = r == "c" || r == "p" ? "" : r == "done" ? "orders" : r == "partner" ? "account" : r;
-  const n = cartCount(),
-    v = $("#nv");
+  const v = $("#nv");
   const items = [
     ["", "home", "home"],
-    ["fav", "heart", "fav"],
     ["orders", "box", "ord"],
-    ["cart", "cart", "cart"],
+    ["wallet", "wallet", "wallet"],
+    ["fav", "heart", "fav"],
     ["account", "user", "acc"],
   ];
   v.innerHTML = items
     .map(
       ([l, i, k]) =>
-        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span>${ k == "cart" && n ? '<span class="cnt">' + fmtN(n) + "</span>" : "" }</a>`
+        `<a href="#/${l}" data-r="${l}"${k == "ord" ? ' class="hl"' : ""}>${ic(i, k == "ord" ? 22 : 20)}<span>${t(k)}</span></a>`
     )
     .join("");
   v.querySelectorAll("a").forEach((e) =>
@@ -2318,7 +2317,7 @@ function drawerRender() {
     <div class="dr-h">${A ? "القائمة" : "Menu"}</div>
     ${big("#/", "home", t("home"))}
     ${big("#/orders", "box", t("ord"))}
-    ${big("#/cart", "cart", t("cart"), n ? `<span class="dr-n">${fmtN(n)}</span>` : "")}
+    ${big("#/wallet", "wallet", t("wallet"))}
     ${big("#/fav", "heart", t("fav"))}
     ${big("#/account", user ? "user" : "out", user ? t("acc") : t("login"))}
     ${user ? big("#/partner", "gift", A ? "برنامج الشركاء" : "Partner program") : ""}
@@ -2688,7 +2687,7 @@ function prodPage(id) {
   const ds = p.ds && (p.ds[lang] || (boost ? p.ds.ar || p.ds.en : ""));
   const rel = boost ? [] : P.filter((x) => x.c == p.c && x.id != p.id).slice(0, 4);
   const back = boost ? `<a class="b b2 sm sb-back" href="#/boost">${ic("chev", 14)} ${lang == "ar" ? "العودة إلى منصة الرشق" : "Back to the Boost panel"}</a>` : "";
-  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty}${accountField} <div class="row"><button class="b" style="flex:1" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${t("buy")}</button><button class="b b2" style="flex:1" data-a="add" data-id="${ex(p.id)}" data-n="${n}">${t("add")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
+  return `${back}<div class="box"><div class="gallery">${gallery}</div> <h1>${boost ? ex(sbTitle(p, sbMeta(p))) : p[lang]}</h1>${p.sp ? `<div class="spec">${p.sp}</div>` : ""}${boost ? sbChips(sbMeta(p)) : ""}${vis ? "" : badge} ${vis ? "" : ratingHtml(p)} ${vis ? `<div class="vnote lg">${ic("ext", 14)} ${t("visitext")}</div>${visitBtn(p, true)}` : `<div class="pr" style="margin:8px 0 12px"><b class="n">${(p.smm_service && !apiMode(p)) ? money(sbPrice(p).v) + ' <small>' + ex(sbPrice(p).l) + '</small>' : money(pr(p))}</b>${old}</div>${qty}${accountField} <div class="row"><button class="b" style="flex:1;font-weight:700" data-a="buy" data-id="${ex(p.id)}" data-n="${n}">${ic("bolt", 16)} ${t("buy")}</button></div>`}</div> ${boost && sbFull(p, sbMeta(p)) ? `<div class="box">${sbFull(p, sbMeta(p))}</div>` : ""}${ds ? `<div class="box"><p class="pd">${ex(ds)}</p></div>` : ""}${rel.length ? `<h2>${t("related")}</h2>${grid(rel)}` : ""}`;
 }
 
 /* Static pages: FAQ and policies */
@@ -2720,7 +2719,7 @@ function policiesPage() {
 function checkoutStepper(currentStep) {
   const A = lang == "ar";
   const steps = [
-    { n: 1, t: A ? "السلة والطلب" : "Cart & Order", sub: A ? "مراجعة المنتجات" : "Review items" },
+    { n: 1, t: A ? "الطلب المباشر" : "Direct Order", sub: A ? "المنتج والبيانات" : "Item & details" },
     { n: 2, t: A ? "وسيلة الدفع" : "Payment Method", sub: A ? "تحديد طريقة الدفع" : "Select method" },
     { n: 3, t: A ? "التحويل والإشعار" : "Transfer & Proof", sub: A ? "إرفاق إيصال الدفع" : "Attach receipt" },
     { n: 4, t: A ? "التحقق والتنفيذ" : "Manual Review", sub: A ? "مراجعة الإدارة والاعتماد" : "Admin verification" }
@@ -2766,11 +2765,11 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeManualVerificationModal();
 });
 
-/* Cart with order summary, coupon, payment method and the two ways to order */
+/* Direct checkout with order summary, coupon, payment method and confirmation */
 function cartPage() {
   const lines = cartLines();
   if (!lines.length)
-    return `<p class="emp">${ic("cart", 40)}<br>${t("ce")}</p>`;
+    return `<div class="box empty-checkout" style="text-align:center;padding:32px 16px"><div style="font-size:42px;margin-bottom:12px">🛍️</div><h2>${lang == "ar" ? "لم تحدد منتجاً للشراء بعد" : "No item selected"}</h2><p class="pd">${lang == "ar" ? "اختر أي خدمة أو لعبة من المتجر واضغط «شراء الآن» لإتمام طلبك مباشرة وبدون سلة." : "Choose any product and tap 'Buy Now' to complete your order directly."}</p><a class="b" href="#/" style="display:inline-flex;margin-top:12px">${lang == "ar" ? "تصفح المتجر الآن" : "Browse Store"}</a></div>`;
   const T_ = totals(),
     cp = cpOf(coupon);
   const rows = lines
@@ -4593,37 +4592,33 @@ document.addEventListener("click", async (e) => {
       b.dataset.next = String(end);
       b.textContent = (lang == "ar" ? "عرض المزيد" : "Load more") + " · " + end + " / " + rows.length;
     }
-  } else if (a == "add") {
-    if (!addFromProduct(id, +b.dataset.n || 1)) return;
-    toast(t("added"));
-  } else if (a == "ntab") {
-    NS.tab = b.dataset.t == "free" ? "free" : "paid";
-    NS.fc = -1;
-    render();
-  } else if (a == "nfree") {
-    NS.fc = +b.dataset.i;
-    render();
-    scrollTo(0, 0);
-  } else if (a == "npick") {
-    const fs = fstate(b.dataset.c);
-    fs.sel[+b.dataset.g] = [+b.dataset.o];
-    if (+b.dataset.g == 0) delete fs.sel[1];
-    render();
-    scrollTo(0, 0);
-  } else if (a == "nstep") {
-    const fs = fstate(b.dataset.c),
-      s0 = fs.sel[0];
-    fs.sel = +b.dataset.s == 0 ? {} : s0 ? { 0: s0 } : {};
-    render();
-    scrollTo(0, 0);
-  } else if (a == "buy") {
-    if (!addFromProduct(id, +b.dataset.n || 1)) return;
+  } else if (a == "buy" || a == "add") {
+    const p = prod(id);
+    if (!p) return;
+    let accountValue = "";
+    if (apiInput(p)) {
+      const field = [...document.querySelectorAll('[data-a="product-id"]')].find((el) => el.dataset.id === String(id));
+      if (!field && !location.hash.startsWith("#/p/" + id)) {
+        location.hash = "#/p/" + id;
+        return;
+      }
+      if (field) {
+        accountValue = String(field.value || "").trim();
+        if (!inputOk(accountValue)) {
+          field.setAttribute("aria-invalid", "true");
+          field.focus();
+          toast(lang === "ar" ? "أدخل معرّف اللاعب أو بيانات الحساب المطلوبة للمتابعة" : "Enter required player ID before proceeding", "wn");
+          return;
+        }
+      }
+    }
+    cart = [{ id, q: +b.dataset.n || 1, ...(accountValue ? { l: accountValue } : {}) }];
+    save();
     qbOpen();
   } else if (a == "qb-x") {
     qbClose();
   } else if (a == "qb-cart") {
     qbClose();
-    location.hash = "#/cart";
   } else if (a == "fav") {
     fav = fav.includes(id) ? fav.filter((x) => x != id) : [...fav, id];
     save();
@@ -6196,7 +6191,7 @@ function qbEl() {
   e.className = "qb";
   e.setAttribute("aria-hidden", "true");
   const A = lang == "ar";
-  e.innerHTML = `<div class="qb-ov" data-a="qb-x"></div><div class="qb-s" role="dialog" aria-modal="true" aria-label="${A ? "إتمام الشراء" : "Checkout"}"><div class="qb-h"><b>${A ? "إتمام الشراء" : "Checkout"}</b><button type="button" class="ib" data-a="qb-x" aria-label="${A ? "إغلاق" : "Close"}">${ic("x", 16)}</button></div><ol class="qb-st"><li>${A ? "المنتج" : "Item"}</li><li>${A ? "الدفع" : "Payment"}</li><li>${A ? "التأكيد" : "Confirm"}</li></ol><div class="qb-b" id="qb-b"></div><button type="button" class="qb-more" data-a="qb-cart">${A ? "فتح السلة كاملة" : "Open full cart"}</button></div>`;
+  e.innerHTML = `<div class="qb-ov" data-a="qb-x"></div><div class="qb-s" role="dialog" aria-modal="true" aria-label="${A ? "إتمام الشراء المباشر" : "Direct Checkout"}"><div class="qb-h"><b>${A ? "إتمام الشراء المباشر" : "Direct Checkout"}</b><button type="button" class="ib" data-a="qb-x" aria-label="${A ? "إغلاق" : "Close"}">${ic("x", 16)}</button></div><ol class="qb-st"><li>${A ? "المنتج" : "Item"}</li><li>${A ? "الدفع" : "Payment"}</li><li>${A ? "التأكيد" : "Confirm"}</li></ol><div class="qb-b" id="qb-b"></div><button type="button" class="qb-more" data-a="qb-x">${A ? "إلغاء والعودة للمتجر" : "Cancel and return to store"}</button></div>`;
   document.body.appendChild(e);
   return e;
 }

@@ -1,6 +1,6 @@
-import { loadCatalog, data, edit, subscribe } from "../core/catalog.js";
+import { loadCatalog, data, edit, subscribe, publish } from "../core/catalog.js";
 import { publishBar, imageField } from "../core/forms.js";
-import { h, mount, pageHeader, toolbar, searchBox, select as sel, dataTable, badge, modal, toast, confirmBox, field, input, spinner, switchEl } from "../core/ui.js";
+import { h, mount, pageHeader, toolbar, searchBox, select as sel, dataTable, badge, modal, toast, confirmBox, field, input, spinner, switchEl, icon } from "../core/ui.js";
 import { money, num } from "../core/utils.js";
 import { getGameArtwork } from "../core/game-art.js";
 
@@ -28,21 +28,34 @@ export default async function (view) {
         provider ? h("button", {
           class: "btn danger sm",
           onclick: async () => {
-            const count = D.products.filter((p) => String(p.smm_provider || "").toLowerCase() === provider.toLowerCase()).length;
-            if (!count) return toast("لا توجد منتجات لهذا المزوّد", "err");
-            if (!(await confirmBox(`هل تريد حذف جميع منتجات المزوّد «${provider}» البالغ عددها ${count} منتجاً؟\n(لن يُطبّق الحذف نهائياً قبل الضغط على زر «نشر» بالأعلى)`, { danger: true, okLabel: `حذف ${count} منتج` }))) return;
-            edit((draft) => {
-              draft.products = draft.products.filter((p) => String(p.smm_provider || "").toLowerCase() !== provider.toLowerCase());
-            });
-            toast(`تم حذف ${count} منتج للمزوّد «${provider}». اضغط «نشر» لتطبيق التغيير.`);
+            const toDelete = D.products.filter((p) => String(p.smm_provider || "").toLowerCase() === provider.toLowerCase());
+            if (!toDelete.length) return toast("لا توجد منتجات لهذا المزوّد", "err");
+            if (!(await confirmBox(`هل تريد حذف جميع منتجات المزوّد «${provider}» البالغ عددها ${toDelete.length} منتجاً وحفظ الحذف فوراً؟`, { danger: true, okLabel: `حذف ${toDelete.length} منتج نهائياً` }))) return;
+            const ids = toDelete.map((p) => p.id);
+            await deleteAndPublish(ids, `منتجات ${provider} (${ids.length})`);
             provider = "";
-            draw();
-            drawToolbar();
           }
         }, `حذف كل منتجات «${provider}» (${provCount})`) : null
       )
     );
   };
+
+  async function deleteAndPublish(idsToDelete, label = "") {
+    const idSet = new Set(idsToDelete.map(String));
+    edit((D) => {
+      D.products = D.products.filter((p) => !idSet.has(String(p.id)));
+    });
+    toast("جارٍ نشر الحذف وتحديث المتجر…");
+    try {
+      await publish();
+      toast(`✓ تم حذف ${label} بنجاح من المتجر`, "ok");
+    } catch (err) {
+      console.error("[Products Delete] Publish failed:", err);
+      toast("تم الحذف من القائمة، اضغط زر «نشر» بالأعلى لتأكيد الحفظ", "warn");
+    }
+    draw();
+    drawToolbar();
+  }
 
   const draw = () => {
     const D = data(), cats = Object.fromEntries(D.categories.map((c) => [c.id, c.ar]));
@@ -67,7 +80,19 @@ export default async function (view) {
       { label: "المسار", render: (p) => badge(p.ptype || (p.smm_service ? "مزود" : "يدوي"), "info") },
       { label: "المزوّد / الخدمة", render: (p) => [h("span", { class: "mono" }, p.smm_provider || "—"), h("small", { class: "sub mono" }, p.smm_service || "—")] },
       { label: "السعر", render: (p) => [h("b", { class: "mono" }, money(p.p)), num(p.o) > 0 && h("small", { class: "sub" }, `قبل: ${money(p.o)}`)] },
-      { label: "خصم", render: (p) => (num(p.d) ? `${p.d}%` : "—") }, { label: "تقييم", render: (p) => (p.r ? `★ ${p.r}` : "—") }] }));
+      { label: "خصم", render: (p) => (num(p.d) ? `${p.d}%` : "—") },
+      { label: "تقييم", render: (p) => (p.r ? `★ ${p.r}` : "—") },
+      { label: "إجراءات", render: (p) => h("button", {
+        class: "btn sm danger",
+        style: { padding: "4px 8px", minWidth: "auto", display: "inline-flex", alignItems: "center", gap: "4px" },
+        title: "حذف هذا المنتج فوراً",
+        onclick: async (e) => {
+          e.stopPropagation();
+          if (!(await confirmBox(`هل أنت متأكد من حذف «${p.ar || p.en || p.id}» وحفظ الحذف في المتجر فوراً؟`, { danger: true, okLabel: "حذف الآن" }))) return;
+          await deleteAndPublish([p.id], p.ar || p.en || p.id);
+        }
+      }, icon("trash", 14), "حذف") }
+    ] }));
   };
   function open(existing) {
     const D = data(), isNew = !existing, p = existing ? { ...existing } : { id: slug(), c: D.categories[0]?.id || "", ar: "", en: "", p: 0, o: 0, d: 0, r: 5, n: 0, bs: 0, t: 0, tg: "", sp: "", img: "", images: [] };
@@ -85,7 +110,10 @@ export default async function (view) {
     let auto = p.auto !== false;
     let img = p.img || "";
     modal({ title: isNew ? "منتج جديد" : "تعديل منتج", wide: true, actions: [
-      !isNew && { label: "حذف", kind: "danger", onClick: async () => { if (!(await confirmBox(`حذف «${p.ar || p.id}»؟ (لن يُنشر قبل الضغط على «نشر»)`, { danger: true }))) return false; edit((D) => { D.products = D.products.filter((x) => String(x.id) !== String(p.id)); }); toast("حُذف مؤقتاً — انشر لتأكيد الحذف"); } },
+      !isNew && { label: "حذف نهائي ونشر", kind: "danger", onClick: async () => {
+        if (!(await confirmBox(`حذف «${p.ar || p.id}» وتحديث المتجر فوراً؟`, { danger: true, okLabel: "حذف الآن" }))) return false;
+        await deleteAndPublish([p.id], p.ar || p.id);
+      } },
       { label: "إلغاء", kind: "ghost" },
       { label: "حفظ", kind: "primary", onClick: () => {
         if (!f.ar.value.trim() && !f.en.value.trim()) { toast("أدخل اسم المنتج", "err"); return false; }

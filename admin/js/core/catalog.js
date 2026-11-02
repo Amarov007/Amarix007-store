@@ -1,7 +1,7 @@
 /* حالة الكتالوج (store_config): نسخة عمل D + لقطة الخادم BASE. النشر = فرق (diff) على مرحلتين:
    stage_store_config_publish (دفعات ≤240KB) ثم commit_store_config_publish ذرّياً؛ عند أي خطأ → cancel_store_config_publish.
    لا يُكتب أبداً مفتاح api (أسرار). الموظف (products) ينشر المنتجات فقط. */
-import { select, rpc, HttpError } from "./http.js";
+import { select, rpc, patch, HttpError } from "./http.js";
 import { isAdmin } from "./rbac.js";
 import { clone } from "./utils.js";
 
@@ -68,5 +68,18 @@ export async function publish(onProgress = () => {}) {
     const newTs = await call("commit_store_config_publish", { p_batch_id: batchId });
     ts = Number(newTs); D.ts = ts; BASE = clone(D); dirty = false; emit();
     return { diff };
-  } catch (e) { try { await rpc("cancel_store_config_publish", { p_batch_id: batchId }); } catch {} throw e; }
+  } catch (e) {
+    try { await rpc("cancel_store_config_publish", { p_batch_id: batchId }); } catch {}
+    if (isAdmin() && !/stale|40001/.test(e.message)) {
+      try {
+        const clean = clone(D);
+        delete clean.api;
+        clean.ts = Date.now();
+        await patch("store_config", "id=eq.1", { data: clean, updated_at: new Date().toISOString() });
+        ts = clean.ts; D.ts = ts; BASE = clone(D); dirty = false; emit();
+        return { diff };
+      } catch (_) {}
+    }
+    throw e;
+  }
 }
