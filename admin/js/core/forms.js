@@ -20,9 +20,12 @@ export function imageField(label, value, onChange, max = 900) {
 
 /* شريط النشر: يظهر فقط عند وجود تعديلات غير منشورة */
 export function publishBar() {
-  const bar = h("div", { class: "publish-bar", hidden: true });
+  const bar = h("div", { class: "publish-bar", hidden: true, style: { display: "none" } });
   const draw = () => {
-    bar.hidden = !isDirty(); if (bar.hidden) return;
+    const dirty = isDirty();
+    bar.hidden = !dirty;
+    bar.style.display = dirty ? "flex" : "none";
+    if (!dirty) return;
     const d = buildDiff(!isAdmin());
     const parts = [d.upserts.length && `${d.upserts.length} منتج مضاف/معدّل`, d.deletes.length && `${d.deletes.length} محذوف`, d.order && "ترتيب المنتجات", ...d.patchKeys.map((k) => `إعدادات: ${k}`)].filter(Boolean);
     const pub = h("button", { class: "btn primary", onclick: async (e) => {
