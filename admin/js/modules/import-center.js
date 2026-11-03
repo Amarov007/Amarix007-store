@@ -9,7 +9,7 @@ const cleanId = (v) => String(v || "").normalize("NFKD").toLowerCase().replace(/
 const text = (v) => String(v ?? "").trim();
 const number = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 const priceText = (v) => Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 12 });
-const retailPrice = (row, margin) => providerRetailUnitPrice(row.rate, margin);
+const retailPrice = (row, margin) => providerRetailUnitPrice(row.rate, margin, row.rateBasis);
 const safeHttps = (v) => {
   const s = String(v ?? "").trim();
   if (/^https:\/\//i.test(s)) return s;
@@ -82,6 +82,7 @@ export default async function (view) {
           name: (services.get(service) || service) + " — " + (countries.get(country) || country),
           category: services.get(service) || "أرقام التفعيل",
           rate: number(o.p),
+          rateBasis: "per_unit", // numbers_catalog returns one activation price, not a per-thousand rate
           amount: o.n,
           available: o.n == null || number(o.n) > 0,
           image: "",
@@ -113,6 +114,7 @@ export default async function (view) {
         name,
         category,
         rate,
+        rateBasis: "per_1000", // smm-order normalizes SMM/custom service rates to per-thousand
         min,
         max,
         image,
@@ -224,7 +226,8 @@ export default async function (view) {
           const product = D.products.find((p) => p.id === row.existingProduct.id);
           if (!product) { skipped++; continue; }
           product.p = price;
-          product.provider_cost_per_1000 = number(row.rate);
+          product.provider_cost_rate = number(row.rate);
+          product.provider_rate_basis = row.rateBasis;
           product.provider_markup_pct = markup;
           product.provider_price_synced_at = new Date().toISOString();
           updated++;
@@ -265,7 +268,7 @@ export default async function (view) {
           id: productId, c: category, ar: row.name, en: row.name, p: price, o: 0, d: 0, r: 5, t: 3,
           img: safeHttps(row.image) || safeHttps(row.category_image) || gameArtworkFor(row.name, row.category),
           images: [], ptype, smm_provider: provider.id, smm_service: service, smm_qty: 1, smm_input, req,
-          provider_cost_per_1000: number(row.rate), provider_markup_pct: markup,
+          provider_cost_rate: number(row.rate), provider_rate_basis: row.rateBasis, provider_markup_pct: markup,
           provider_price_synced_at: new Date().toISOString(),
           ...(row.country ? { smm_country: row.country } : {}),
           ...(hub === "smm" ? { qmin: Math.max(1, row.min || 1), qmax: Math.max(0, row.max || 0) } : { qmin: 1, qmax: 1 }),
@@ -319,7 +322,7 @@ export default async function (view) {
           h("div", null, h("b", null, x.name), h("small", { class: "sub mono" }, `#${x.id}`))
         )),
         h("td", null, badge(HUB_LABEL[x.hub] || x.hub, "info")),
-        h("td", { class: "mono" }, priceText(x.rate) + " /1000"),
+        h("td", { class: "mono" }, priceText(x.rate) + (x.rateBasis === "per_1000" ? " /1000" : " /وحدة")),
         h("td", { class: "mono" }, x.exists && x.existingProduct ? priceText(x.currentPrice * (x.hub === "smm" ? 1000 : 1)) + (x.hub === "smm" ? " /1000" : " /وحدة") : "—"),
         h("td", { class: "mono" }, priceText(x.nextPrice * (x.hub === "smm" ? 1000 : 1)) + (x.hub === "smm" ? " /1000" : " /وحدة")),
         h("td", null, x.duplicateCount > 1 ? badge("تكرار يحتاج مراجعة", "warn") : x.exists ? (x.priceChanged ? badge("السعر تغيّر", "warn") : badge("مطابق", "ok")) : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "info"))
