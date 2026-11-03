@@ -4985,3 +4985,16 @@ html[dir="rtl"] .amx-marquee-track {
     display: none !important;
   }
 }
+
+/* AMARIX007: strictly hide payment showcase on home page and eliminate cart buttons store-wide */
+.pay-showcase, [data-a="add"], [data-a="sbadd"], .nm-cb, .cart-btn, [data-a="cart"], a[href="#/cart"] {
+  display: none !important;
+}
+.sb-act {
+  display: flex !important;
+  width: 100% !important;
+}
+.sb-act button {
+  width: 100% !important;
+  flex: 1 1 100% !important;
+}

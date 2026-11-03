@@ -2403,10 +2403,7 @@ function partner(sm) {
   return `<a class="pt${sm ? " sm" : ""}" href="${ex( safeUrl(p.url) )}" target="_blank" rel="noopener">${bg} <div class="pt-in"> <span class="pt-logo">${ p.logo ? `<img src="${ex(p.logo)}" alt="" loading="lazy" decoding="async">` : ic("bank", 26) }</span> <span class="pt-tx"><span class="pt-badge">${ic("shield", 12)} ${ A ? "شريك رسمي" : "Official partner" }</span> <b class="pt-nm">${ex(p.name)}</b><span class="pt-d">${ex( A ? p.ar : p.en )}</span></span> <span class="pt-cta">${ex(A ? p.ba : p.be)} ${ic("ext", 15)}</span> </div></a>`;
 }
 function paymentsSection() {
-  if (!PM.length) return "";
-  const A = lang == "ar";
-  const methods = [...PM].sort((x, y) => (+x.sort || 0) - (+y.sort || 0));
-  return `<section class="pay-showcase" aria-labelledby="pay-showcase-title"><div class="pay-head"><span class="pay-kicker">${ic("shield",14)} ${A ? "دفع يدوي آمن" : "SECURE MANUAL PAYMENT"}</span><h2 id="pay-showcase-title">${t("paymethods")}</h2><p>${A ? "اختر طريقة الدفع المناسبة لك، وأكمل طلبك بخطوات بسيطة" : "Choose your preferred method and complete your order in a few simple steps."}</p></div><div class="pays pay-method-grid">${methods.map((m,i)=>`<article class="pm pay-method-card" style="--pc:${safeColor(m.color)||"var(--ac)"}"><span class="pay-card-top"><span class="pay-card-index">0${i+1}</span><span class="pay-card-status">${A?"متاحة":"AVAILABLE"}</span></span><span class="pay-card-logo">${payLogo(m,60)}</span><b>${pmName(m)}</b><small>${m.config?.network || (m.id==="usdt"?(A?"تحويل رقمي · شبكة BEP20":"Digital transfer · BEP20 network"):m.id==="binance"?(A?"تحويل سريع عبر Binance Pay":"Fast transfer with Binance Pay"):m.id==="syriatel"?(A?"تحويل محلي عبر سيريتل كاش":"Local transfer via Syriatel Cash"):m.id==="sham"?(A?"تحويل محلي عبر شام كاش":"Local transfer via Sham Cash"):(A?"تحويل دفع يدوي موثّق":"Verified manual payment"))}</small></article>`).join("")}</div><div class="pay-trust-row"><div><span>${ic("shield-check",20)}</span><b>${A?"دفع موثّق يدوياً":"Manual verification"}</b></div><div><span>${ic("zap",20)}</span><b>${A?"معالجة سريعة":"Fast processing"}</b></div><div><span>${ic("lock",20)}</span><b>${A?"إثبات دفع محمي":"Protected payment proof"}</b></div><div><span>${ic("headset",20)}</span><b>${A?"دعم متواصل":"Ongoing support"}</b></div></div></section>`;
+  return "";
 }
 function amxMarqueeSection() {
   const brands = [
@@ -2434,7 +2431,7 @@ function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
   if (q) return searchPage();
   return (
-    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + amxMarqueeSection() + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = c.ty == "hub" ? AMXHub.count(c) : P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${c.ty == "hub" ? (lang == "ar" ? "خيار" : "options") : lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> ${(() => { const pn = P.filter((p) => +p.pin > 0).sort((a, b) => a.pin - b.pin); return pn.length ? `<h2>${lang == "ar" ? "منتجات مميزة" : "Featured"}</h2>${gridBig(pn)}` : ""; })()} ${paymentsSection()}`
+    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + amxMarqueeSection() + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = c.ty == "hub" ? AMXHub.count(c) : P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${c.ty == "hub" ? (lang == "ar" ? "خيار" : "options") : lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> ${(() => { const pn = P.filter((p) => +p.pin > 0).sort((a, b) => a.pin - b.pin); return pn.length ? `<h2>${lang == "ar" ? "منتجات مميزة" : "Featured"}</h2>${gridBig(pn)}` : ""; })()}`
   );
 }
 
@@ -2564,7 +2561,7 @@ function nmSvcs(f) {
 function nmRow(p) {
   const m = nmMeta(p),
     cn = nmCty(m);
-  return `<div class="nm-r"><span class="nm-fl">${m.flag ? m.flag : ic("globe", 18)}</span><span class="sb-nm"><b>${ex(cn || m.sv)}</b><small>${ex(m.sv)} · ${sbT("استلام الكود فوراً", "Instant code")}</small></span><span class="sb-pr"><b class="n">${money(pr(p))}</b><small>${sbT("للرقم", "per number")}</small></span><button type="button" class="b nm-b" data-a="buy" data-id="${ex(p.id)}">${sbT("اشترِ", "Buy")}</button><button type="button" class="nm-cb" data-a="add" data-id="${ex(p.id)}" aria-label="${t("add")}">${ic("cart", 16)}</button></div>`;
+  return `<div class="nm-r"><span class="nm-fl">${m.flag ? m.flag : ic("globe", 18)}</span><span class="sb-nm"><b>${ex(cn || m.sv)}</b><small>${ex(m.sv)} · ${sbT("استلام الكود فوراً", "Instant code")}</small></span><span class="sb-pr"><b class="n">${money(pr(p))}</b><small>${sbT("للرقم", "per number")}</small></span><button type="button" class="b nm-b" data-a="buy" data-id="${ex(p.id)}">${sbT("اشترِ", "Buy")}</button></div>`;
 }
 function nmRes(f) {
   if (!f.cur) return "";
@@ -5693,7 +5690,7 @@ function sbForm(p) {
 <div class="qstep"><button type="button" class="qs" data-a="sbs" data-d="-1" aria-label="-">−</button><input id="sb-n" class="inp qin" type="number" inputmode="numeric" min="${lo * u}" max="${hi * u}" value="${n * u}" dir="ltr" data-a="sbqin" aria-label="${sbT("الكمية", "Quantity")}"><button type="button" class="qs" data-a="sbs" data-d="1" aria-label="+">+</button></div>
 <small class="qhint">${u > 1 ? sbT("بمضاعفات", "In steps of") + " <bdi dir=\"ltr\">" + fmtN(u) + "</bdi>" : ""}</small></div>
 <div class="sb-tot"><span>${sbT("الإجمالي", "Total")}</span><b class="n" id="sb-tot">${money(pr(p) * n)}</b></div>
-<div class="sb-act"><button type="button" class="b" data-a="sbbuy">${ic("bolt", 15)} ${t("buy")}</button><button type="button" class="b b2" data-a="sbadd">${ic("cart", 15)} ${t("add")}</button></div>
+<div class="sb-act"><button type="button" class="b cta" data-a="sbbuy" style="width:100%">${ic("bolt", 15)} ${t("buy")}</button></div>
 <a class="sb-det" href="#/p/${ex(p.id)}">${sbT("تفاصيل الخدمة", "Service details")}</a></div>`;
 }
 function sbRow(p) {
@@ -6187,7 +6184,7 @@ function render0() {
       : r == "partner"
       ? (loadPartner(), partnerPage())
       : r == "cart"
-      ? cartPage()
+      ? (location.hash = "#/", home())
       : r == "fav"
       ? favPage()
       : r == "login"
