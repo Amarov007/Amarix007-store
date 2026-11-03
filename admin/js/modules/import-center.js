@@ -9,6 +9,8 @@ const cleanId = (v) => String(v || "").normalize("NFKD").toLowerCase().replace(/
 const text = (v) => String(v ?? "").trim();
 const number = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 const priceText = (v) => Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 12 });
+const shownMul = (x) => (x.hub === "smm" && x.rateBasis === "per_1000" ? 1000 : 1);
+const shownLabel = (x) => (shownMul(x) === 1000 ? " /1000" : " /وحدة");
 const retailPrice = (row, margin, product = null) => providerRetailUnitPrice(row.rate, margin, row.rateBasis, number(product?.d));
 const safeHttps = (v) => {
   const s = String(v ?? "").trim();
@@ -124,7 +126,8 @@ export default async function (view) {
         product_type,
         country,
         count,
-        available: x.available !== false && x.enabled !== false
+        available: x.available !== false && x.enabled !== false,
+        ...(/^package$/i.test(text(x.type ?? x.service_type)) ? { rateBasis: "per_unit" } : {})
       };
     }).filter((x) => x.id && x.name);
   }
@@ -156,8 +159,9 @@ export default async function (view) {
         x.markupPct = x.existingProduct && Number.isFinite(Number(x.existingProduct.provider_markup_pct)) ? number(x.existingProduct.provider_markup_pct) : markup;
         x.nextPrice = retailPrice(x, x.markupPct, x.existingProduct);
         x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice);
+        x.suspiciousPrice = (x.hub !== "smm" || x.rateBasis === "per_unit") && x.nextPrice > 0 && x.nextPrice < 0.01;
         // New services are preselected; existing prices always require explicit review.
-        x.selected = !x.exists && x.available && x.rate > 0;
+        x.selected = !x.exists && x.available && x.rate > 0 && !x.suspiciousPrice;
       });
       mount(status, h("p", { class: "hint" }, `اكتمل الجلب: ${rows.length} خدمة. الموجود مسبقاً مستبعد تلقائياً من التحديد.`));
     } catch (e) { mount(status, errorState(e, fetchCatalog)); }
@@ -327,9 +331,9 @@ export default async function (view) {
         )),
         h("td", null, badge(HUB_LABEL[x.hub] || x.hub, "info")),
         h("td", { class: "mono" }, priceText(x.rate) + (x.rateBasis === "per_1000" ? " /1000" : " /وحدة")),
-        h("td", { class: "mono" }, x.exists && x.existingProduct ? priceText(x.currentPrice * (x.hub === "smm" ? 1000 : 1)) + (x.hub === "smm" ? " /1000" : " /وحدة") : "—"),
-        h("td", { class: "mono" }, priceText(x.nextPrice * (x.hub === "smm" ? 1000 : 1)) + (x.hub === "smm" ? " /1000" : " /وحدة")),
-        h("td", null, x.duplicateCount > 1 ? badge("تكرار يحتاج مراجعة", "warn") : x.exists ? (x.priceChanged ? badge("السعر تغيّر", "warn") : badge("مطابق", "ok")) : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "info"))
+        h("td", { class: "mono" }, x.exists && x.existingProduct ? priceText(x.currentPrice * shownMul(x)) + shownLabel(x) : "—"),
+        h("td", { class: "mono" }, priceText(x.nextPrice * shownMul(x)) + shownLabel(x)),
+        h("td", null, x.duplicateCount > 1 ? badge("تكرار يحتاج مراجعة", "warn") : x.suspiciousPrice ? badge("سعر مشبوه", "warn") : x.exists ? (x.priceChanged ? badge("السعر تغيّر", "warn") : badge("مطابق", "ok")) : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "info"))
       ));
     });
     mount(preview, h("div", null,

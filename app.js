@@ -947,10 +947,15 @@ const pmName = (m) =>
 const pr = (p) => p.p * (1 - (p.d || 0) / 100); // unit price after product discount (base currency)
 const fmt = (v, k = cur) => {
   if (!R[k]) k = BASE;
-  const x =
-    k == "SYP"
-      ? Math.round(v * R[k][0]).toLocaleString("en-US")
-      : (v * R[k][0]).toFixed(2);
+  const num = v * R[k][0];
+  let x;
+  if (k == "SYP") {
+    x = Math.round(num).toLocaleString("en-US");
+  } else if (num > 0 && num < 0.01) {
+    x = Number(num.toPrecision(2)).toString();
+  } else {
+    x = num.toFixed(2);
+  }
   return x + " " + R[k][1];
 };
 const money = (v) => `<bdi dir="ltr">${fmt(v)}</bdi>`;
@@ -5605,6 +5610,7 @@ const sbU = (p) => (+p.smm_qty > 0 ? +p.smm_qty : 1); // real quantity of one pa
 const sbN = (p) => qClamp(p, SB.n);
 const sbPrice = (p) => {
   const u = sbU(p);
+  if (u === 1 && p.smm_service && !apiMode(p) && qMin(p) === 1 && qMax(p) === 1) return { v: pr(p), l: sbT("/ باقة", "/ package") };
   return u > 1 || (p.smm_service && !apiMode(p)) ? { v: (pr(p) * 1000) / u, l: "/ 1000" } : { v: pr(p), l: sbT("/ وحدة", "/ unit") };
 };
 const sbAll = () => P.filter(isBoost);

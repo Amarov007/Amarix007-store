@@ -553,11 +553,11 @@ Deno.serve(async (req: Request) => {
         if (!m) return { error: saFail(r.text) };
         return { balance: m[1].trim(), currency: String(s.cfg?.currency ?? "") };
       }
-      if (s.kind === "arcadezy" || (s.base.includes("arcadezy.com") && !s.cfg?.balance)) {
+      if (s.kind === "arcadezy" || s.base.includes("arcadezy.com")) {
         const r = await arcadezyCall(s, "/balance", "GET");
         if ("error" in r) return r;
-        const bal = r.data.balance_usd ?? r.data.balance ?? r.data.data?.balance_usd ?? r.data.data?.balance;
-        if (bal === undefined || bal === null) return { error: `provider "${s.id}": balance not found in Arcadezy response` };
+        const bal = r.data.balance_usd ?? r.data.balance ?? r.data.data?.balance_usd ?? r.data.data?.balance ?? r.data.amount;
+        if (bal === undefined || bal === null) return { error: `provider "${s.id}": balance not found in Arcadezy response (${JSON.stringify(r.data).slice(0, 100)})` };
         return { balance: String(bal), currency: "USD" };
       }
       const spec = s.cfg?.balance;
@@ -570,7 +570,7 @@ Deno.serve(async (req: Request) => {
       if (v === undefined || v === null) {
         v = getPath(r.data, "balance_usd") ?? getPath(r.data, "data.balance_usd") ?? getPath(r.data, "data.balance") ?? getPath(r.data, "balance.amount") ?? getPath(r.data, "wallet.balance") ?? getPath(r.data, "amount");
       }
-      if (v === undefined || v === null) return { error: `provider "${s.id}": balance.value path not found in the response` };
+      if (v === undefined || v === null) return { error: `provider "${s.id}": balance.value path not found in the response (${JSON.stringify(r.data).slice(0, 100)})` };
       return { balance: String(v), currency: String(getPath(r.data, spec.currency) ?? spec.currency_label ?? s.cfg?.currency ?? "USD") };
     };
 

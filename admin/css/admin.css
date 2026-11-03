@@ -73,13 +73,14 @@ button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer;to
   .layout{grid-template-columns:1fr}
   .sidebar{position:fixed;inset-block:0;inset-inline-start:0;width:280px;z-index:60;transform:translateX(100%);visibility:hidden;pointer-events:none;transition:transform .25s,visibility .25s}
   [dir=rtl] .sidebar{transform:translateX(100%)}
+  [dir=ltr] .sidebar{transform:translateX(-100%)}
   body.nav-open .sidebar{transform:none;visibility:visible;pointer-events:auto}
   .icon-btn.menu{display:grid}
   .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;opacity:0;pointer-events:none;visibility:hidden;transition:opacity .2s,visibility .2s}
   body.nav-open .scrim{opacity:1;pointer-events:auto;visibility:visible}
   .table.stack{min-width:0}.kv{grid-template-columns:100px 1fr}
   .scroll-x{-webkit-overflow-scrolling:touch}
-  .btn,.icon-btn{min-height:36px}
-  .table td{padding:9px 10px}
+  .btn,.icon-btn{min-height:44px;min-width:44px}
+  .table td{padding:10px 12px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

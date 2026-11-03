@@ -18,7 +18,7 @@ export default async function (view) {
         { label: "النوع", render: (p) => badge(p.kind || "smm", "info") }, { label: "Secret", render: (p) => h("span", { class: "mono" }, p.api_key_secret_name || "—") },
         { label: "آخر رصيد", render: (p) => p.last_balance != null ? [h("b", { class: "mono" }, `${p.last_balance} ${p.last_currency || ""}`), h("small", { class: "sub" }, fmtDate(p.last_checked_at))] : "—" },
         { label: "الحالة", render: (p) => badge(p.enabled ? "مفعّل" : "موقوف", p.enabled ? "ok" : "mute") },
-        { label: "", render: (p) => h("button", { class: "btn sm", onclick: () => test(p.id) }, "اختبار") }] }));
+        { label: "", render: (p) => h("button", { class: "btn sm", onclick: (e) => { e?.stopPropagation?.(); test(p.id); } }, "اختبار") }] }));
     } catch (e) { mount(box, errorState(new Error(`${e.message} — انشر migration إخفاء أسرار المزوّدين أولاً`), load)); }
   }
   async function test(id) {
