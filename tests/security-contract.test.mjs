@@ -136,3 +136,19 @@ test("wallet eligibility fails closed for missing catalog and unknown products",
   assert.match(sql, /return coalesce\(section_name = any\(public\.wallet_sections\(cfg\)\), false\)/i);
   assert.match(sql, /item_count < 1 or item_count > 50/i);
 });
+
+
+test("provider import and repricing use explicit units and require review before publish", async () => {
+  const src = await read("../admin/js/modules/import-center.js");
+  assert.match(src, /rateBasis: "per_unit"/);
+  assert.match(src, /rateBasis: "per_1000"/);
+  assert.match(src, /providerRetailUnitPrice/);
+  assert.match(src, /product\.p = price/);
+  assert.match(src, /provider_cost_rate/);
+  assert.match(src, /existingProduct\.provider_markup_pct/);
+  assert.match(src, /const appliedMarkup = number\(row\.markupPct, markup\)/);
+  assert.match(src, /provider_rate_basis/);
+  assert.match(src, /تحديد الأسعار المتغيّرة/);
+  assert.match(src, /لا يُعدّل شيء منشور/);
+  assert.doesNotMatch(src, /hub === "smm" \? row\.rate \* \(1 \+ markup/);
+});

@@ -3,10 +3,13 @@ import { loadCatalog, data, edit } from "../core/catalog.js";
 import { publishBar } from "../core/forms.js";
 import { h, mount, pageHeader, badge, field, input, select as sel, toast, fail, spinner, errorState } from "../core/ui.js";
 import { getGameArtwork } from "../core/game-art.js";
+import { providerProductKey, providerPriceChanged, providerRetailUnitPrice } from "../core/provider-pricing.js";
 
 const cleanId = (v) => String(v || "").normalize("NFKD").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "service";
 const text = (v) => String(v ?? "").trim();
 const number = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
+const priceText = (v) => Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 12 });
+const retailPrice = (row, margin, product = null) => providerRetailUnitPrice(row.rate, margin, row.rateBasis, number(product?.d));
 const safeHttps = (v) => {
   const s = String(v ?? "").trim();
   if (/^https:\/\//i.test(s)) return s;
@@ -79,6 +82,7 @@ export default async function (view) {
           name: (services.get(service) || service) + " — " + (countries.get(country) || country),
           category: services.get(service) || "أرقام التفعيل",
           rate: number(o.p),
+          rateBasis: "per_unit", // numbers_catalog returns one activation price, not a per-thousand rate
           amount: o.n,
           available: o.n == null || number(o.n) > 0,
           image: "",
@@ -110,6 +114,7 @@ export default async function (view) {
         name,
         category,
         rate,
+        rateBasis: "per_1000", // smm-order normalizes SMM/custom service rates to per-thousand
         min,
         max,
         image,
@@ -133,8 +138,25 @@ export default async function (view) {
       if (raw?.error) throw new Error(raw.error);
       rows = normalize(raw, provider).map((x) => ({ ...x, hub: classify(x.name, x.category, provider.kind, x.product_type), selected: false }));
       const current = data().products;
-      const exists = new Set(current.map((p) => [String(p.smm_provider || "main"), String(p.smm_service || ""), String(p.smm_country || "")].join("|")));
-      rows.forEach((x) => { x.exists = exists.has([provider.id, x.service || x.id, x.country || ""].join("|")); x.selected = !x.exists && x.available && x.rate > 0; });
+      const byKey = new Map();
+      current.forEach((product) => {
+        const key = providerProductKey(product.smm_provider || "main", product.smm_service || "", product.smm_country || "");
+        if (!byKey.has(key)) byKey.set(key, []);
+        byKey.get(key).push(product);
+      });
+      rows.forEach((x) => {
+        const key = providerProductKey(provider.id, x.service || x.id, x.country || "");
+        const matches = byKey.get(key) || [];
+        x.exists = matches.length > 0;
+        x.duplicateCount = matches.length;
+        x.existingProduct = matches.length === 1 ? matches[0] : null;
+        x.currentPrice = matches.length === 1 ? number(matches[0].p) : 0;
+        x.markupPct = x.existingProduct && Number.isFinite(Number(x.existingProduct.provider_markup_pct)) ? number(x.existingProduct.provider_markup_pct) : markup;
+        x.nextPrice = retailPrice(x, x.markupPct, x.existingProduct);
+        x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice);
+        // New services are preselected; existing prices always require explicit review.
+        x.selected = !x.exists && x.available && x.rate > 0;
+      });
       mount(status, h("p", { class: "hint" }, `اكتمل الجلب: ${rows.length} خدمة. الموجود مسبقاً مستبعد تلقائياً من التحديد.`));
     } catch (e) { mount(status, errorState(e, fetchCatalog)); }
     finally { loading = false; draw(); }
@@ -187,21 +209,37 @@ export default async function (view) {
   }
 
   function saveSelected() {
-    const chosen = rows.filter((x) => x.selected && !x.exists && x.available && x.rate > 0);
-    if (!chosen.length) return toast("حدد خدمات صالحة أولاً", "err");
+    const chosen = rows.filter((x) => x.selected && x.available && x.rate > 0 && (!x.exists || (x.existingProduct && x.duplicateCount === 1)));
+    if (!chosen.length) return toast("حدد خدمات جديدة أو أسعاراً مختلفة صالحة أولاً", "err");
     const provider = providers.find((p) => p.id === selected);
     if (!provider) return toast("المزوّد غير محدد", "err");
+    let added = 0, updated = 0, skipped = 0;
     edit((D) => {
-      const keys = new Set(D.products.map((p) => [String(p.smm_provider || "main"), String(p.smm_service || ""), String(p.smm_country || "")].join("|")));
+      const keys = new Set(D.products.map((p) => providerProductKey(p.smm_provider || "main", p.smm_service || "", p.smm_country || "")));
       for (const row of chosen) {
         const service = row.service || row.id;
-        const key = [provider.id, service, row.country || ""].join("|");
-        if (keys.has(key)) continue;
+        const key = providerProductKey(provider.id, service, row.country || "");
+        const appliedMarkup = number(row.markupPct, markup);
+        const price = retailPrice(row, appliedMarkup, row.existingProduct);
+        if (!(price > 0)) { skipped++; continue; }
+
+        if (row.exists) {
+          if (row.duplicateCount !== 1 || !row.existingProduct) { skipped++; continue; }
+          const product = D.products.find((p) => p.id === row.existingProduct.id);
+          if (!product) { skipped++; continue; }
+          product.p = price;
+          product.provider_cost_rate = number(row.rate);
+          product.provider_rate_basis = row.rateBasis;
+          product.provider_markup_pct = appliedMarkup;
+          product.provider_price_synced_at = new Date().toISOString();
+          updated++;
+          continue;
+        }
+        if (keys.has(key)) { skipped++; continue; }
+
         const hub = row.hub;
         const category = categoryFor(D, row, provider);
-        const price = hub === "smm" ? row.rate * (1 + markup / 100) / 1000 : row.rate * (1 + markup / 100);
         const productId = ("imp_" + cleanId(provider.id) + "_" + cleanId(service) + (row.country ? "_" + cleanId(row.country) : "")).slice(0, 60);
-
         let ptype = PTYPE[hub] || "app_subscription";
         let req = [];
         let smm_input = "none";
@@ -209,64 +247,47 @@ export default async function (view) {
         if (provider.kind === "custom" || row.product_type || provider.id === "toupup") {
           const pt = String(row.product_type || "").toLowerCase();
           if (pt === "topup" || (!pt && hub === "games")) {
-            ptype = "game_topup";
-            req = ["player_id"];
-            smm_input = "text";
+            ptype = "game_topup"; req = ["player_id"]; smm_input = "text";
           } else if (pt === "voucher") {
-            ptype = "gift_card";
-            req = [];
-            smm_input = "none";
+            ptype = "gift_card"; req = []; smm_input = "none";
           } else {
             ptype = hub === "games" ? "game_topup" : (PTYPE[hub] || "app_subscription");
             req = hub === "games" ? ["player_id"] : [];
             smm_input = req.length ? "text" : "none";
           }
         } else if (provider.kind === "smsactivate") {
-          ptype = "app_subscription";
-          req = ["phone"];
-          smm_input = "phone";
+          ptype = "app_subscription"; req = ["phone"]; smm_input = "phone";
         } else if (hub === "smm") {
-          ptype = "smm";
-          req = [];
-          smm_input = "";
+          ptype = "smm"; req = []; smm_input = "";
         } else if (hub === "games") {
-          ptype = "game_topup";
-          req = ["player_id"];
-          smm_input = "player_id";
+          ptype = "game_topup"; req = ["player_id"]; smm_input = "player_id";
         } else {
-          ptype = "app_subscription";
-          req = ["email"];
-          smm_input = "email";
+          ptype = "app_subscription"; req = ["email"]; smm_input = "email";
         }
 
         const auto = provider.kind === "smsactivate" || provider.config?.self_service === true;
         D.products.unshift({
-          id: productId,
-          c: category,
-          ar: row.name,
-          en: row.name,
-          p: Math.max(0.000001, Math.round(price * 1000000) / 1000000),
-          o: 0,
-          d: 0,
-          r: 5,
-          t: 3,
+          id: productId, c: category, ar: row.name, en: row.name, p: price, o: 0, d: 0, r: 5, t: 3,
           img: safeHttps(row.image) || safeHttps(row.category_image) || gameArtworkFor(row.name, row.category),
-          images: [],
-          ptype,
-          smm_provider: provider.id,
-          smm_service: service,
-          smm_qty: 1,
-          smm_input,
-          req,
+          images: [], ptype, smm_provider: provider.id, smm_service: service, smm_qty: 1, smm_input, req,
+          provider_cost_rate: number(row.rate), provider_rate_basis: row.rateBasis, provider_markup_pct: appliedMarkup,
+          provider_price_synced_at: new Date().toISOString(),
           ...(row.country ? { smm_country: row.country } : {}),
           ...(hub === "smm" ? { qmin: Math.max(1, row.min || 1), qmax: Math.max(0, row.max || 0) } : { qmin: 1, qmax: 1 }),
           auto
         });
-        keys.add(key);
+        keys.add(key); added++;
       }
     });
-    toast(`أُضيفت ${chosen.length} خدمة إلى مسودة الكتالوج. لم تُنشر بعد.`);
-    rows = rows.map((x) => x.selected ? { ...x, exists: true, selected: false } : x);
+    toast(`أُضيفت ${added} خدمة وحدّثت أسعار ${updated} منتج. ${skipped ? `تُخطّي ${skipped}.` : ""} التغييرات في المسودة ولم تُنشر بعد.`);
+    rows = rows.map((x) => {
+      if (!x.selected) return x;
+      x.selected = false;
+      if (!x.exists) x.exists = true;
+      x.currentPrice = x.nextPrice;
+      x.priceChanged = false;
+      return x;
+    });
     draw();
   }
 
@@ -279,7 +300,7 @@ export default async function (view) {
     const table = h("div", { class: "table-wrap" });
     const body = h("tbody");
     filtered.slice(page * pageSize, (page + 1) * pageSize).forEach((x) => {
-      const check = h("input", { type: "checkbox", checked: x.selected, disabled: x.exists || !x.available || !(x.rate > 0), onchange: (e) => { x.selected = e.target.checked; drawPreview(); } });
+      const check = h("input", { type: "checkbox", checked: x.selected, disabled: !x.available || !(x.rate > 0) || (x.exists && (!x.existingProduct || x.duplicateCount !== 1)), onchange: (e) => { x.selected = e.target.checked; drawPreview(); } });
       const fbArt = gameArtworkFor(x.name, x.category);
       const imgSrc = (x.image && !x.image.startsWith("/assets/")) ? x.image : fbArt;
       const imgEl = h("img", {
@@ -303,16 +324,19 @@ export default async function (view) {
           h("div", null, h("b", null, x.name), h("small", { class: "sub mono" }, `#${x.id}`))
         )),
         h("td", null, badge(HUB_LABEL[x.hub] || x.hub, "info")),
-        h("td", { class: "mono" }, x.rate),
-        h("td", null, x.exists ? badge("موجود", "mute") : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "ok"))
+        h("td", { class: "mono" }, priceText(x.rate) + (x.rateBasis === "per_1000" ? " /1000" : " /وحدة")),
+        h("td", { class: "mono" }, x.exists && x.existingProduct ? priceText(x.currentPrice * (x.hub === "smm" ? 1000 : 1)) + (x.hub === "smm" ? " /1000" : " /وحدة") : "—"),
+        h("td", { class: "mono" }, priceText(x.nextPrice * (x.hub === "smm" ? 1000 : 1)) + (x.hub === "smm" ? " /1000" : " /وحدة")),
+        h("td", null, x.duplicateCount > 1 ? badge("تكرار يحتاج مراجعة", "warn") : x.exists ? (x.priceChanged ? badge("السعر تغيّر", "warn") : badge("مطابق", "ok")) : !x.available ? badge("غير متاح", "warn") : !(x.rate > 0) ? badge("سعر غير صالح", "warn") : badge("جديد", "info"))
       ));
     });
     mount(preview, h("div", null,
       h("div", { class: "toolbar" }, input({ type: "search", placeholder: "بحث في النتائج", value: filter, oninput: (e) => { filter = e.target.value.toLowerCase(); page = 0; drawPreview(); } }),
-        h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (!x.exists && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الصالح في النتائج"),
+        h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (!x.exists && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الخدمات الجديدة"),
+        h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (x.exists && x.existingProduct && x.duplicateCount === 1 && x.priceChanged && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الأسعار المتغيّرة"),
         h("button", { class: "btn ghost sm", onclick: () => { rows.forEach((x) => x.selected = false); drawPreview(); } }, "إلغاء التحديد")),
-      h("p", { class: "hint" }, `المزوّد: ${provider?.name || selected} · المعروض حتى 250 صفاً من ${filtered.length} · المحدد: ${rows.filter((x) => x.selected).length}`),
-      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة والصورة", "القسم", "سعر المزوّد", "الحالة"].map((x) => h("th", null, x)))), body)),
+      h("p", { class: "hint" }, `المزوّد: ${provider?.name || selected} · المعروض حتى 250 صفاً من ${filtered.length} · تكلفة المزوّد موحّدة لكل 1000 وحدة · المحدد: ${rows.filter((x) => x.selected).length}`),
+      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة والصورة", "القسم", "تكلفة المزوّد (أساسه موضّح)", "سعر المتجر الحالي", "السعر الجديد", "الحالة"].map((x) => h("th", null, x)))), body)),
       h("div", { class: "page-actions" },
         h("button", { class: "btn ghost sm", disabled: page <= 0, onclick: () => { page--; drawPreview(); } }, "السابق"),
         h("span", null, "صفحة " + (page + 1) + " من " + pages),
@@ -327,8 +351,8 @@ export default async function (view) {
         h("button", { class: "btn primary", disabled: loading || !selected, onclick: fetchCatalog }, "جلب الخدمات")),
       h("div", { class: "card" },
         h("div", { class: "form-grid" }, field("المزوّد", sel(opts, selected, { onchange: (e) => { selected = e.target.value; rows = []; mount(status); drawPreview(); } })),
-          field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); } }))),
-        h("p", { class: "hint" }, "الجلب لا يغيّر قاعدة البيانات أو المتجر المنشور. الخدمات تُضاف إلى مسودة الكتالوج، وتحتاج مراجعة الأسعار والحقول ثم الضغط على «نشر»."),
+          field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); rows.forEach((x) => { x.markupPct = markup; x.nextPrice = retailPrice(x, x.markupPct, x.existingProduct); x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice); if (x.exists && !x.priceChanged) x.selected = false; }); drawPreview(); } }))),
+        h("p", { class: "hint" }, "يُحسب السعر حسب أساس المزود: خدمات SMM والمزوّدين المخصصين لكل 1000، وأرقام التفعيل لكل تفعيل. تُحفظ الدقة حتى 12 منزلة. يمكنك تحديد الخدمات الجديدة أو المنتجات التي تغيّر سعرها. لا يُعدّل شيء منشور حتى تراجع المسودة وتضغط «نشر». المنتجات ذات الربط المكرر تُستثنى من التحديث الآلي."),
         status),
       preview,
       h("div", { class: "page-actions" }, h("button", { class: "btn primary", disabled: !rows.some((x) => x.selected), onclick: saveSelected }, "إضافة المحدد إلى المسودة")),
