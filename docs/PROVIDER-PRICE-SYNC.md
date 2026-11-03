@@ -5,7 +5,7 @@
 The store's product field `p` is always the retail price for one sellable unit/package in USDT. Provider responses do not all arrive in the same unit:
 
 - SMM `services`: provider rate is per 1,000 service units.
-- SMSActivate `numbers_catalog`: offer `p` is the price for one activation.
+- SMSActivate `numbers_catalog`: offer `p` is the price for one activation (the endpoint returns `cost * fx`, not `cost * 1000`).
 - Custom providers: `smm-order` normalizes the configured source using `config.services.rate_is_unit`; its returned `rate` is per 1,000. Check that setting against the provider's documented API before enabling a custom integration.
 
 Retail calculation:
