@@ -89,7 +89,7 @@ begin
   end loop;
 
   return 'main';
-end
+end;
 $;
 
 -- Preserve the live security contract: signed-in user, valid JSON objects,
@@ -125,7 +125,7 @@ begin
 
   section_name := public.wallet_order_section(p_items, cfg);
   return section_name = any(public.wallet_sections(cfg));
-end
+end;
 $;
 
 create or replace function public.wallet_topup_create(
@@ -201,7 +201,7 @@ begin
     E'\n💰 ' || amt || ' USD · main' || E'\n💳 ' || p_method
   );
   return nid;
-end
+end;
 $;
 
 do $$
