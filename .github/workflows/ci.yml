@@ -21,6 +21,20 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            if [[ "$file" == *.mjs || "$file" == *.cjs ]]; then
+              node --check "$file"
+            else
+              cp "$file" /tmp/amx-syntax-check.mjs
+              node --check /tmp/amx-syntax-check.mjs
+            fi
+          done < <(find . -path './node_modules' -prune -o -type f \\( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \\) -print0)
+      - name: Verify project structure and references
+        run: python3 tests/verify-project.py
       - name: Run tests
         run: npm test
       - name: Build production bundle
