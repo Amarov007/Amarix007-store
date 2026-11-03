@@ -20,71 +20,20 @@
   };
 
   /* =========================================================================
-     1. Scroll Reveal (IntersectionObserver)
+     1. Scroll Reveal (Immediate, stable rendering to eliminate tremors)
      ========================================================================= */
-  let revealObserver = null;
-
   function initRevealObserver() {
-    if (!("IntersectionObserver" in window)) {
-      document.querySelectorAll(".cd, .pr-r, .ct, .ban-w, .sec-t, .sec-h, .amx-rv").forEach((el) => {
-        el.classList.add("amx-revealed");
-      });
-      return;
-    }
-    if (!revealObserver) {
-      revealObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              const el = entry.target;
-              el.classList.add("amx-revealed");
-              revealObserver.unobserve(el);
-            }
-          });
-        },
-        { threshold: 0.12, rootMargin: "0px 0px -20px 0px" }
-      );
-    }
-    const targets = document.querySelectorAll(
-      ".cd:not(.amx-revealed), .pr-r:not(.amx-revealed), .ct:not(.amx-revealed), .ban-w:not(.amx-revealed), .sec-t:not(.amx-revealed), .sec-h:not(.amx-revealed), .amx-rv:not(.amx-revealed)"
-    );
-    targets.forEach((el, index) => {
-      if (prefersReducedMotion()) {
-        el.classList.add("amx-revealed");
-        return;
-      }
-      el.classList.add("amx-rv");
-      const parent = el.parentElement;
-      const sibIdx = parent ? Array.prototype.indexOf.call(parent.children, el) : index;
-      const delay = Math.min(Math.max(sibIdx, 0) * 40, 240);
-      el.style.setProperty("--rv-delay", delay + "ms");
-      revealObserver.observe(el);
+    document.querySelectorAll(".cd, .pr-r, .ct, .ban-w, .sec-t, .sec-h, .amx-rv").forEach((el) => {
+      el.classList.add("amx-revealed");
     });
   }
 
   /* =========================================================================
-     2. SplitText / BlurText on Headings (by words only to preserve Arabic ligatures)
+     2. SplitText / BlurText on Headings (Disabled to prevent DOM thrashing)
      ========================================================================= */
   function initBlurText() {
-    if (prefersReducedMotion()) return;
-    const headings = document.querySelectorAll(
-      "#m h1:not([data-amx-split]), #m h2:not([data-amx-split]):not(.no-split)"
-    );
-    headings.forEach((h) => {
-      h.setAttribute("data-amx-split", "1");
-      // Only split if heading has simple text children
-      if (h.children.length > 0) return;
-      const text = (h.textContent || "").trim();
-      if (!text || text.length > 80) return;
-      const words = text.split(/\s+/);
-      if (words.length <= 1) return;
-      h.innerHTML = words
-        .map(
-          (w, i) =>
-            `<span class="amx-word" style="animation-delay:${Math.min(i * 55, 300)}ms">${escapeHTML(w)}</span>`
-        )
-        .join(" ");
-    });
+    // Keep typography stable and prevent layout shifts
+    return;
   }
 
   function escapeHTML(str) {
@@ -278,7 +227,7 @@
   function setupCanvas() {
     const canvas = document.getElementById("amx-hero-canvas");
     if (!canvas) return;
-    if (prefersReducedMotion() || isLowEndDevice()) {
+    if (prefersReducedMotion() || isLowEndDevice() || window.innerWidth <= 768) {
       canvas.style.display = "none";
       return;
     }
