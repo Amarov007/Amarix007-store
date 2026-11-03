@@ -12,6 +12,7 @@ Retail calculation:
 
 - Per-thousand rate: `product.p = provider_rate * (1 + markup / 100) / 1000`.
 - Per-unit rate: `product.p = provider_rate * (1 + markup / 100)`.
+- If a product already has a discount `d`, the base `p` is divided by `(1 - d / 100)` so the discounted selling price retains the configured margin.
 
 The helper keeps 12 decimal places so very small SMM prices are not rounded up to a much larger minimum price.
 
