@@ -5,10 +5,10 @@
    - admin page, Supabase API, auth, storage, fonts: untouched, never cached
    - push notifications: shows the message sent by the send-push edge function; a tap opens the order page */
 const ICONS_CACHE = "amx-icons-v4";
-const SHELL_CACHE = "amx-shell-v28";
+const SHELL_CACHE = "amx-shell-v29";
 const ICONS = ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-64.png", "logo-mark.webp", "logo-word.webp"];
-const SHELL = ["./", "index.html", "boot.js", "app.js", "pay.js", "style.css", "store-data.js", "music.js", "svc-parse.js", "hubs.js", "splash.js", "splash.css"];
-const CODE = /\/(boot\.js|app\.js|pay\.js|style\.css|store-data\.js|music\.js|svc-parse\.js|hubs\.js|splash\.js|splash\.css)$/;
+const SHELL = ["./", "index.html", "boot.js", "app.js", "effects.js", "pay.js", "style.css", "store-data.js", "music.js", "svc-parse.js", "hubs.js", "splash.js", "splash.css"];
+const CODE = /\/(boot\.js|app\.js|effects\.js|pay\.js|style\.css|store-data\.js|music\.js|svc-parse\.js|hubs\.js|splash\.js|splash\.css)$/;
 const ADMIN = /\/admin(\.html|\/.*)$/;
 
 self.addEventListener("install", (e) => {

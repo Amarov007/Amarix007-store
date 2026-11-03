@@ -2170,6 +2170,9 @@ function decorate() {
     e.classList.add("rv");
     trioIO.observe(e);
   });
+  if (window.AMXEffects && window.AMXEffects.scan) {
+    window.AMXEffects.scan();
+  }
 }
 
 function head() {
@@ -2264,9 +2267,9 @@ function nav() {
   const v = $("#nv");
   const items = [
     ["", "home", "home"],
+    ["fav", "heart", "fav"],
     ["orders", "box", "ord"],
     ["wallet", "wallet", "wallet"],
-    ["fav", "heart", "fav"],
     ["account", "user", "acc"],
   ];
   v.innerHTML = items
@@ -2278,6 +2281,9 @@ function nav() {
   v.querySelectorAll("a").forEach((e) =>
     e.classList.toggle("on", e.dataset.r == active)
   );
+  if (window.AMXEffects && window.AMXEffects.updateNav) {
+    window.AMXEffects.updateNav();
+  }
   snSync();
   drawerRender();
 }
@@ -2395,11 +2401,33 @@ function paymentsSection() {
   const methods = [...PM].sort((x, y) => (+x.sort || 0) - (+y.sort || 0));
   return `<section class="pay-showcase" aria-labelledby="pay-showcase-title"><div class="pay-head"><span class="pay-kicker">${ic("shield",14)} ${A ? "دفع يدوي آمن" : "SECURE MANUAL PAYMENT"}</span><h2 id="pay-showcase-title">${t("paymethods")}</h2><p>${A ? "اختر طريقة الدفع المناسبة لك، وأكمل طلبك بخطوات بسيطة" : "Choose your preferred method and complete your order in a few simple steps."}</p></div><div class="pays pay-method-grid">${methods.map((m,i)=>`<article class="pm pay-method-card" style="--pc:${safeColor(m.color)||"var(--ac)"}"><span class="pay-card-top"><span class="pay-card-index">0${i+1}</span><span class="pay-card-status">${A?"متاحة":"AVAILABLE"}</span></span><span class="pay-card-logo">${payLogo(m,60)}</span><b>${pmName(m)}</b><small>${m.config?.network || (m.id==="usdt"?(A?"تحويل رقمي · شبكة BEP20":"Digital transfer · BEP20 network"):m.id==="binance"?(A?"تحويل سريع عبر Binance Pay":"Fast transfer with Binance Pay"):m.id==="syriatel"?(A?"تحويل محلي عبر سيريتل كاش":"Local transfer via Syriatel Cash"):m.id==="sham"?(A?"تحويل محلي عبر شام كاش":"Local transfer via Sham Cash"):(A?"تحويل دفع يدوي موثّق":"Verified manual payment"))}</small></article>`).join("")}</div><div class="pay-trust-row"><div><span>${ic("shield-check",20)}</span><b>${A?"دفع موثّق يدوياً":"Manual verification"}</b></div><div><span>${ic("zap",20)}</span><b>${A?"معالجة سريعة":"Fast processing"}</b></div><div><span>${ic("lock",20)}</span><b>${A?"إثبات دفع محمي":"Protected payment proof"}</b></div><div><span>${ic("headset",20)}</span><b>${A?"دعم متواصل":"Ongoing support"}</b></div></div></section>`;
 }
+function amxMarqueeSection() {
+  const brands = [
+    { n: "PUBG Mobile", i: "bolt" },
+    { n: "Free Fire", i: "spark" },
+    { n: "Roblox", i: "star" },
+    { n: "TikTok", i: "bolt" },
+    { n: "Telegram", i: "send" },
+    { n: "Instagram", i: "spark" },
+    { n: "PlayStation", i: "card" },
+    { n: "Steam", i: "shield2" },
+    { n: "YouTube", i: "spark" },
+    { n: "Discord", i: "send" },
+  ];
+  const items = brands
+    .map(
+      (b) =>
+        `<div class="amx-loop-item"><span class="amx-loop-icon">${ic(b.i, 13)}</span><span>${b.n}</span></div>`
+    )
+    .join("");
+  return `<div class="amx-marquee-wrap" aria-label="Supported Platforms"><div class="amx-marquee"><div class="amx-marquee-track">${items}</div><div class="amx-marquee-track" aria-hidden="true">${items}</div></div></div>`;
+}
+
 function home() {
   if (loadingCfg && !P.length) return skeletonGrid();
   if (q) return searchPage();
   return (
-    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = c.ty == "hub" ? AMXHub.count(c) : P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${c.ty == "hub" ? (lang == "ar" ? "خيار" : "options") : lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> ${(() => { const pn = P.filter((p) => +p.pin > 0).sort((a, b) => a.pin - b.pin); return pn.length ? `<h2>${lang == "ar" ? "منتجات مميزة" : "Featured"}</h2>${gridBig(pn)}` : ""; })()} ${paymentsSection()}`
+    (BN.length ? `<div class="ban-w"><div class="ban${BN.length < 2 ? " one" : ""}">${BN.map( (b, i) => { const txt = !b.img || b.ot === true, sub = lang == "ar" ? b.sa : b.se; /* image banners: the picture already carries its own text, so no title/subtitle/gradient on top unless `ot` is switched on in the admin */ return `<div class="bs${i ? "" : " cur"}${txt ? "" : " pic"}"${ b.img ? ` style="background:${ txt ? "linear-gradient(135deg,rgba(0,0,0,.6),rgba(0,0,0,.3))," : "" }url('${ex(b.img)}') center/cover"` : "" }>${ txt ? '<span class="bs-o o1"></span><span class="bs-o o2"></span>' : "" }<div class="bs-c">${ txt ? `${isGenericTitle(b[lang]) ? "" : `<h3>${b[lang]}</h3>`}${ sub && sub != b[lang] ? `<p>${sub}</p>` : "" }` : "" }<a class="b bs-b" href="${ex(safeUrl(b.h) || "#/")}" aria-label="${ bannerLabel(b) }">${ic("bolt", 14)} ${t("all")}</a></div></div>`; } ).join("")}</div> ${ BN.length > 1 ? `<button type="button" class="ban-n prev" data-a="ban-prev" aria-label="prev">${ic( "chev", 18 )}</button><button type="button" class="ban-n next" data-a="ban-next" aria-label="next">${ic( "chev", 18 )}</button> <div class="dots">${BN.map( (_, i) => `<button type="button" class="${ i ? "" : "on" }" data-a="ban-go" data-i="${i}" aria-label="${i + 1}"><u></u></button>` ).join("")}</div>` : "" }</div>` : "") + amxMarqueeSection() + `<div class="tiles" style="margin-top:14px">${CV.map((c, i) => { const n = c.ty == "hub" ? AMXHub.count(c) : P.filter((p) => p.c == c.id).length; return `<a class="ct" style="--d:${i}" href="${catHref(c)}"><span class="tile${ c.image_url ? " img" : "" }">${ico(c, 24)}</span><span class="ct-t"><b>${c[lang]}</b><small>${ n ? `${n} ${c.ty == "hub" ? (lang == "ar" ? "خيار" : "options") : lang == "ar" ? "منتج" : "items"}` : lang == "ar" ? "تصفّح القسم" : "Browse" }</small></span><i class="ct-go">${ic("chev", 16)}</i></a>`; }).join("")}</div> ${(() => { const pn = P.filter((p) => +p.pin > 0).sort((a, b) => a.pin - b.pin); return pn.length ? `<h2>${lang == "ar" ? "منتجات مميزة" : "Featured"}</h2>${gridBig(pn)}` : ""; })()} ${paymentsSection()}`
   );
 }
 

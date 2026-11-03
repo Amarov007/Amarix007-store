@@ -308,37 +308,46 @@ header {
   position: fixed;
   bottom: 0;
   inset-inline: 0;
-  background: var(--card);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--bd);
   display: flex;
-  justify-content: space-around;
-  padding: 6px 0 calc(env(safe-area-inset-bottom, 0px) + 6px);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 8px);
+  margin: 0;
   z-index: 30;
+  box-sizing: border-box;
 }
 #nv a {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   font-size: 11px;
   color: var(--mu);
   position: relative;
-  padding: 4px 6px;
-  border-radius: 12px;
-  flex: 1;
+  z-index: 2;
+  padding: 0 4px 6px;
+  border-radius: 14px;
+  flex: 1 1 0;
   min-width: 0;
-  margin: 0 3px;
+  height: 48px;
+  margin: 0;
+  box-sizing: border-box;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s ease;
 }
 #nv a.on {
   color: var(--m);
-  background: var(--g);
 }
 #nv a svg {
-  transition: transform 0.25s;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 #nv a.on svg {
-  transform: translateY(-1px) scale(1.12);
+  transform: translateY(-2px) scale(1.12);
 }
 .cnt {
   position: absolute;
@@ -3548,14 +3557,45 @@ h2 { font-size: 21px; margin: 34px 0 14px; letter-spacing: -.2px; }
 .ct small { font-size: 12.5px; color: var(--mu); }
 .ct .tile { width: 52px; height: 52px; border-radius: 16px; }
 
-/* bottom bar: "My orders" is the centre action */
-#nv { padding: 8px 6px calc(env(safe-area-inset-bottom, 0px) + 8px); background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-#nv a { font-size: 11.5px; gap: 2px; }
-#nv a.hl { flex: 1.25; margin-top: -22px; color: var(--on-ac); background: var(--m); border-radius: 20px; padding: 9px 6px 7px; box-shadow: 0 8px 22px rgba(185,255,102,.35), 0 0 0 5px var(--bg); font-weight: 800; }
+/* bottom bar: "My orders" is the centre action (fixed 76x68, mathematically centered at innerWidth / 2) */
+#nv a.hl {
+  flex: 0 0 76px;
+  width: 76px;
+  height: 68px;
+  margin: 0;
+  padding: 0 4px 8px;
+  transform: translateY(-20px);
+  color: var(--on-ac);
+  background: var(--m);
+  border-radius: 22px;
+  box-shadow: 0 8px 22px rgba(185,255,102,.35), 0 0 0 5px var(--bg);
+  font-weight: 800;
+  animation: amx-hl-spring 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  will-change: transform;
+}
 #nv a.hl svg { stroke: currentColor; }
-#nv a.hl.on { background: var(--g); color: var(--m); box-shadow: 0 8px 22px rgba(185,255,102,.25), 0 0 0 5px var(--bg), inset 0 0 0 2px var(--m); }
-#nv a.hl:active { transform: scale(.96); }
-@media (prefers-reduced-motion: reduce) { #nv a, #nv a svg { transition: none; } }
+#nv a.hl.on {
+  background: var(--g);
+  color: var(--m);
+  box-shadow: 0 8px 22px rgba(185,255,102,.25), 0 0 0 5px var(--bg), inset 0 0 0 2px var(--m);
+  animation: amx-hl-pulse 2.4s ease-in-out infinite;
+}
+#nv a.hl:active {
+  transform: translateY(-20px) scale(.96);
+}
+@keyframes amx-hl-spring {
+  0% { transform: translateY(20px) scale(.6); opacity: 0; }
+  60% { transform: translateY(-24px) scale(1.04); opacity: 1; }
+  100% { transform: translateY(-20px) scale(1); opacity: 1; }
+}
+@keyframes amx-hl-pulse {
+  0%, 100% { box-shadow: 0 8px 22px rgba(185,255,102,.25), 0 0 0 5px var(--bg), inset 0 0 0 2px var(--m), 0 0 0 0 rgba(185,255,102,.4); }
+  50% { box-shadow: 0 8px 22px rgba(185,255,102,.35), 0 0 0 5px var(--bg), inset 0 0 0 2px var(--m), 0 0 0 8px rgba(185,255,102,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #nv a, #nv a svg, #nv a.hl { transition: none; animation: none; }
+  #nv a.hl { transform: translateY(-20px); }
+}
 
 
 /* ===== Quick-buy bottom sheet (v30) ===== */
@@ -4662,3 +4702,230 @@ body.qb-open{overflow:hidden}
   }
 }
 @media(prefers-reduced-motion:reduce){.pay-method-card{transition:none}.pay-method-card:hover{transform:none}}
+
+/* =========================================================================
+   24. AMARIX007 Motion & Visual Effects (Pure CSS, strict zero-color changes)
+   ========================================================================= */
+
+/* Hero Aurora / Dot Grid Canvas */
+.hero-canvas {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.85;
+}
+header {
+  position: relative;
+  overflow: hidden;
+}
+header .w {
+  position: relative;
+  z-index: 1;
+}
+
+/* Scroll Reveal (Fade-in-up with staggered delay) */
+.amx-rv {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: var(--rv-delay, 0ms);
+  will-change: opacity, transform;
+}
+.amx-rv.amx-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* SplitText / BlurText on Headings */
+.amx-word {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(6px);
+  animation: amx-word-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: opacity, filter, transform;
+}
+@keyframes amx-word-in {
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* SpotlightCard & 3D Tilted Card */
+.cd {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s ease;
+  transform-style: preserve-3d;
+}
+.cd::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(170px circle at var(--spot-x, -200px) var(--spot-y, -200px), color-mix(in srgb, var(--ac) 16%, transparent), transparent 70%);
+  opacity: var(--spot-op, 0);
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 1;
+}
+.cd:active {
+  transform: scale(0.98);
+}
+
+/* ClickSpark particles */
+.amx-spark {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ac);
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%, -50%);
+  animation: amx-spark-anim 0.38s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+@keyframes amx-spark-anim {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, 0px))) scale(0);
+    opacity: 0;
+  }
+}
+
+/* Sliding Nav Indicator */
+.nv-slide {
+  position: absolute;
+  top: auto;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  left: 0;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--g);
+  pointer-events: none;
+  z-index: 1;
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  opacity: 0;
+}
+
+/* LogoLoop / Marquee Ribbon */
+.amx-marquee-wrap {
+  overflow: hidden;
+  position: relative;
+  margin: 14px 0 8px;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+.amx-marquee {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  user-select: none;
+}
+.amx-marquee-track {
+  display: flex;
+  gap: 10px;
+  animation: amx-loop 26s linear infinite;
+}
+.amx-marquee:hover .amx-marquee-track {
+  animation-play-state: paused;
+}
+@keyframes amx-loop {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+html[dir="rtl"] .amx-marquee-track {
+  animation-direction: reverse;
+}
+.amx-loop-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: var(--card);
+  border: 1px solid var(--bd);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--mu);
+  white-space: nowrap;
+}
+.amx-loop-icon {
+  display: flex;
+  align-items: center;
+  color: var(--ac);
+}
+
+/* Shimmer on Badges & Logo */
+.bd {
+  position: relative;
+  overflow: hidden;
+}
+.bd::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.32) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: amx-shimmer 4.2s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+@keyframes amx-shimmer {
+  0% { background-position: 200% 0; }
+  22%, 100% { background-position: -200% 0; }
+}
+
+/* Spring Toast & Modal Easing */
+#ts {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
+  inset-inline: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 80;
+  gap: 8px;
+}
+#ts > div {
+  animation: amx-toast-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes amx-toast-in {
+  0% { transform: translateY(14px) scale(0.88); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Tabular figures for animated counters */
+.num-cnt, [data-countup] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced motion full adherence */
+@media (prefers-reduced-motion: reduce) {
+  .amx-rv, .amx-word, .amx-spark, .amx-marquee-track, #ts > div, .nv-slide, .bd::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .amx-rv {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .amx-word {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+  .hero-canvas {
+    display: none !important;
+  }
+}
