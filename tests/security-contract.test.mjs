@@ -145,6 +145,8 @@ test("provider import and repricing use explicit units and require review before
   assert.match(src, /providerRetailUnitPrice/);
   assert.match(src, /product\.p = price/);
   assert.match(src, /provider_cost_rate/);
+  assert.match(src, /existingProduct\.provider_markup_pct/);
+  assert.match(src, /const appliedMarkup = number\(row\.markupPct, markup\)/);
   assert.match(src, /provider_rate_basis/);
   assert.match(src, /تحديد الأسعار المتغيّرة/);
   assert.match(src, /لا يُعدّل شيء منشور/);
