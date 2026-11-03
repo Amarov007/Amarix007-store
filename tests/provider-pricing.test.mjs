@@ -4,12 +4,14 @@ import { providerProductKey, providerPriceChanged, providerRetailUnitPrice } fro
 
 test("provider rates are converted from per-thousand to one sellable unit", () => {
   assert.equal(providerRetailUnitPrice(1.25, 30), 0.001625);
+  assert.equal(providerRetailUnitPrice(1.25, 30, "per_unit"), 1.625);
   assert.equal(providerRetailUnitPrice(0.025, 30), 0.0000325);
 });
 
 test("provider pricing keeps precision for very small SMM prices", () => {
   assert.equal(providerRetailUnitPrice(0.0025, 30), 0.00000325);
   assert.equal(providerRetailUnitPrice(0.0002, 30), 0.00000026);
+  assert.equal(providerRetailUnitPrice(0.0002, 30, "per_unit"), 0.00026);
 });
 
 test("invalid provider prices and margins fail closed", () => {
