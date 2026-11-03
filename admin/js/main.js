@@ -2,7 +2,7 @@
 import { getSession, onAuthChange, signIn, signOut } from "./core/auth.js";
 import { loadRole, hasAccess, isAdmin, state as role } from "./core/rbac.js";
 import { startRouter, visible, current, go, register } from "./core/router.js";
-import { h, $, mount, icon, toast, spinner, errorState, empty, withBusy } from "./core/ui.js";
+import { h, $, mount, icon, toast, spinner, errorState, empty, withBusy } from "./core/ui.js?v=2";
 import { TURNSTILE_KEY } from "./core/config.js";
 import { routes } from "./routes.js";
 
