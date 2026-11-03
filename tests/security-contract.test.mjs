@@ -111,10 +111,28 @@ test("AI support fails closed when the shared rate limiter is unavailable", asyn
 test("all active Edge Functions are tracked in the repository", async () => {
   const slugs = [
     "ai-support", "api-hub", "img-shrink", "media-seed", "payment-proof-hash",
-    "send-push", "smm-order", "telegram-admin", "telegram-auth"
+    "send-push", "smm-order", "telegram-admin", "telegram-auth", "provider-api", "smmnine-readonly"
   ];
   for (const slug of slugs) {
     const source = await read(`../supabase/functions/${slug}/index.ts`);
     assert.ok(source.length > 0, `${slug} source must be tracked`);
   }
+});
+
+
+test("wallet reconciliation preserves auth guards, limits, and immutable ledger", async () => {
+  const sql = await read("../supabase/migrations/20261103001934_wallet_unify_main_corrected_20261103.sql");
+  assert.match(sql, /LOCK TABLE public\.wallets, public\.wallet_transactions, public\.wallet_topups/i);
+  assert.match(sql, /auth\.uid\(\) is null then return false/i);
+  assert.match(sql, /item_count < 1 or item_count > 50/i);
+  assert.match(sql, /wallet_transactions is an immutable audit ledger/i);
+  assert.doesNotMatch(sql, /UPDATE public\.wallet_transactions/i);
+  assert.match(sql, /wallet_total_changed_during_migration/i);
+});
+
+test("wallet eligibility fails closed for missing catalog and unknown products", async () => {
+  const sql = await read("../supabase/migrations/20261103002100_wallet_eligibility_fail_closed_20261103.sql");
+  assert.match(sql, /coalesce\(jsonb_typeof\(cfg->'products'\), 'null'\) <> 'array'/i);
+  assert.match(sql, /return coalesce\(section_name = any\(public\.wallet_sections\(cfg\)\), false\)/i);
+  assert.match(sql, /item_count < 1 or item_count > 50/i);
 });

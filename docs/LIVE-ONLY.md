@@ -13,8 +13,8 @@
   - دالة `public.wallet_item_section(p jsonb, cfg jsonb)`: ترجع `'main'` لكل المنتجات الصالحة.
   - دالة `public.wallet_eligible(p_items jsonb)`: هي المصدر المعتمد الوحيد لفحص أهلية الدفع من المحفظة على الخادم دون أي شروط تضييقية موازية في JavaScript.
   - دالة `public.wallet_topup_create(p_amount, p_method, p_currency, p_section)`: المعامل `p_section` أصبح افتراضيه `'main'::text`.
-  - ملف الترحيل: `supabase/migrations/20261101000000_wallet_unify_main.sql`
-  - ملف التراجع: `supabase/rollbacks/20261101000000_wallet_unify_main.sql`
+  - ملف الترحيل: `supabase/migrations/20261103001934_wallet_unify_main_corrected_20261103.sql`
+  - ملف التراجع: `supabase/rollbacks/20261103001934_wallet_unify_main_corrected_20261103.sql`
 
 ---
 
@@ -48,3 +48,22 @@
 - `public.wallets`: جدول أرصدة المستخدمين (`user_id`, `section`, `balance`, `updated_at`). قراءة السجل الخاص بالمستخدم فقط أو المدير.
 - `public.wallet_transactions`: دفتر الحركات المالية المقيد (`user_id`, `section`, `kind`, `amount`, `balance_after`, `ref`, `note`).
 - `public.wallet_topups`: طلبات الشحن اليدوية للمحفظة مع تتبع حالة المراجعة والصور.
+
+
+## 5. حالة المحفظة بعد مطابقة 2026-11-03
+
+- نسخة احتياطية خاصة غير مكشوفة عبر Data API: `private.amarix_wallet_backup_20261103`.
+- Migration backup: `20261103001321_wallet_reconcile_backup_20261103`.
+- Migration توحيد المحفظة: `20261103001934_wallet_unify_main_corrected_20261103`.
+- Migration إغلاق أهلية المحفظة عند أي منتج غير معروف: `20261103002100_wallet_eligibility_fail_closed`.
+- الرصيد الحالي بعد الترحيل: 100 USD في `wallets.section = 'main'`، مطابق لإجمالي الرصيد قبل الترحيل.
+- دفتر `wallet_transactions` غير قابل للتعديل أو الحذف؛ لذلك بقيت الحركة التاريخية بقسمها الأصلي `smm` عمداً. واجهة العميل تقرأ آخر الحركات دون فلترة القسم.
+- أقسام المحفظة المسموحة والافتراضيات الجديدة هي `main` فقط.
+- `wallet_eligible` يتحقق من `auth.uid()` ومن 1 إلى 50 عنصراً، ويرفض المنتجات غير الموجودة بشكل صريح.
+- `payments_v2` بقي `false`.
+
+## 6. Edge Functions المستعادة إلى المستودع
+
+- `provider-api`: المصدر المستعاد من النشر الحي، النسخة 3. لا يعني ذلك إعادة نشره أو اعتماد سلامة SSRF؛ ما زال يحتاج إلى مراجعة DNS rebinding وقيود الشبكة.
+- `smmnine-readonly`: المصدر المستعاد من النشر الحي، النسخة 4؛ وظيفته للقراءة فقط وتتطلب `SMMNINE_API_KEY` كـ Edge Secret.
+- لم يتم حذف أو إعادة نشر أي Edge Function خلال هذه المطابقة.

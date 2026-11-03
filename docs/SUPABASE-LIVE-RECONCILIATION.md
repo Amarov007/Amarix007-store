@@ -20,3 +20,20 @@ This branch synchronizes supporting source and test artifacts with the live Supa
 - No unverified SQL migration was added to the runnable migration directory.
 - No payment feature flag was enabled.
 - No fulfillment worker was deployed without its secret configured.
+
+
+## Reconciliation update — 2026-11-03
+
+The live Supabase wallet mismatch was corrected using recorded migrations:
+
+- A private pre-change snapshot was created before the wallet migration.
+- Wallet balances were moved from `smm` into `main` without changing the total balance.
+- The wallet and top-up defaults now use `main`.
+- The immutable `wallet_transactions` ledger was deliberately not updated. Historical rows retain their original section label.
+- `wallet_eligible` preserves the authenticated-user check and the 1–50 item limit; unknown products and missing catalog configuration fail closed.
+- Payments V2 remains disabled.
+- The live-only `provider-api` and `smmnine-readonly` function sources were retrieved from the deployed project and added to the repository. Neither function was redeployed.
+
+The private backup is retained at `private.amarix_wallet_backup_20261103`. Do not drop it as part of routine cleanup.
+
+Remaining security review items include DNS rebinding resistance in provider outbound requests, CSP `unsafe-inline`, and the existing Supabase advisor findings. These were not silently changed because doing so without runtime verification could break provider access or storefront/admin behavior.
