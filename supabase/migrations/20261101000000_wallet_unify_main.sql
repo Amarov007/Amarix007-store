@@ -63,7 +63,7 @@ create or replace function public.wallet_order_section(items jsonb, cfg jsonb)
 returns text
 language plpgsql stable
 set search_path = public
-as $function$
+as $
 declare
   it jsonb;
   product jsonb;
@@ -90,7 +90,7 @@ begin
 
   return 'main';
 end
-$function$;
+$;
 
 -- Preserve the live security contract: signed-in user, valid JSON objects,
 -- and a hard 1..50 item bound. CREATE OR REPLACE retains existing ACLs.
@@ -98,7 +98,7 @@ create or replace function public.wallet_eligible(p_items jsonb)
 returns boolean
 language plpgsql stable security definer
 set search_path = public
-as $function$
+as $
 declare
   cfg jsonb;
   item jsonb;
@@ -126,7 +126,7 @@ begin
   section_name := public.wallet_order_section(p_items, cfg);
   return section_name = any(public.wallet_sections(cfg));
 end
-$function$;
+$;
 
 create or replace function public.wallet_topup_create(
   p_amount numeric,
@@ -138,7 +138,7 @@ returns bigint
 language plpgsql
 security definer
 set search_path = public
-as $function$
+as $
 declare
   uid uuid := auth.uid();
   cfg jsonb;
@@ -202,7 +202,7 @@ begin
   );
   return nid;
 end
-$function$;
+$;
 
 do $$
 declare
@@ -218,4 +218,4 @@ begin
   if public.payments_v2_on() is distinct from false then
     raise exception 'payments_v2_invariant_failed';
   end if;
-end $$;
+end; $;
