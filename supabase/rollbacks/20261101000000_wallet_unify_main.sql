@@ -22,7 +22,7 @@ set balance = public.wallets.balance + excluded.balance,
     updated_at = greatest(public.wallets.updated_at, excluded.updated_at);
 
 delete from public.wallets where section = 'main';
-update public.wallet_transactions set section = 'smm' where section = 'main';
+-- wallet_transactions is immutable; historical section labels are intentionally preserved.
 update public.wallet_topups set section = 'smm' where section = 'main';
 
 do $$
