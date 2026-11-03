@@ -18,7 +18,7 @@ begin
   if public.payments_v2_on() is distinct from false then
     raise exception 'payments_v2_must_remain_disabled';
   end if;
-end; $;
+end; $$;
 
 -- Freeze all wallet writes while taking the in-transaction total guard and migrating.
 lock table public.wallets, public.wallet_transactions, public.wallet_topups in access exclusive mode;
@@ -218,4 +218,4 @@ begin
   if public.payments_v2_on() is distinct from false then
     raise exception 'payments_v2_invariant_failed';
   end if;
-end; $;
+end; $$;
