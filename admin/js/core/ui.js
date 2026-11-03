@@ -114,7 +114,7 @@ export function modal({ title, body, actions = [], wide = false, onClose }) {
           }
         }, a.label);
         return btn;
-      })))));
+      }))));
   document.body.append(ov);
   document.addEventListener("keydown", esc);
   ov.querySelector("input,select,textarea,button.btn")?.focus();
