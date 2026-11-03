@@ -46,22 +46,18 @@ update public.wallet_topups set section = 'main' where section = 'smm';
 create or replace function public.wallet_sections(cfg jsonb)
 returns text[]
 language sql stable
-set search_path = public
-as $$
-  select array['main']::text[]
-$$;
+set search_path to 'public'
+as 'select array[''main'']::text[]';
 
 create or replace function public.wallet_item_section(p jsonb, cfg jsonb)
 returns text
 language sql stable
-set search_path = public
-as $$
-  select case
-    when jsonb_typeof(p) <> 'object' then null
-    when nullif(btrim(p->>'id'), '') is null then null
-    else 'main'
-  end
-$;
+set search_path to 'public'
+as 'select case
+  when jsonb_typeof($1) <> ''object'' then null
+  when nullif(btrim($1->>''id''), '''') is null then null
+  else ''main''
+end';
 
 create or replace function public.wallet_order_section(items jsonb, cfg jsonb)
 returns text
