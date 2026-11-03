@@ -50,3 +50,24 @@ test("admin provider import module has valid JavaScript syntax", async () => {
   const errors = (result.diagnostics || []).filter((d) => d.category === ts.DiagnosticCategory.Error);
   assert.equal(errors.length, 0, errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")).join("\n"));
 });
+
+test("admin providers module supports arcadezy and has valid syntax", async () => {
+  const src = await readFile(new URL("../admin/js/modules/providers.js", import.meta.url), "utf8");
+  assert.match(src, /arcadezy/);
+  const result = ts.transpileModule(src, {
+    compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    reportDiagnostics: true
+  });
+  const errors = (result.diagnostics || []).filter((d) => d.category === ts.DiagnosticCategory.Error);
+  assert.equal(errors.length, 0, errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")).join("\n"));
+});
+
+test("smm-order Edge function supports arcadezy provider and Edge Secrets", async () => {
+  const src = await readFile(new URL("../supabase/functions/smm-order/index.ts", import.meta.url), "utf8");
+  assert.match(src, /"arcadezy"/);
+  assert.match(src, /arcadezyCall/);
+  assert.match(src, /opArcadezyServices/);
+  assert.match(src, /balance_usd/);
+  assert.match(src, /Deno\.env\.get\(secretName\)/);
+});
+

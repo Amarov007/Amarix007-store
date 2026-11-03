@@ -26,6 +26,8 @@ function gameArtworkFor(name, category) {
 function classify(name, category, kind, product_type) {
   if (kind === "smm") return "smm";
   if (kind === "smsactivate") return "numbers";
+  if (kind === "arcadezy" && String(product_type || "").toLowerCase() === "voucher") return "apps";
+  if (kind === "arcadezy") return "games";
   const pt = String(product_type || "").toLowerCase();
   if (pt === "topup") return "games";
   if (pt === "voucher") return "apps";
@@ -244,7 +246,7 @@ export default async function (view) {
         let req = [];
         let smm_input = "none";
 
-        if (provider.kind === "custom" || row.product_type || provider.id === "toupup") {
+        if (provider.kind === "custom" || provider.kind === "arcadezy" || row.product_type || provider.id === "toupup") {
           const pt = String(row.product_type || "").toLowerCase();
           if (pt === "topup" || (!pt && hub === "games")) {
             ptype = "game_topup"; req = ["player_id"]; smm_input = "text";

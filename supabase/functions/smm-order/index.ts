@@ -40,8 +40,8 @@ const json = (b: unknown, s = 200) =>
 const clean = (t: string) => t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 const PID = /^[a-z0-9_-]{1,30}$/;
 const MAIN = "main";
-const VERSION = 5; // v5: قفل بوقت + فك صريح، حفظ كل بند، حالة partial لا تتحول إلى completed
-const KINDS = ["smm", "smsactivate", "custom"];
+const VERSION = 6; // v6: دعم Arcadezy للألعاب والكروت، حل أسرار Edge Secrets، واستخراج رصيد مرن
+const KINDS = ["smm", "smsactivate", "custom", "arcadezy"];
 const UA = "Mozilla/5.0 (compatible; AMARIX007/1.0)";
 const lower = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
@@ -62,7 +62,7 @@ const normBase = (raw: string) => {
   return base;
 };
 
-type Kind = "smm" | "smsactivate" | "custom";
+type Kind = "smm" | "smsactivate" | "custom" | "arcadezy";
 type Site = { id: string; name: string; kind: Kind; base: string; key: string; enabled: boolean; cfg: any };
 type SiteErr = { error: string; status: number };
 
@@ -95,7 +95,10 @@ function pickDelivery(data: any, map: any): Record<string, string> | undefined {
   if (!map || typeof map !== "object") return undefined;
   const out: Record<string, string> = {};
   for (const k of DELIVERY_KEYS) {
-    const v = getPath(data, map[k]);
+    let v = getPath(data, map[k]);
+    if ((v === undefined || v === null) && map[k] && !String(map[k]).startsWith("order.")) {
+      v = getPath(data, `order.${map[k]}`);
+    }
     if (v !== undefined && v !== null && typeof v !== "object" && String(v).trim() !== "") out[k] = String(v).slice(0, 500);
   }
   return Object.keys(out).length ? out : undefined;
@@ -203,21 +206,38 @@ Deno.serve(async (req: Request) => {
       } else {
         let { data: row, error: rErr } = await admin
           .from("smm_providers")
-          .select("id,name,kind,api_url,api_key,config,enabled")
+          .select("id,name,kind,api_url,api_key,config,enabled,api_key_secret_name")
           .eq("id", id)
           .maybeSingle();
         if (rErr) {
-          // قاعدة بيانات قديمة بلا kind/config: تُعامَل كل المواقع كـ smm
-          const old = await admin.from("smm_providers").select("id,name,api_url,api_key,enabled").eq("id", id).maybeSingle();
+          // في حال عدم وجود عمود api_key_secret_name في المخطط القديم
+          const old = await admin.from("smm_providers").select("id,name,kind,api_url,api_key,config,enabled").eq("id", id).maybeSingle();
           row = old.data as any;
+          if (!row) {
+            const legacy = await admin.from("smm_providers").select("id,name,api_url,api_key,enabled").eq("id", id).maybeSingle();
+            row = legacy.data as any;
+          }
         }
         if (!row) {
           out = { err: { error: `provider not found: ${id}`, status: 404 } };
         } else {
-          const kind = (KINDS.includes(String(row.kind)) ? String(row.kind) : "smm") as Kind;
-          const u = safeUrl(row.api_url);
+          const rawKind = String(row.kind ?? "");
+          const isArcadezy = rawKind === "arcadezy" || /arcadezy\.com/i.test(String(row.api_url ?? ""));
+          const kind = (KINDS.includes(rawKind) ? rawKind : isArcadezy ? "arcadezy" : "smm") as Kind;
+          const u = safeUrl(row.api_url || (kind === "arcadezy" ? "https://arcadezy.com/api/v1" : ""));
+
+          const secretName = String(
+            (row as any)?.api_key_secret_name ||
+            row?.config?.api_key_secret_name ||
+            (/^SMM_PROVIDER_/i.test(String(row?.api_key ?? "")) ? row?.api_key : "") ||
+            `SMM_PROVIDER_${id.toUpperCase().replace(/-/g, "_")}_API_KEY`
+          ).trim();
+          const secretVal = (typeof Deno !== "undefined" && secretName ? Deno.env.get(secretName) : null) || "";
+          const rawKey = String(row?.api_key ?? "").trim();
+          const key = secretVal || (!rawKey.startsWith("SMM_PROVIDER_") ? rawKey : "");
+
           if (!u) out = { err: { error: `provider "${id}": URL must be https and a public host`, status: 400 } };
-          else if (!String(row.api_key ?? "").trim()) out = { err: { error: `provider "${id}": API key not set`, status: 400 } };
+          else if (!key) out = { err: { error: `provider "${id}": API key not set (Edge Secret "${secretName}" not found in Supabase)`, status: 400 } };
           else {
             let base: string;
             if (kind === "smm") base = normBase(u.toString());
@@ -226,7 +246,7 @@ Deno.serve(async (req: Request) => {
             out = {
               site: {
                 id, name: String(row.name || id), kind, base,
-                key: String(row.api_key).trim(), enabled: row.enabled !== false,
+                key, enabled: row.enabled !== false,
                 cfg: row.config && typeof row.config === "object" ? row.config : {},
               },
             };
@@ -344,6 +364,128 @@ Deno.serve(async (req: Request) => {
     };
     const jsonOrNull = (t: string): any => { try { return JSON.parse(t); } catch { return null; } };
 
+    // ===================== نوع arcadezy =====================
+    const arcadezyCall = async (s: Site, path: string, method = "GET", body?: any, ref?: string): Promise<{ data: any; status: number } | { error: string }> => {
+      const baseU = safeUrl(s.base);
+      if (!baseU) return { error: `provider "${s.id}": URL must be https` };
+      const cleanPath = path.startsWith("/") ? path : `/${path}`;
+      const target = safeUrl(s.base.replace(/\/+$/, "") + cleanPath);
+      if (!target || target.host !== baseU.host) return { error: `provider "${s.id}": invalid request URL` };
+      const headers: Record<string, string> = {
+        "Accept": "application/json",
+        "User-Agent": UA,
+        "X-API-Key": s.key,
+      };
+      if (ref) headers["Idempotency-Key"] = ref;
+      let bodyInit: string | undefined;
+      if (method !== "GET" && body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        bodyInit = JSON.stringify(body);
+      }
+      const r = await http(s, target, { method, headers, body: bodyInit });
+      if ("error" in r) return { error: r.error };
+      const data = parse(s, r);
+      if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string" && data.error.startsWith("Bad response from provider")) {
+        return { error: data.error };
+      }
+      if (!data || typeof data !== "object") return { error: `Invalid JSON from Arcadezy (${r.status})` };
+      if (data.ok === false) {
+        return { error: data.error || data.code || `HTTP ${r.status}` };
+      }
+      return { data, status: r.status };
+    };
+
+    const opArcadezyServices = async (s: Site): Promise<any[] | { error: string }> => {
+      const types = ["topup", "giftcard", "gamekey", "telegram", "steam"];
+      const catsMap = new Map<string, { slug: string; name: string; type: string; image_url: string }>();
+
+      const rCats = await arcadezyCall(s, "/categories", "GET");
+      if (!("error" in rCats) && rCats.data) {
+        const list = Array.isArray(rCats.data) ? rCats.data : Array.isArray(rCats.data.data) ? rCats.data.data : [];
+        for (const c of list) {
+          if (c && c.slug) {
+            catsMap.set(c.slug, {
+              slug: c.slug,
+              name: c.name || c.slug,
+              type: c.type || "topup",
+              image_url: c.image_url || c.image || ""
+            });
+          }
+        }
+      }
+
+      if (catsMap.size === 0) {
+        for (const t of types) {
+          const r = await arcadezyCall(s, `/categories?type=${t}`, "GET");
+          if (!("error" in r) && r.data) {
+            const list = Array.isArray(r.data) ? r.data : Array.isArray(r.data.data) ? r.data.data : [];
+            for (const c of list) {
+              if (c && c.slug) {
+                catsMap.set(c.slug, {
+                  slug: c.slug,
+                  name: c.name || c.slug,
+                  type: t,
+                  image_url: c.image_url || c.image || ""
+                });
+              }
+            }
+          }
+        }
+      }
+
+      if (catsMap.size === 0) {
+        return { error: `provider "${s.id}": لم يتم العثور على أقسام في Arcadezy — تأكد من صحة المفتاح وتفعيل الحساب` };
+      }
+
+      const categories = Array.from(catsMap.values());
+      const fx = Number(s.cfg?.rate_factor) > 0 ? Number(s.cfg.rate_factor) : 1;
+      const allServices: any[] = [];
+
+      const batchSize = 6;
+      for (let i = 0; i < categories.length; i += batchSize) {
+        const batch = categories.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (cat) => {
+          try {
+            const rOffers = await arcadezyCall(s, `/categories/${encodeURIComponent(cat.slug)}/offers`, "GET");
+            if ("error" in rOffers) return;
+            const offersData = rOffers.data;
+            const offersList = Array.isArray(offersData) ? offersData : Array.isArray(offersData.offers) ? offersData.offers : Array.isArray(offersData.data) ? offersData.data : [];
+            const catImage = offersData.category?.image_url || cat.image_url || "";
+            const catName = offersData.category?.name || cat.name || cat.slug;
+
+            for (const offer of offersList) {
+              const offerId = String(offer.id || offer.offer_id || "");
+              if (!offerId) continue;
+              const offerName = String(offer.name || offer.title || offer.offer_name || "Package");
+              const priceNum = parseFloat(offer.price ?? offer.price_usd ?? offer.total_usd ?? 0) || 0;
+              const rate = String(priceNum * 1000 * fx);
+              allServices.push({
+                service: offerId,
+                name: `${catName} — ${offerName}`,
+                category: catName,
+                rate,
+                min: 1,
+                max: 1,
+                image: catImage,
+                category_image: catImage,
+                product_type: cat.type === "topup" ? "topup" : "voucher",
+                country: "",
+                available: offer.available !== false && offer.enabled !== false,
+                fields: offer.fields || null,
+              });
+            }
+          } catch {
+            // تجاهل خطأ فئة مفردة والمتابعة
+          }
+        }));
+      }
+
+      if (allServices.length === 0) {
+        return { error: `provider "${s.id}": لم يتم العثور على عروض متاحة في Arcadezy` };
+      }
+      return allServices;
+    };
+
     // ===================== نوع custom =====================
     const customCall = async (s: Site, spec: any, vars: Record<string, string>): Promise<{ data: any; status: number } | { error: string }> => {
       if (!spec || typeof spec !== "object") return { error: `provider "${s.id}": this operation is not configured (config)` };
@@ -388,7 +530,10 @@ Deno.serve(async (req: Request) => {
       return null;
     };
     const customState = (spec: any, data: any): string => {
-      const st = lower(getPath(data, spec?.state));
+      let st = lower(getPath(data, spec?.state));
+      if (!st && spec?.state && !String(spec.state).startsWith("order.")) {
+        st = lower(getPath(data, `order.${spec.state}`));
+      }
       const done = (Array.isArray(spec?.done) ? spec.done : ["completed", "complete", "success", "delivered", "done"]).map(lower);
       const bad = (Array.isArray(spec?.failed) ? spec.failed : ["failed", "canceled", "cancelled", "refunded", "rejected", "error"]).map(lower);
       return done.includes(st) ? "Completed" : bad.includes(st) ? "Canceled" : "In progress";
@@ -408,15 +553,25 @@ Deno.serve(async (req: Request) => {
         if (!m) return { error: saFail(r.text) };
         return { balance: m[1].trim(), currency: String(s.cfg?.currency ?? "") };
       }
+      if (s.kind === "arcadezy" || (s.base.includes("arcadezy.com") && !s.cfg?.balance)) {
+        const r = await arcadezyCall(s, "/balance", "GET");
+        if ("error" in r) return r;
+        const bal = r.data.balance_usd ?? r.data.balance ?? r.data.data?.balance_usd ?? r.data.data?.balance;
+        if (bal === undefined || bal === null) return { error: `provider "${s.id}": balance not found in Arcadezy response` };
+        return { balance: String(bal), currency: "USD" };
+      }
       const spec = s.cfg?.balance;
       if (!spec) return { balance: "n/a", currency: "" };
       const r = await customCall(s, spec, {});
       if ("error" in r) return r;
       const e = customErr(spec, r.data, r.status);
       if (e) return { error: e };
-      const v = getPath(r.data, spec.value);
+      let v = getPath(r.data, spec.value);
+      if (v === undefined || v === null) {
+        v = getPath(r.data, "balance_usd") ?? getPath(r.data, "data.balance_usd") ?? getPath(r.data, "data.balance") ?? getPath(r.data, "balance.amount") ?? getPath(r.data, "wallet.balance") ?? getPath(r.data, "amount");
+      }
       if (v === undefined || v === null) return { error: `provider "${s.id}": balance.value path not found in the response` };
-      return { balance: String(v), currency: String(getPath(r.data, spec.currency) ?? spec.currency_label ?? s.cfg?.currency ?? "") };
+      return { balance: String(v), currency: String(getPath(r.data, spec.currency) ?? spec.currency_label ?? s.cfg?.currency ?? "USD") };
     };
 
     const opServices = async (s: Site): Promise<any[] | { error: string }> => {
@@ -447,6 +602,9 @@ Deno.serve(async (req: Request) => {
           out.push({ service: o.service, name: names.get(o.service) || o.service, category: "Numbers", rate: String(o.cost * 1000 * fx), min: 1, max: 1, type: "Number", country: o.country, count: o.count });
         }
         return out;
+      }
+      if (s.kind === "arcadezy" || (s.base.includes("arcadezy.com") && !s.cfg?.services?.path)) {
+        return await opArcadezyServices(s);
       }
       const spec = s.cfg?.services;
       if (!spec) return { error: `provider "${s.id}": config.services is not set — add the products by hand (service code + price)` };
@@ -484,13 +642,38 @@ Deno.serve(async (req: Request) => {
         if (parts[0] !== "ACCESS_NUMBER" || !parts[1] || !parts[2]) return { order: null, error: saFail(r.text) };
         return { order: parts[1], error: null, status: "In progress", delivery: { number: parts.slice(2).join(":").slice(0, 40) } };
       }
+      if (s.kind === "arcadezy" || (s.base.includes("arcadezy.com") && !s.cfg?.order?.path)) {
+        let fields: Record<string, string> = {};
+        const inp = String(l.input || "").trim();
+        if (inp) {
+          const m = inp.match(/^([^\s/@(]+)[\s/@(]+([^)]+)\)?$/);
+          if (m) {
+            fields = { player_id: m[1].trim(), server_id: m[2].trim() };
+          } else {
+            fields = { player_id: inp };
+          }
+        }
+        const body: Record<string, any> = {
+          offer_id: l.service,
+          qty: l.quantity || 1,
+          fields
+        };
+        const r = await arcadezyCall(s, "/orders", "POST", body, l.ref);
+        if ("error" in r) return { order: null, error: r.error };
+        const ord = r.data.order || r.data;
+        const ordId = String(ord.id || ord.order_id || "");
+        if (!ordId) return { order: null, error: `provider "${s.id}": order id not returned from Arcadezy` };
+        const st = (ord.status === "completed") ? "Completed" : "In progress";
+        const code = Array.isArray(ord.codes) && ord.codes.length ? String(ord.codes[0]) : undefined;
+        return { order: ordId, error: null, status: st, delivery: code ? { code } : undefined };
+      }
       const spec = s.cfg?.order;
       const vars = { service: l.service, input: l.input, email: l.input, quantity: String(l.quantity), country: l.country, ref: l.ref };
       const r = await customCall(s, spec, vars);
       if ("error" in r) return { order: null, error: r.error };
       const e = customErr(spec, r.data, r.status);
       if (e) return { order: null, error: e };
-      const idv = getPath(r.data, spec.id);
+      const idv = getPath(r.data, spec.id) ?? (!String(spec.id).startsWith("order.") ? getPath(r.data, `order.${spec.id}`) : undefined);
       const hasStatus = !!s.cfg?.status;
       const order = idv !== undefined && idv !== null && idv !== "" ? String(idv).slice(0, 120) : spec.id ? null : l.ref;
       if (!order) return { order: null, error: `provider "${s.id}": order.id path not found in the response` };
@@ -521,6 +704,17 @@ Deno.serve(async (req: Request) => {
           if ("error" in r) return r;
           const st = saStatus(r.text);
           if (!st.error) out.set(o, st);
+        } else if (s.kind === "arcadezy" || (s.base.includes("arcadezy.com") && !s.cfg?.status?.path)) {
+          const r = await arcadezyCall(s, `/orders/${encodeURIComponent(o)}`, "GET");
+          if (!("error" in r) && r.data) {
+            const ord = r.data.order || r.data;
+            const rawSt = String(ord.status || "").toLowerCase();
+            let st = "In progress";
+            if (rawSt === "completed") st = "Completed";
+            else if (rawSt === "failed" || rawSt === "refunded" || rawSt === "cancelled") st = "Canceled";
+            const code = Array.isArray(ord.codes) && ord.codes.length ? String(ord.codes[0]) : undefined;
+            out.set(o, { status: st, delivery: code ? { code } : undefined, extra: ord });
+          }
         } else {
           const spec = s.cfg?.status;
           if (!spec) { continue; }

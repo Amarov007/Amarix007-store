@@ -3,7 +3,7 @@ import { h, mount, pageHeader, dataTable, badge, modal, toast, fail, confirmBox,
 import { fmtDate } from "../core/utils.js";
 
 const ID_RE = /^[a-z0-9_-]{2,30}$/, SECRET_RE = /^[A-Z][A-Z0-9_]{2,63}$/;
-const KINDS = [["smm", "SMM (رشق)"], ["smsactivate", "SMS-Activate (أرقام)"], ["custom", "مخصّص (JSON)"]];
+const KINDS = [["smm", "SMM (رشق)"], ["smsactivate", "SMS-Activate (أرقام)"], ["arcadezy", "Arcadezy (ألعاب وكروت)"], ["custom", "مخصّص (JSON)"]];
 
 export default async function (view) {
   const box = h("div");
@@ -34,12 +34,15 @@ export default async function (view) {
     const isNew = !p, v = p || { kind: "smm", enabled: true, config: {} };
     const f = { id: input({ value: v.id || "", dir: "ltr", readOnly: !isNew, placeholder: "مثال: s2" }), name: input({ value: v.name || "" }), kind: sel(KINDS, v.kind), url: input({ value: v.api_url || "", dir: "ltr", placeholder: "https://…" }),
       secret: input({ value: v.api_key_secret_name || "", dir: "ltr", placeholder: "SMM_PROVIDER_S2_API_KEY" }), cfg: h("textarea", { class: "input mono", rows: 6, value: v.config && Object.keys(v.config).length ? JSON.stringify(v.config, null, 2) : "" }) };
+    f.kind.onchange = () => {
+      if (f.kind.value === "arcadezy" && !f.url.value.trim()) f.url.value = "https://arcadezy.com/api/v1";
+    };
     let enabled = !!v.enabled;
     modal({ title: isNew ? "مزوّد جديد" : `مزوّد: ${v.id}`, wide: true, actions: [
       !isNew && { label: "حذف", kind: "danger", onClick: async () => { if (!(await confirmBox(`حذف «${v.name}» نهائياً؟ تأكد أنه لا توجد منتجات مرتبطة به.`, { danger: true }))) return false; try { const r = await rest(`smm_providers?id=eq.${enc(v.id)}`, { method: "DELETE", prefer: "return=representation" }); if (!r.length) throw new Error("لم يُحذف شيء (RLS)"); toast("حُذف"); load(); } catch (e) { fail(e); return false; } } },
       { label: "إلغاء", kind: "ghost" },
       { label: "حفظ", kind: "primary", onClick: async () => {
-        const id = f.id.value.trim().toLowerCase(), kind = f.kind.value, url = f.url.value.trim(), secret = f.secret.value.trim() || `SMM_PROVIDER_${id.toUpperCase().replace(/-/g, "_")}_API_KEY`;
+        const id = f.id.value.trim().toLowerCase(), kind = f.kind.value, url = f.url.value.trim() || (kind === "arcadezy" ? "https://arcadezy.com/api/v1" : ""), secret = f.secret.value.trim() || `SMM_PROVIDER_${id.toUpperCase().replace(/-/g, "_")}_API_KEY`;
         let config = {};
         if (kind !== "smm" && f.cfg.value.trim()) { try { config = JSON.parse(f.cfg.value); } catch (e) { toast(`JSON غير صالح: ${e.message}`, "err"); return false; } if (!config || Array.isArray(config) || typeof config !== "object") { toast("الإعدادات يجب أن تكون كائناً", "err"); return false; } }
         if (kind === "custom" && !config.order?.path) { toast("النوع المخصّص يحتاج order.path على الأقل", "err"); return false; }
@@ -51,7 +54,7 @@ export default async function (view) {
         const row = { name: f.name.value.trim() || id, kind, config, api_url: url, api_key_secret_name: secret, enabled };
         try { isNew ? await insert("smm_providers", { id, ...row }) : await patch("smm_providers", `id=eq.${enc(id)}`, row); toast("تم الحفظ"); load(); } catch (e) { fail(e); return false; } } }].filter(Boolean),
       body: h("div", null, h("div", { class: "form-grid" }, field("المعرّف", f.id), field("الاسم", f.name), field("النوع", f.kind), field("رابط API", f.url), field("اسم Edge Secret", f.secret, "قيمة المفتاح تُضاف من Supabase → Edge Functions → Secrets")),
-        field("إعدادات JSON (لغير SMM)", f.cfg), switchEl(enabled, (x) => (enabled = x), "مفعّل")) });
+        field("إعدادات JSON (لغير SMM و Arcadezy)", f.cfg), switchEl(enabled, (x) => (enabled = x), "مفعّل")) });
   }
   await load();
 }
