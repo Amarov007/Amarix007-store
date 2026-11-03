@@ -350,7 +350,7 @@ export default async function (view) {
       h("div", { class: "card" },
         h("div", { class: "form-grid" }, field("المزوّد", sel(opts, selected, { onchange: (e) => { selected = e.target.value; rows = []; mount(status); drawPreview(); } })),
           field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); rows.forEach((x) => { x.nextPrice = retailPrice(x, markup, x.existingProduct); x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice); if (x.exists && !x.priceChanged) x.selected = false; }); drawPreview(); } }))),
-        h("p", { class: "hint" }, "سعر المزود موحّد لكل 1000 وحدة، ويُحوّل إلى سعر الوحدة بدقة 12 منزلة. يمكنك تحديد الخدمات الجديدة أو المنتجات التي تغيّر سعرها. لا يُعدّل شيء منشور حتى تراجع المسودة وتضغط «نشر». المنتجات ذات الربط المكرر تُستثنى من التحديث الآلي."),
+        h("p", { class: "hint" }, "يُحسب السعر حسب أساس المزود: خدمات SMM والمزوّدين المخصصين لكل 1000، وأرقام التفعيل لكل تفعيل. تُحفظ الدقة حتى 12 منزلة. يمكنك تحديد الخدمات الجديدة أو المنتجات التي تغيّر سعرها. لا يُعدّل شيء منشور حتى تراجع المسودة وتضغط «نشر». المنتجات ذات الربط المكرر تُستثنى من التحديث الآلي."),
         status),
       preview,
       h("div", { class: "page-actions" }, h("button", { class: "btn primary", disabled: !rows.some((x) => x.selected), onclick: saveSelected }, "إضافة المحدد إلى المسودة")),
