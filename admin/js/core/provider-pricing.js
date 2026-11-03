@@ -8,12 +8,14 @@
  */
 export const PROVIDER_RATE_BASE = 1000;
 
-export function providerRetailUnitPrice(ratePerThousand, markupPct) {
-  const rate = Number(ratePerThousand);
+export function providerRetailUnitPrice(rate, markupPct, rateBasis = "per_1000") {
+  const cost = Number(rate);
   const markup = Number(markupPct);
-  if (!Number.isFinite(rate) || rate <= 0) return 0;
+  if (!Number.isFinite(cost) || cost <= 0) return 0;
   if (!Number.isFinite(markup) || markup < 0 || markup > 500) return 0;
-  const value = (rate * (1 + markup / 100)) / PROVIDER_RATE_BASE;
+  const divisor = rateBasis === "per_unit" ? 1 : rateBasis === "per_1000" ? PROVIDER_RATE_BASE : 0;
+  if (!divisor) return 0;
+  const value = (cost * (1 + markup / 100)) / divisor;
   // Keep sub-micro USDT prices accurate; six decimals were too coarse for SMM.
   const rounded = Math.round((value + Number.EPSILON) * 1e12) / 1e12;
   return rounded > 0 ? rounded : 0;
