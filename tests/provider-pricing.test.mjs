@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import ts from "typescript";
 import { providerProductKey, providerPriceChanged, providerRetailUnitPrice } from "../admin/js/core/provider-pricing.js";
 
 test("provider rates are converted from per-thousand to one sellable unit", () => {
@@ -36,4 +37,15 @@ test("provider product matching includes provider, service, and country", () => 
   assert.equal(providerProductKey("smmne", "123", "US"), "smmne|123|US");
   assert.notEqual(providerProductKey("smmne", "123", "US"), providerProductKey("main", "123", "US"));
   assert.notEqual(providerProductKey("smmne", "123", "US"), providerProductKey("smmne", "123", "GB"));
+});
+
+
+test("admin provider import module has valid JavaScript syntax", async () => {
+  const src = await readFile(new URL("../admin/js/modules/import-center.js", import.meta.url), "utf8");
+  const result = ts.transpileModule(src, {
+    compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    reportDiagnostics: true
+  });
+  const errors = (result.diagnostics || []).filter((d) => d.category === ts.DiagnosticCategory.Error);
+  assert.equal(errors.length, 0, errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")).join("\n"));
 });
