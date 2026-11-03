@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import ts from "typescript";
+import { readFile } from "node:fs/promises";
 import { providerProductKey, providerPriceChanged, providerRetailUnitPrice } from "../admin/js/core/provider-pricing.js";
 
 test("provider rates are converted from per-thousand to one sellable unit", () => {
