@@ -18,7 +18,12 @@ begin
   if public.payments_v2_on() is distinct from false then
     raise exception 'payments_v2_must_remain_disabled';
   end if;
-end $$;
+end $;
+
+-- Freeze all wallet writes while taking the in-transaction total guard and migrating.
+lock table public.wallets, public.wallet_transactions, public.wallet_topups in access exclusive mode;
+create temporary table wallet_main_total_guard (total numeric not null) on commit drop;
+insert into wallet_main_total_guard select coalesce(sum(balance), 0) from public.wallets;
 
 alter table public.wallets alter column section set default 'main';
 alter table public.wallet_topups alter column section set default 'main';
@@ -211,13 +216,7 @@ begin
   select coalesce(sum(balance), 0) into current_total from public.wallets;
   select count(*) into smm_rows from public.wallets where section = 'smm';
   if smm_rows <> 0 then raise exception 'wallet_smm_rows_remain'; end if;
-  if current_total <> (
-    select coalesce(sum((x->>'balance')::numeric), 0)
-    from jsonb_array_elements(
-      (select snapshot->'wallets' from private.amarix_wallet_backup_20261103
-       where backup_id = 'pre_wallet_main_unification')
-    ) x
-  ) then
+  if current_total <> (select total from pg_temp.wallet_main_total_guard) then
     raise exception 'wallet_total_changed_during_migration';
   end if;
   if public.payments_v2_on() is distinct from false then
