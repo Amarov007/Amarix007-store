@@ -250,8 +250,16 @@ export default async function (view) {
 
     const fileInput = h("input", {
       type: "file",
-      accept: "image/*",
-      style: { display: "none" },
+      accept: "image/png,image/jpeg,image/webp,image/svg+xml,image/*",
+      style: {
+        position: "absolute",
+        inset: 0,
+        opacity: 0,
+        width: "100%",
+        height: "100%",
+        cursor: "pointer",
+        zIndex: 10
+      },
       onchange: async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -259,9 +267,11 @@ export default async function (view) {
         try {
           let url = "";
           try {
-            url = await uploadImage(file, 260);
+            const uploadPromise = uploadImage(file, 260);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Storage timeout")), 4000));
+            url = await Promise.race([uploadPromise, timeoutPromise]);
           } catch (storageErr) {
-            console.warn("[Payments] Storage upload failed, converting to optimized Data URL:", storageErr);
+            console.warn("[Payments] Storage upload fallback:", storageErr);
           }
           if (url && /^https:\/\//i.test(url)) {
             f.icon_url.value = url;
@@ -302,12 +312,18 @@ export default async function (view) {
       }
     });
 
-    const uploadBtn = h("button", {
-      type: "button",
+    const uploadBtn = h("label", {
       class: "btn sm ghost",
-      style: { whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: "6px" },
-      onclick: () => fileInput.click()
-    }, icon("upload", 14), "رفع صورة من جهازك");
+      style: {
+        position: "relative",
+        whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        cursor: "pointer",
+        overflow: "hidden"
+      }
+    }, icon("upload", 14), "رفع صورة من جهازك", fileInput);
 
     updatePreview(initialIconUrl);
     let enabled = v.enabled, proof = v.requires_proof;
@@ -387,7 +403,7 @@ export default async function (view) {
           h("div", { style: { gridColumn: "1 / -1" } },
             h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" } },
               h("label", { style: { fontWeight: "bold" } }, "صورة وأيقونة وسيلة الدفع (رابط أو رفع ملف)"),
-              h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } }, uploadBtn, fileInput)
+              h("div", { style: { display: "flex", gap: "8px", alignItems: "center" } }, uploadBtn)
             ),
             h("div", { class: "toolbar", style: { flexWrap: "nowrap" } },
               f.icon_url

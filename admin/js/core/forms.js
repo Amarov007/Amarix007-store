@@ -9,13 +9,61 @@ export function imageField(label, value, onChange, max = 900) {
   const url = input({ value: value || "", dir: "ltr", placeholder: "https://… أو ارفع صورة", oninput: (e) => { onChange(e.target.value.trim()); prev(); } });
   const prevBox = h("div", { style: { marginTop: "6px" } });
   const prev = () => { prevBox.replaceChildren(url.value ? h("img", { src: url.value, alt: "", style: { maxHeight: "70px", maxWidth: "100%", borderRadius: "8px", border: "1px solid var(--line)" }, onerror: (e) => e.target.remove() }) : ""); };
-  const file = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", style: { display: "none" }, onchange: async (e) => {
-    const f = e.target.files[0]; if (!f) return; setBusy(btn, true);
-    try { url.value = await uploadImage(f, max); onChange(url.value); prev(); toast("تم رفع الصورة"); } catch (x) { fail(x, "فشل الرفع"); } finally { setBusy(btn, false); e.target.value = ""; }
-  } });
-  const btn = h("button", { class: "btn sm", type: "button", onclick: () => file.click() }, icon("upload", 14), "رفع");
+  const file = h("input", {
+    type: "file",
+    accept: "image/png,image/jpeg,image/webp,image/*",
+    style: { position: "absolute", inset: 0, opacity: 0, width: "100%", height: "100%", cursor: "pointer", zIndex: 10 },
+    onchange: async (e) => {
+      const f = e.target.files?.[0]; if (!f) return; setBusy(btn, true);
+      try {
+        let uploadedUrl = "";
+        try {
+          const uploadPromise = uploadImage(f, max);
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Storage timeout")), 4000));
+          uploadedUrl = await Promise.race([uploadPromise, timeoutPromise]);
+        } catch (storageErr) {
+          console.warn("[Forms] Storage upload fallback:", storageErr);
+        }
+        if (uploadedUrl && /^https:\/\//i.test(uploadedUrl)) {
+          url.value = uploadedUrl;
+        } else {
+          const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const img = new Image();
+              img.onload = () => {
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL("image/webp", 0.85));
+              };
+              img.onerror = () => resolve(reader.result);
+              img.src = reader.result;
+            };
+            reader.onerror = () => resolve("");
+            reader.readAsDataURL(f);
+          });
+          if (dataUrl) url.value = dataUrl;
+        }
+        onChange(url.value);
+        prev();
+        toast("تم رفع الصورة");
+      } catch (x) {
+        fail(x, "فشل الرفع");
+      } finally {
+        setBusy(btn, false);
+        e.target.value = "";
+      }
+    }
+  });
+  const btn = h("label", {
+    class: "btn sm",
+    style: { position: "relative", cursor: "pointer", overflow: "hidden", display: "inline-flex", alignItems: "center", gap: "6px" }
+  }, icon("upload", 14), "رفع", file);
   prev();
-  return h("div", { class: "field" }, h("span", null, label), h("div", { class: "toolbar", style: { flexWrap: "nowrap" } }, url, btn, file), prevBox);
+  return h("div", { class: "field" }, h("span", null, label), h("div", { class: "toolbar", style: { flexWrap: "nowrap" } }, url, btn), prevBox);
 }
 
 /* شريط النشر: يظهر فقط عند وجود تعديلات غير منشورة */

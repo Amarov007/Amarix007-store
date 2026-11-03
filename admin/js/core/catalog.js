@@ -5,8 +5,30 @@ import { select, rpc, patch, HttpError } from "./http.js";
 import { isAdmin } from "./rbac.js";
 import { clone } from "./utils.js";
 
-const EMPTY = { ts: 0, site: { n1: "", n2: "", logo: "", sa: "", se: "", desc: "", col: { g: "#191A23", m: "#B9FF66", ac: "#B9FF66" }, rt: { ar: "", en: "" }, risk: { ar: "", en: "" }, ai_on: true },
-  partner: { on: false, name: "", logo: "", url: "", ar: "", en: "", ba: "", be: "", banner_bg_url: "" }, social: {}, payments: [], categories: [], products: [], embeds: [], banners: [], coupons: {}, rates: { USD: [1, "USDT"] } };
+const EMPTY = {
+  ts: 0,
+  site: {
+    n1: "AMARIX",
+    n2: "007",
+    logo: "",
+    sa: "متجر الأصول الرقمية",
+    se: "Digital Assets Store",
+    desc: "AMARIX007 — متجر الأصول الرقمية",
+    col: { g: "#191A23", m: "#B9FF66", ac: "#B9FF66" },
+    rt: { ar: "© 2026 AMARIX007. جميع الحقوق محفوظة.", en: "© 2026 AMARIX007. All rights reserved." },
+    risk: { ar: "التداول ينطوي على مخاطر، والمنتجات رقمية وتُسلَّم إلكترونياً.", en: "Trading involves risk. Products are digital and delivered electronically." },
+    ai_on: true
+  },
+  partner: { on: false, name: "", logo: "", url: "", ar: "", en: "", ba: "", be: "", banner_bg_url: "" },
+  social: {},
+  payments: [],
+  categories: [],
+  products: [],
+  embeds: [],
+  banners: [],
+  coupons: {},
+  rates: { USD: [1, "USDT"] }
+};
 
 let D = null, BASE = null, ts = 0, dirty = false, loading = null;
 const subs = new Set();
@@ -18,7 +40,12 @@ const emit = () => subs.forEach((f) => f());
 function normalize(d) {
   const x = clone(d); delete x.api;
   for (const k in EMPTY) if (x[k] == null) x[k] = clone(EMPTY[k]);
-  x.site = { ...EMPTY.site, ...x.site }; x.partner = { ...EMPTY.partner, ...x.partner };
+  x.site = { ...EMPTY.site, ...x.site };
+  if (!x.site.n1) x.site.n1 = "AMARIX";
+  if (!x.site.n2) x.site.n2 = "007";
+  if (!x.site.sa) x.site.sa = "متجر الأصول الرقمية";
+  if (!x.site.se) x.site.se = "Digital Assets Store";
+  x.partner = { ...EMPTY.partner, ...x.partner };
   return x;
 }
 export function loadCatalog(force = false) {

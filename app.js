@@ -2200,8 +2200,12 @@ function head() {
   if (meta) meta.content = th == "dark" ? "#12131A" : "#FFFFFF";
   const logo = CFG.site.logo || "logo-mark.webp";
   if (logo && $(".logo .tile")) $(".logo .tile").innerHTML = `<img src="${ex(logo)}" alt="AMARIX007" style="width:100%;height:100%;object-fit:contain">`;
-  $("#bn").innerHTML = `${ex(CFG.site.n1)}<b>${ex(CFG.site.n2)}</b>`;
-  $("#sb").textContent = lang == "ar" ? CFG.site.sa : CFG.site.se;
+  const n1 = (CFG.site && String(CFG.site.n1 || "").trim()) || "AMARIX";
+  const n2 = (CFG.site && String(CFG.site.n2 || "").trim()) || "007";
+  const sa = (CFG.site && String(CFG.site.sa || "").trim()) || "متجر الأصول الرقمية";
+  const se = (CFG.site && String(CFG.site.se || "").trim()) || "Digital Assets Store";
+  $("#bn").innerHTML = `${ex(n1)}<b>${ex(n2)}</b>`;
+  $("#sb").textContent = lang == "ar" ? sa : se;
   $("#q").placeholder = t("ph");
   $("#ctl").innerHTML =
     musicBtn() +
@@ -6572,7 +6576,16 @@ function withDefaults(d) {
   ].forEach((k) => {
     if (o[k] == null && CFG0[k] != null) o[k] = CFG0[k];
   });
-  o.site = { ...(CFG0.site || {}), ...(d.site || {}) };
+  const site0 = CFG0.site || {};
+  const dSite = (d && d.site) || {};
+  o.site = {
+    ...site0,
+    ...dSite,
+    n1: String(dSite.n1 || "").trim() || site0.n1 || "AMARIX",
+    n2: String(dSite.n2 || "").trim() || site0.n2 || "007",
+    sa: String(dSite.sa || "").trim() || site0.sa || "متجر الأصول الرقمية",
+    se: String(dSite.se || "").trim() || site0.se || "Digital Assets Store",
+  };
   return o;
 }
 let waitCfg = false; // true while we wait for the first published config (nothing cached yet)

@@ -7,7 +7,6 @@ export function h(tag, props, ...kids) {
     if (k.startsWith("on") && typeof v === "function") {
       const evName = k.slice(2).toLowerCase();
       e.addEventListener(evName, v);
-      try { e[k.toLowerCase()] = v; } catch (_) {}
     }
   }
   for (const [k, v] of Object.entries(props || {})) {
@@ -17,6 +16,9 @@ export function h(tag, props, ...kids) {
     else if (k === "dataset") Object.assign(e.dataset, v);
     else if (k === "value" || k === "checked" || k === "disabled" || k === "selected" || k === "textContent") e[k] = v;
     else e.setAttribute(k, v === true ? "" : v);
+  }
+  if (tag === "button" && !e.hasAttribute("type")) {
+    e.type = "button";
   }
   append(e, kids);
   return e;
@@ -95,7 +97,24 @@ export function modal({ title, body, actions = [], wide = false, onClose }) {
     h("div", { class: `modal ${wide ? "wide" : ""}`, role: "dialog", "aria-modal": "true", "aria-label": title },
       h("header", null, h("h3", null, title), h("button", { class: "icon-btn", onclick: close, "aria-label": "إغلاق" }, icon("x"))),
       h("div", { class: "modal-body" }, body),
-      actions.length && h("footer", null, actions.map((a) => h("button", { class: `btn ${a.kind || ""}`, onclick: async (e) => { if (a.onClick) { const keep = await a.onClick(e, close); if (keep !== false && !a.stay) close(); } else close(); } }, a.label)))));
+      actions.length && h("footer", null, actions.map((a) => {
+        const btn = h("button", {
+          type: "button",
+          class: `btn ${a.kind || ""}`,
+          onclick: async (e) => {
+            if (a.onClick) {
+              setBusy(btn, true);
+              try {
+                const keep = await a.onClick(e, close);
+                if (keep !== false && !a.stay) close();
+              } finally {
+                setBusy(btn, false);
+              }
+            } else close();
+          }
+        }, a.label);
+        return btn;
+      })))));
   document.body.append(ov);
   document.addEventListener("keydown", esc);
   ov.querySelector("input,select,textarea,button.btn")?.focus();
