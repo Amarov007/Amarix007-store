@@ -1,10 +1,10 @@
 /**
  * Provider price contract used by smm-order:
- * every provider's services/catalog response exposes rate as the provider cost
- * per 1,000 units in the store base currency (USDT), including custom providers
- * whose raw unit price is normalized by rate_is_unit in the Edge Function.
+ * SMM/custom services are normalized by smm-order to a provider cost per 1,000
+ * units in the store base currency (USDT). SMSActivate numbers_catalog instead
+ * returns a price for one activation. The caller must pass the explicit basis.
  *
- * Store product.p is the retail price for one sellable unit/package.
+ * Store product.p is always the retail price for one sellable unit/package.
  */
 export const PROVIDER_RATE_BASE = 1000;
 
