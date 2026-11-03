@@ -33,6 +33,8 @@ jobs:
               node --check /tmp/amx-syntax-check.mjs
             fi
           done < <(find . -path './node_modules' -prune -o -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) -print0)
+      - name: Resolve admin imports and exports
+        run: npx esbuild admin/js/main.js --bundle --format=esm --outfile=/tmp/admin-check.js
       - name: Verify project structure and references
         run: python3 tests/verify-project.py
       - name: Run tests
