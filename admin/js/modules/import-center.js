@@ -151,7 +151,8 @@ export default async function (view) {
         x.duplicateCount = matches.length;
         x.existingProduct = matches.length === 1 ? matches[0] : null;
         x.currentPrice = matches.length === 1 ? number(matches[0].p) : 0;
-        x.nextPrice = retailPrice(x, markup, x.existingProduct);
+        x.markupPct = x.existingProduct && Number.isFinite(Number(x.existingProduct.provider_markup_pct)) ? number(x.existingProduct.provider_markup_pct) : markup;
+        x.nextPrice = retailPrice(x, x.markupPct, x.existingProduct);
         x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice);
         // New services are preselected; existing prices always require explicit review.
         x.selected = !x.exists && x.available && x.rate > 0;
@@ -218,7 +219,8 @@ export default async function (view) {
       for (const row of chosen) {
         const service = row.service || row.id;
         const key = providerProductKey(provider.id, service, row.country || "");
-        const price = retailPrice(row, markup, row.existingProduct);
+        const appliedMarkup = number(row.markupPct, markup);
+        const price = retailPrice(row, appliedMarkup, row.existingProduct);
         if (!(price > 0)) { skipped++; continue; }
 
         if (row.exists) {
@@ -228,7 +230,7 @@ export default async function (view) {
           product.p = price;
           product.provider_cost_rate = number(row.rate);
           product.provider_rate_basis = row.rateBasis;
-          product.provider_markup_pct = markup;
+          product.provider_markup_pct = appliedMarkup;
           product.provider_price_synced_at = new Date().toISOString();
           updated++;
           continue;
@@ -268,7 +270,7 @@ export default async function (view) {
           id: productId, c: category, ar: row.name, en: row.name, p: price, o: 0, d: 0, r: 5, t: 3,
           img: safeHttps(row.image) || safeHttps(row.category_image) || gameArtworkFor(row.name, row.category),
           images: [], ptype, smm_provider: provider.id, smm_service: service, smm_qty: 1, smm_input, req,
-          provider_cost_rate: number(row.rate), provider_rate_basis: row.rateBasis, provider_markup_pct: markup,
+          provider_cost_rate: number(row.rate), provider_rate_basis: row.rateBasis, provider_markup_pct: appliedMarkup,
           provider_price_synced_at: new Date().toISOString(),
           ...(row.country ? { smm_country: row.country } : {}),
           ...(hub === "smm" ? { qmin: Math.max(1, row.min || 1), qmax: Math.max(0, row.max || 0) } : { qmin: 1, qmax: 1 }),
@@ -349,7 +351,7 @@ export default async function (view) {
         h("button", { class: "btn primary", disabled: loading || !selected, onclick: fetchCatalog }, "جلب الخدمات")),
       h("div", { class: "card" },
         h("div", { class: "form-grid" }, field("المزوّد", sel(opts, selected, { onchange: (e) => { selected = e.target.value; rows = []; mount(status); drawPreview(); } })),
-          field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); rows.forEach((x) => { x.nextPrice = retailPrice(x, markup, x.existingProduct); x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice); if (x.exists && !x.priceChanged) x.selected = false; }); drawPreview(); } }))),
+          field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); rows.forEach((x) => { x.markupPct = markup; x.nextPrice = retailPrice(x, x.markupPct, x.existingProduct); x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice); if (x.exists && !x.priceChanged) x.selected = false; }); drawPreview(); } }))),
         h("p", { class: "hint" }, "يُحسب السعر حسب أساس المزود: خدمات SMM والمزوّدين المخصصين لكل 1000، وأرقام التفعيل لكل تفعيل. تُحفظ الدقة حتى 12 منزلة. يمكنك تحديد الخدمات الجديدة أو المنتجات التي تغيّر سعرها. لا يُعدّل شيء منشور حتى تراجع المسودة وتضغط «نشر». المنتجات ذات الربط المكرر تُستثنى من التحديث الآلي."),
         status),
       preview,
