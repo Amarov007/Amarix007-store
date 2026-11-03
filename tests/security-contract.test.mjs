@@ -131,7 +131,7 @@ test("wallet reconciliation preserves auth guards, limits, and immutable ledger"
 });
 
 test("wallet eligibility fails closed for missing catalog and unknown products", async () => {
-  const sql = await read("../supabase/migrations/20261103002100_wallet_eligibility_fail_closed.sql");
+  const sql = await read("../supabase/migrations/20261103002100_wallet_eligibility_fail_closed_20261103.sql");
   assert.match(sql, /coalesce\(jsonb_typeof\(cfg->'products'\), 'null'\) <> 'array'/i);
   assert.match(sql, /return coalesce\(section_name = any\(public\.wallet_sections\(cfg\)\), false\)/i);
   assert.match(sql, /item_count < 1 or item_count > 50/i);
