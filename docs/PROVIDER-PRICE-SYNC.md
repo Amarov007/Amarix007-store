@@ -37,7 +37,7 @@ New imports and repriced products store non-secret metadata:
 - `provider_markup_pct`
 - `provider_price_synced_at`
 
-Existing products without this metadata are matched by their provider/service/country fields and receive the metadata the first time they are repriced.
+Existing products without this metadata are matched by their provider/service/country fields and use the configured default margin; once metadata exists, their own saved margin is preserved unless the administrator explicitly changes the margin field. They receive the metadata the first time they are repriced.
 
 ## Safety
 
