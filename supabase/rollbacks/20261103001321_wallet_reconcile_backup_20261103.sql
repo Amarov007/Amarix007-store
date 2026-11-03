@@ -1,0 +1,3 @@
+-- Intentionally retain the private wallet snapshot after rollback.
+-- It is the recovery point for the 2026-11-03 wallet reconciliation.
+-- Do not drop private.amarix_wallet_backup_20261103 automatically.
