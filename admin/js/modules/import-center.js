@@ -9,7 +9,7 @@ const cleanId = (v) => String(v || "").normalize("NFKD").toLowerCase().replace(/
 const text = (v) => String(v ?? "").trim();
 const number = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 const priceText = (v) => Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 12 });
-const retailPrice = (row, margin) => providerRetailUnitPrice(row.rate, margin, row.rateBasis);
+const retailPrice = (row, margin, product = null) => providerRetailUnitPrice(row.rate, margin, row.rateBasis, number(product?.d));
 const safeHttps = (v) => {
   const s = String(v ?? "").trim();
   if (/^https:\/\//i.test(s)) return s;
@@ -151,7 +151,7 @@ export default async function (view) {
         x.duplicateCount = matches.length;
         x.existingProduct = matches.length === 1 ? matches[0] : null;
         x.currentPrice = matches.length === 1 ? number(matches[0].p) : 0;
-        x.nextPrice = retailPrice(x, markup);
+        x.nextPrice = retailPrice(x, markup, x.existingProduct);
         x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice);
         // New services are preselected; existing prices always require explicit review.
         x.selected = !x.exists && x.available && x.rate > 0;
@@ -218,7 +218,7 @@ export default async function (view) {
       for (const row of chosen) {
         const service = row.service || row.id;
         const key = providerProductKey(provider.id, service, row.country || "");
-        const price = retailPrice(row, markup);
+        const price = retailPrice(row, markup, row.existingProduct);
         if (!(price > 0)) { skipped++; continue; }
 
         if (row.exists) {
@@ -349,7 +349,7 @@ export default async function (view) {
         h("button", { class: "btn primary", disabled: loading || !selected, onclick: fetchCatalog }, "جلب الخدمات")),
       h("div", { class: "card" },
         h("div", { class: "form-grid" }, field("المزوّد", sel(opts, selected, { onchange: (e) => { selected = e.target.value; rows = []; mount(status); drawPreview(); } })),
-          field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); rows.forEach((x) => { x.nextPrice = retailPrice(x, markup); x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice); if (x.exists && !x.priceChanged) x.selected = false; }); drawPreview(); } }))),
+          field("هامش الربح %", input({ type: "number", min: 0, max: 500, value: markup, onchange: (e) => { markup = Math.max(0, Math.min(500, number(e.target.value, 30))); rows.forEach((x) => { x.nextPrice = retailPrice(x, markup, x.existingProduct); x.priceChanged = !!x.existingProduct && providerPriceChanged(x.currentPrice, x.nextPrice); if (x.exists && !x.priceChanged) x.selected = false; }); drawPreview(); } }))),
         h("p", { class: "hint" }, "سعر المزود موحّد لكل 1000 وحدة، ويُحوّل إلى سعر الوحدة بدقة 12 منزلة. يمكنك تحديد الخدمات الجديدة أو المنتجات التي تغيّر سعرها. لا يُعدّل شيء منشور حتى تراجع المسودة وتضغط «نشر». المنتجات ذات الربط المكرر تُستثنى من التحديث الآلي."),
         status),
       preview,
