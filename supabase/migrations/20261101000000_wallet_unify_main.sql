@@ -39,7 +39,7 @@ set balance = public.wallets.balance + excluded.balance,
     updated_at = greatest(public.wallets.updated_at, excluded.updated_at);
 
 delete from public.wallets where section = 'smm';
-update public.wallet_transactions set section = 'main' where section = 'smm';
+-- wallet_transactions is an immutable audit ledger; preserve historical section labels.
 update public.wallet_topups set section = 'main' where section = 'smm';
 
 -- This installation intentionally uses one wallet section only.
