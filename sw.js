@@ -5,7 +5,7 @@
    - admin page, Supabase API, auth, storage, fonts: untouched, never cached
    - push notifications: shows the message sent by the send-push edge function; a tap opens the order page */
 const ICONS_CACHE = "amx-icons-v4";
-const SHELL_CACHE = "amx-shell-v35";
+const SHELL_CACHE = "amx-shell-v36";
 const ICONS = ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-64.png", "logo-mark.webp", "logo-word.webp"];
 const SHELL = ["./", "index.html", "boot.js", "app.js", "effects.js", "pay.js", "style.css", "store-data.js", "music.js", "svc-parse.js", "hubs.js", "splash.js", "splash.css"];
 const CODE = /\/(boot\.js|app\.js|effects\.js|pay\.js|style\.css|store-data\.js|music\.js|svc-parse\.js|hubs\.js|splash\.js|splash\.css)$/;
@@ -38,9 +38,15 @@ function networkFirst(req, fallbackUrl) {
       }
       return r;
     })
-    .catch(() =>
-      caches.match(req, { ignoreSearch: true }).then((hit) => hit || (fallbackUrl ? caches.match(fallbackUrl, { ignoreSearch: true }) : undefined) || Response.error())
-    );
+    .catch(() => {
+      // Prefer the exact requested version; otherwise use only the unversioned shell
+      // entry populated during install. Never select an arbitrary stale ?v= asset.
+      const canonicalUrl = new URL(req.url);
+      canonicalUrl.search = "";
+      return caches.match(req)
+        .then((hit) => hit || caches.match(canonicalUrl.href))
+        .then((hit) => hit || (fallbackUrl ? caches.match(fallbackUrl) : undefined) || Response.error());
+    });
 }
 
 self.addEventListener("fetch", (e) => {
