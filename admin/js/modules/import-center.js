@@ -334,7 +334,7 @@ export default async function (view) {
         h("button", { class: "btn ghost sm", onclick: () => { filtered.forEach((x) => { if (x.exists && x.existingProduct && x.duplicateCount === 1 && x.priceChanged && x.available && x.rate > 0) x.selected = true; }); drawPreview(); } }, "تحديد الأسعار المتغيّرة"),
         h("button", { class: "btn ghost sm", onclick: () => { rows.forEach((x) => x.selected = false); drawPreview(); } }, "إلغاء التحديد")),
       h("p", { class: "hint" }, `المزوّد: ${provider?.name || selected} · المعروض حتى 250 صفاً من ${filtered.length} · تكلفة المزوّد موحّدة لكل 1000 وحدة · المحدد: ${rows.filter((x) => x.selected).length}`),
-      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة والصورة", "القسم", "تكلفة المزوّد /1000", "سعر المتجر الحالي", "السعر الجديد", "الحالة"].map((x) => h("th", null, x)))), body)),
+      h("div", { class: "scroll-x" }, h("table", { class: "table" }, h("thead", null, h("tr", null, ["", "الخدمة والصورة", "القسم", "تكلفة المزوّد (أساسه موضّح)", "سعر المتجر الحالي", "السعر الجديد", "الحالة"].map((x) => h("th", null, x)))), body)),
       h("div", { class: "page-actions" },
         h("button", { class: "btn ghost sm", disabled: page <= 0, onclick: () => { page--; drawPreview(); } }, "السابق"),
         h("span", null, "صفحة " + (page + 1) + " من " + pages),
